@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth } from '../firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 const VistaLogin = () => {
@@ -8,6 +8,23 @@ const VistaLogin = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+
+  // --- NUEVO: EL ATRAPADOR DE GOOGLE ---
+  useEffect(() => {
+    // Apenas carga la pantalla, se fija si venís volviendo de Google
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          console.log("¡Pase VIP recibido de Google!");
+          // Si hay resultado, el App.jsx principal te va a abrir la puerta automáticamente
+        }
+      })
+      .catch((err) => {
+        console.error("Error al volver de Google:", err);
+        setError('Hubo un problema al procesar tu cuenta de Google. Intentá de nuevo.');
+      });
+  }, []);
+  // -------------------------------------
 
   const manejarLogin = async (e) => {
     e.preventDefault();
@@ -23,18 +40,17 @@ const VistaLogin = () => {
     }
   };
 
-  // --- NUEVO MOTOR DE GOOGLE ---
   const manejarLoginGoogle = async () => {
     setError('');
     setCargando(true);
     const provider = new GoogleAuthProvider();
     
-    // Forzamos a que siempre pregunte qué cuenta usar (ideal para no marearnos)
     provider.setCustomParameters({
       prompt: 'select_account'
     });
 
     try {
+      // Inicia el viaje hacia Google
       await signInWithRedirect(auth, provider);
     } catch (err) {
       console.error(err);
@@ -121,7 +137,7 @@ const VistaLogin = () => {
             </div>
           </form>
 
-          {/* --- BOTÓN DE GOOGLE AGREGADO --- */}
+          {/* --- BOTÓN DE GOOGLE --- */}
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -141,7 +157,6 @@ const VistaLogin = () => {
                 type="button"
                 className={`w-full flex justify-center items-center py-3 px-4 border-2 border-slate-200 rounded-xl shadow-sm text-sm font-black text-slate-700 bg-white hover:bg-slate-50 uppercase tracking-widest transition-all ${cargando ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
               >
-                {/* Ícono oficial de Google en formato SVG para que quede impecable */}
                 <svg className="h-5 w-5 mr-3" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -153,7 +168,6 @@ const VistaLogin = () => {
               </button>
             </div>
           </div>
-          {/* -------------------------------------- */}
         </div>
       </div>
     </div>
