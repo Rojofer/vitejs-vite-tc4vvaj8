@@ -124,42 +124,47 @@ const App = () => {
   
   const [config, setConfig] = useState({ contactos: [], feriados: [], asuntos: { equipo: "ALERTA: {nombre}", comprasLeve: "SEGUIMIENTO: {nombre}", comprasGrave: "URGENTE: {nombre}" }, plantillas: { equipo: "", comprasLeve: "", comprasGrave: "" } });
 
-// 1. SISTEMA DINÁMICO DE USUARIOS Y MATCHING (VERSIÓN FINAL)
-  const currentUser = useMemo(() => {
+// 1. CEREBRO DE USUARIOS CON "MODO DIOS" PARA EL OWNER
+  const realUser = useMemo(() => {
     if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
-
     const emailLogueado = usuarioLogueado.email.toLowerCase();
 
-    // PERFIL 1: EL ÚNICO OWNER SUPREMO (Inamovible)
-    if (emailLogueado === 'fachaval@devesa.com') {
-      return { id: 'owner_real', email: emailLogueado, nombre: "Fernando (Dueño)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
+    // TUS DOS CUENTAS SON DUEÑAS (Llaves maestras)
+    if (emailLogueado === 'fachaval@devesa.com' || emailLogueado === 'fernandocomex1@gmail.com') {
+      return { id: 'owner_real', email: emailLogueado, nombre: emailLogueado === 'fachaval@devesa.com' ? "Fernando (Dueño)" : "Fer (Tester)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
     }
-
-    // PERFIL 2: MONITOR TV
-    if (emailLogueado === 'tv@devesa.com') {
-      return { id: 'tv', email: emailLogueado, nombre: "Monitor TV", rol: "produccion", inicial: "TV", aliasMatch: "TV", editorFavoritos: false };
-    }
-
-    // PERFIL 3: OPERARIOS Y TESTERS (Depende 100% de lo que cargues en Ajustes)
-    const contactosEquipo = (config?.contactos || []).filter(c => c.tipo === 'equipo');
-    const operarioMatch = contactosEquipo.find(c => c.email && c.email.toLowerCase() === emailLogueado);
-
-    if (operarioMatch) {
-      return {
-        id: operarioMatch.id,
-        email: emailLogueado,
-        nombre: operarioMatch.label || operarioMatch.email,
-        rol: "operario",
-        inicial: (operarioMatch.label || operarioMatch.email || "O").charAt(0).toUpperCase(),
-        aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), 
-        editorFavoritos: operarioMatch.editorFavoritos === true
-      };
-    }
-
-    // PERFIL 4: BLOQUEADO (Si entraste pero no estás en el directorio)
+    
+    // MONITOR FÍSICO REAL EN PLANTA
+    if (emailLogueado === 'tv@devesa.com') return { id: 'tv', email: emailLogueado, nombre: "Monitor TV", rol: "produccion", inicial: "TV", aliasMatch: "TV", editorFavoritos: false };
+    
+    // OPERARIOS (Cruza el mail con tu directorio de ajustes)
+    const operarioMatch = (config?.contactos || []).filter(c => c.tipo === 'equipo').find(c => c.email && c.email.toLowerCase() === emailLogueado);
+    if (operarioMatch) return { id: operarioMatch.id, email: emailLogueado, nombre: operarioMatch.label || operarioMatch.email, rol: "operario", inicial: (operarioMatch.label || operarioMatch.email || "O").charAt(0).toUpperCase(), aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), editorFavoritos: operarioMatch.editorFavoritos === true };
+    
+    // BLOQUEADO
     return { id: usuarioLogueado.uid, email: emailLogueado, nombre: "Sin Permisos", rol: "espectador", inicial: "X", aliasMatch: "NINGUNO", editorFavoritos: false };
-
   }, [usuarioLogueado, config]);
+
+  // Construye la lista de vistas que el Owner puede espiar
+  const perfilesSimulables = useMemo(() => {
+    const base = [
+      { id: 'owner_real', nombre: "Modo Dios", rol: "owner", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true },
+      { id: 'tv', nombre: "Monitor TV", rol: "produccion", inicial: "📺", aliasMatch: "TV", editorFavoritos: false }
+    ];
+    const extras = (config?.contactos || []).filter(c => c.tipo === 'equipo').map((c) => ({
+      id: c.id, nombre: `Visión: ${c.label || 'Operario'}`, rol: "operario", inicial: "👁️", aliasMatch: (c.alias || "").trim().toUpperCase(), editorFavoritos: c.editorFavoritos === true
+    }));
+    return [...base, ...extras];
+  }, [config]);
+
+  const [simulatedId, setSimulatedId] = useState('owner_real');
+
+  // Si sos Owner, podés simular. Si sos operario, te quedás con tu usuario real.
+  const currentUser = useMemo(() => {
+    if (realUser.rol !== 'owner') return realUser; 
+    const simulado = perfilesSimulables.find(p => p.id === simulatedId);
+    return simulado || realUser;
+  }, [realUser, simulatedId, perfilesSimulables]);
 
   const [showWelcome, setShowWelcome] = useState(true);
   
@@ -525,11 +530,24 @@ const App = () => {
               <p className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end ${isTV ? 'text-slate-400' : 'text-slate-400'}`}><Clock size={10}/> Última Actualización Sheets</p>
               <p className={`text-xs font-bold ${isTV ? 'text-white' : 'text-slate-600'}`}>{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
-            <div className={`flex items-center group p-2 rounded-xl border relative ${isTV ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+            {/* --- AVATAR CON MODO DIOS --- */}
+            <div 
+              className={`flex items-center group p-2 rounded-xl border relative transition-all ${isTV ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} ${realUser.rol === 'owner' ? 'cursor-pointer hover:border-orange-500 hover:shadow-md' : ''}`}
+              onClick={() => { 
+                if (realUser.rol === 'owner') {
+                  const currentIndex = perfilesSimulables.findIndex(p => p.id === currentUser.id); 
+                  const nextIndex = (currentIndex + 1) % perfilesSimulables.length; 
+                  setSimulatedId(perfilesSimulables[nextIndex].id); 
+                } 
+              }}
+            >
               <div className="text-right mr-3">
                 <p className={`text-[10px] font-bold uppercase tracking-widest ${isTV ? 'text-slate-400' : 'text-slate-400'}`}>{currentUser.rol}</p>
                 <p className={`text-xs font-black ${isTV ? 'text-white' : 'text-slate-800'}`}>{currentUser.nombre.split(' ')[0]}</p>
               </div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : currentUser.rol === 'produccion' ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
+            </div>
+            {/* --------------------------- */}
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : currentUser.rol === 'produccion' ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
             </div>
             {/* --- BOTÓN CERRAR SESIÓN --- */}
