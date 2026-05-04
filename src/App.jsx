@@ -525,11 +525,12 @@ const App = () => {
             )}
           </div>
           
-          <div className={`flex items-center gap-4 ml-auto border-l pl-8 ${isTV ? 'border-slate-800' : 'border-slate-200'}`}>
+       <div className={`flex items-center gap-4 ml-auto border-l pl-8 ${isTV ? 'border-slate-800' : 'border-slate-200'}`}>
             <div className="mr-4 text-right hidden md:block">
               <p className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end ${isTV ? 'text-slate-400' : 'text-slate-400'}`}><Clock size={10}/> Última Actualización Sheets</p>
               <p className={`text-xs font-bold ${isTV ? 'text-white' : 'text-slate-600'}`}>{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
+            
             {/* --- AVATAR CON MODO DIOS --- */}
             <div 
               className={`flex items-center group p-2 rounded-xl border relative transition-all ${isTV ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} ${realUser.rol === 'owner' ? 'cursor-pointer hover:border-orange-500 hover:shadow-md' : ''}`}
@@ -548,8 +549,7 @@ const App = () => {
               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : currentUser.rol === 'produccion' ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
             </div>
             {/* --------------------------- */}
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : currentUser.rol === 'produccion' ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
-            </div>
+            
             {/* --- BOTÓN CERRAR SESIÓN --- */}
             <button 
               onClick={() => signOut(auth)} 
