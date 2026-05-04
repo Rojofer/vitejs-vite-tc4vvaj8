@@ -124,29 +124,23 @@ const App = () => {
   
   const [config, setConfig] = useState({ contactos: [], feriados: [], asuntos: { equipo: "ALERTA: {nombre}", comprasLeve: "SEGUIMIENTO: {nombre}", comprasGrave: "URGENTE: {nombre}" }, plantillas: { equipo: "", comprasLeve: "", comprasGrave: "" } });
 
-  // 1. SISTEMA DINÁMICO DE USUARIOS Y MATCHING (VERSIÓN PRODUCCIÓN REAL)
+// 1. SISTEMA DINÁMICO DE USUARIOS Y MATCHING (VERSIÓN FINAL)
   const currentUser = useMemo(() => {
-    // Si todavía no cargó Firebase, ponemos un placeholder
     if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
 
     const emailLogueado = usuarioLogueado.email.toLowerCase();
 
-    // PERFIL 1: PROPIETARIO REAL
+    // PERFIL 1: EL ÚNICO OWNER SUPREMO (Inamovible)
     if (emailLogueado === 'fachaval@devesa.com') {
       return { id: 'owner_real', email: emailLogueado, nombre: "Fernando (Dueño)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
     }
 
-    // PERFIL 2: TESTER / DESARROLLADOR
-    if (emailLogueado === 'fernandocomex1@gmail.com') {
-      return { id: 'tester', email: emailLogueado, nombre: "Fer (Tester)", rol: "owner", inicial: "T", aliasMatch: "TODOS", editorFavoritos: true };
-    }
-
-    // PERFIL 3: MONITOR TV DE PLANTA (Para una cuenta que se llame tv@devesa.com)
+    // PERFIL 2: MONITOR TV
     if (emailLogueado === 'tv@devesa.com') {
       return { id: 'tv', email: emailLogueado, nombre: "Monitor TV", rol: "produccion", inicial: "TV", aliasMatch: "TV", editorFavoritos: false };
     }
 
-    // PERFIL 4: OPERARIOS (Los busca en tu configuración "Contactos" y cruza el mail)
+    // PERFIL 3: OPERARIOS Y TESTERS (Depende 100% de lo que cargues en Ajustes)
     const contactosEquipo = (config?.contactos || []).filter(c => c.tipo === 'equipo');
     const operarioMatch = contactosEquipo.find(c => c.email && c.email.toLowerCase() === emailLogueado);
 
@@ -157,17 +151,18 @@ const App = () => {
         nombre: operarioMatch.label || operarioMatch.email,
         rol: "operario",
         inicial: (operarioMatch.label || operarioMatch.email || "O").charAt(0).toUpperCase(),
-        aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), // <-- ESTO FILTRA SUS INSUMOS
+        aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), 
         editorFavoritos: operarioMatch.editorFavoritos === true
       };
     }
 
-    // PERFIL 5: DESCONOCIDO (Si alguien entra pero no le diste permisos)
-    return { id: usuarioLogueado.uid, email: emailLogueado, nombre: "Usuario Bloqueado", rol: "espectador", inicial: "X", aliasMatch: "NINGUNO", editorFavoritos: false };
+    // PERFIL 4: BLOQUEADO (Si entraste pero no estás en el directorio)
+    return { id: usuarioLogueado.uid, email: emailLogueado, nombre: "Sin Permisos", rol: "espectador", inicial: "X", aliasMatch: "NINGUNO", editorFavoritos: false };
 
   }, [usuarioLogueado, config]);
 
   const [showWelcome, setShowWelcome] = useState(true);
+  
   useEffect(() => { 
     if (currentUser.rol === 'produccion') {
       setShowWelcome(false);
