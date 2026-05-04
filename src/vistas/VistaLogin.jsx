@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 
 const VistaLogin = () => {
@@ -35,7 +35,7 @@ const VistaLogin = () => {
     });
 
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (err) {
       console.error(err);
       setError('Error al conectar con Google. Intentá de nuevo.');
