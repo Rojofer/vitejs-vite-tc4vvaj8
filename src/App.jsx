@@ -124,27 +124,50 @@ const App = () => {
   
   const [config, setConfig] = useState({ contactos: [], feriados: [], asuntos: { equipo: "ALERTA: {nombre}", comprasLeve: "SEGUIMIENTO: {nombre}", comprasGrave: "URGENTE: {nombre}" }, plantillas: { equipo: "", comprasLeve: "", comprasGrave: "" } });
 
-  // 1. SISTEMA DINÁMICO DE USUARIOS Y MATCHING
-  const usuariosDisponibles = useMemo(() => {
-    const base = [
-      { id: 'owner', nombre: "Fernando (Owner)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true },
-      { id: 'tv', nombre: "Monitor TV", rol: "produccion", inicial: "TV", aliasMatch: "TV", editorFavoritos: false }
-    ];
-    const extras = (config?.contactos || []).filter(c => c.tipo === 'equipo').map((c, index) => ({
-      id: c.id,
-      nombre: c.label || c.email || `Miembro ${index+1}`,
-      rol: "operario",
-      inicial: (c.label || c.email || "U").charAt(0).toUpperCase(),
-      aliasMatch: (c.alias || "").trim().toUpperCase(),
-      editorFavoritos: c.editorFavoritos === true // <-- NUEVA REGLA DE PERMISOS
-    }));
-    return [...base, ...extras];
-  }, [config]);
+  // 1. SISTEMA DINÁMICO DE USUARIOS Y MATCHING (VERSIÓN PRODUCCIÓN REAL)
+  const currentUser = useMemo(() => {
+    // Si todavía no cargó Firebase, ponemos un placeholder
+    if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
 
-  const [currentUserId, setCurrentUserId] = useState('owner');
-  const currentUser = usuariosDisponibles.find(u => u.id === currentUserId) || usuariosDisponibles[0];
+    const emailLogueado = usuarioLogueado.email.toLowerCase();
+
+    // PERFIL 1: PROPIETARIO REAL
+    if (emailLogueado === 'fachaval@devesa.com') {
+      return { id: 'owner_real', email: emailLogueado, nombre: "Fernando (Dueño)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
+    }
+
+    // PERFIL 2: TESTER / DESARROLLADOR
+    if (emailLogueado === 'fernandocomex1@gmail.com') {
+      return { id: 'tester', email: emailLogueado, nombre: "Fer (Tester)", rol: "owner", inicial: "T", aliasMatch: "TODOS", editorFavoritos: true };
+    }
+
+    // PERFIL 3: MONITOR TV DE PLANTA (Para una cuenta que se llame tv@devesa.com)
+    if (emailLogueado === 'tv@devesa.com') {
+      return { id: 'tv', email: emailLogueado, nombre: "Monitor TV", rol: "produccion", inicial: "TV", aliasMatch: "TV", editorFavoritos: false };
+    }
+
+    // PERFIL 4: OPERARIOS (Los busca en tu configuración "Contactos" y cruza el mail)
+    const contactosEquipo = (config?.contactos || []).filter(c => c.tipo === 'equipo');
+    const operarioMatch = contactosEquipo.find(c => c.email && c.email.toLowerCase() === emailLogueado);
+
+    if (operarioMatch) {
+      return {
+        id: operarioMatch.id,
+        email: emailLogueado,
+        nombre: operarioMatch.label || operarioMatch.email,
+        rol: "operario",
+        inicial: (operarioMatch.label || operarioMatch.email || "O").charAt(0).toUpperCase(),
+        aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), // <-- ESTO FILTRA SUS INSUMOS
+        editorFavoritos: operarioMatch.editorFavoritos === true
+      };
+    }
+
+    // PERFIL 5: DESCONOCIDO (Si alguien entra pero no le diste permisos)
+    return { id: usuarioLogueado.uid, email: emailLogueado, nombre: "Usuario Bloqueado", rol: "espectador", inicial: "X", aliasMatch: "NINGUNO", editorFavoritos: false };
+
+  }, [usuarioLogueado, config]);
+
   const [showWelcome, setShowWelcome] = useState(true);
-  
   useEffect(() => { 
     if (currentUser.rol === 'produccion') {
       setShowWelcome(false);
@@ -507,7 +530,7 @@ const App = () => {
               <p className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end ${isTV ? 'text-slate-400' : 'text-slate-400'}`}><Clock size={10}/> Última Actualización Sheets</p>
               <p className={`text-xs font-bold ${isTV ? 'text-white' : 'text-slate-600'}`}>{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
-            <div className={`flex items-center cursor-pointer group p-2 rounded-xl transition-colors border relative ${isTV ? 'hover:bg-slate-800 border-transparent hover:border-slate-700' : 'hover:bg-slate-50 border-transparent hover:border-slate-200'}`} onClick={() => { const currentIndex = usuariosDisponibles.findIndex(u => u.id === currentUser.id); const nextIndex = (currentIndex + 1) % usuariosDisponibles.length; setCurrentUserId(usuariosDisponibles[nextIndex].id); }}>
+            <div className={`flex items-center group p-2 rounded-xl border relative ${isTV ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <div className="text-right mr-3">
                 <p className={`text-[10px] font-bold uppercase tracking-widest ${isTV ? 'text-slate-400' : 'text-slate-400'}`}>{currentUser.rol}</p>
                 <p className={`text-xs font-black ${isTV ? 'text-white' : 'text-slate-800'}`}>{currentUser.nombre.split(' ')[0]}</p>
