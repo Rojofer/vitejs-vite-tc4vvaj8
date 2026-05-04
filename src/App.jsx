@@ -9,9 +9,9 @@ import PanelAjustes from './componentes/PanelAjustes';
 import PanelDetalle from './componentes/PanelDetalle';
 import ModalRedactor from './componentes/ModalRedactor';
 import VistaGestion from './vistas/VistaGestion';
-import VistaLogin from './vistas/VistaLogin'; // (Ajustá la ruta si la guardaste en otra carpeta)
+import VistaLogin from './vistas/VistaLogin';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from './firebase'; // (O el nombre de tu archivo de configuración)
+import { auth } from './firebase';
 
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { 
@@ -54,6 +54,7 @@ const App = () => {
     });
     return () => unsubscribe();
   }, []);
+  
   const [insumosRaw, setInsumosRaw] = useState([]);
   const [reclamosRaw, setReclamosRaw] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,15 +65,14 @@ const App = () => {
   const [filtroAlerta, setFiltroAlerta] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [vistaActiva, setVistaActiva] = useState('gestion'); 
-  const [notiTabActiva, setNotiTabActiva] = useState('avisos'); // <--- NUEVO ESTADO PARA MEMORIZAR LA PESTAÑA
+  const [notiTabActiva, setNotiTabActiva] = useState('avisos');
   const [auditoriaFiltroInsumo, setAuditoriaFiltroInsumo] = useState(null);
   const [reclamoDraft, setReclamoDraft] = useState(null); 
-  const [toastMsg, setToastMsg] = useState(null); // <--- NUEVO ESTADO PARA EL CARTEL ERP
+  const [toastMsg, setToastMsg] = useState(null);
   const [filtroResponsable, setFiltroResponsable] = useState("TODOS"); 
   const [filtroRiesgoGrupo, setFiltroRiesgoGrupo] = useState(false);
-  const [filtroVistaLista, setFiltroVistaLista] = useState('todos'); // 'todos', 'favoritos', 'nofavoritos'
+  const [filtroVistaLista, setFiltroVistaLista] = useState('todos');
 
-  // Diccionario visual de colores para los responsables
   const obtenerColorOwner = (ownerString) => {
     if (!ownerString || ownerString === "Sin asignar" || ownerString === "SIN ASIGNAR") return { bg: 'bg-slate-50', text: 'text-slate-400', border: 'border-slate-200', dot: 'bg-slate-300' };
     const txt = String(ownerString).trim().toUpperCase();
@@ -90,16 +90,13 @@ const App = () => {
     }
     return { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200', dot: 'bg-slate-400' };
   };
-  // 1. Resetear el filtro supremo cada vez que cambiamos de pantalla
+
   useEffect(() => {
     setFiltroResponsable('TODOS');
   }, [filtroAlerta, selectedGroup, searchTerm]);
 
-  // 2. Helper Mágico: Genera los botones leyendo ÚNICAMENTE los insumos de la vista actual
   const renderRadarDinamico = (datosDeLaLista) => {
     if (currentUser.rol !== 'owner') return null;
-    
-    // Extraemos solo los responsables que tienen insumos en esta lista exacta
     const ownersUnicos = [...new Set(datosDeLaLista.map(i => i.owner?.toUpperCase().trim() || 'SIN ASIGNAR'))].filter(o => o !== 'SIN ASIGNAR');
     if (ownersUnicos.length === 0) return null;
 
@@ -124,28 +121,23 @@ const App = () => {
   
   const [config, setConfig] = useState({ contactos: [], feriados: [], asuntos: { equipo: "ALERTA: {nombre}", comprasLeve: "SEGUIMIENTO: {nombre}", comprasGrave: "URGENTE: {nombre}" }, plantillas: { equipo: "", comprasLeve: "", comprasGrave: "" } });
 
-// 1. CEREBRO DE USUARIOS CON "MODO DIOS" PARA EL OWNER
+  // 1. CEREBRO DE USUARIOS CON "MODO DIOS" PARA EL OWNER
   const realUser = useMemo(() => {
     if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
     const emailLogueado = usuarioLogueado.email.toLowerCase();
 
-    // TUS DOS CUENTAS SON DUEÑAS (Llaves maestras)
     if (emailLogueado === 'fachaval@devesa.com' || emailLogueado === 'fernandocomex1@gmail.com') {
       return { id: 'owner_real', email: emailLogueado, nombre: emailLogueado === 'fachaval@devesa.com' ? "Fernando (Dueño)" : "Fer (Tester)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
     }
     
-    // MONITOR FÍSICO REAL EN PLANTA
     if (emailLogueado === 'tv@devesa.com') return { id: 'tv', email: emailLogueado, nombre: "Monitor TV", rol: "produccion", inicial: "TV", aliasMatch: "TV", editorFavoritos: false };
     
-    // OPERARIOS (Cruza el mail con tu directorio de ajustes)
     const operarioMatch = (config?.contactos || []).filter(c => c.tipo === 'equipo').find(c => c.email && c.email.toLowerCase() === emailLogueado);
     if (operarioMatch) return { id: operarioMatch.id, email: emailLogueado, nombre: operarioMatch.label || operarioMatch.email, rol: "operario", inicial: (operarioMatch.label || operarioMatch.email || "O").charAt(0).toUpperCase(), aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), editorFavoritos: operarioMatch.editorFavoritos === true };
     
-    // BLOQUEADO
     return { id: usuarioLogueado.uid, email: emailLogueado, nombre: "Sin Permisos", rol: "espectador", inicial: "X", aliasMatch: "NINGUNO", editorFavoritos: false };
   }, [usuarioLogueado, config]);
 
-  // Construye la lista de vistas que el Owner puede espiar
   const perfilesSimulables = useMemo(() => {
     const base = [
       { id: 'owner_real', nombre: "Modo Dios", rol: "owner", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true },
@@ -159,7 +151,6 @@ const App = () => {
 
   const [simulatedId, setSimulatedId] = useState('owner_real');
 
-  // Si sos Owner, podés simular. Si sos operario, te quedás con tu usuario real.
   const currentUser = useMemo(() => {
     if (realUser.rol !== 'owner') return realUser; 
     const simulado = perfilesSimulables.find(p => p.id === simulatedId);
@@ -233,7 +224,7 @@ const App = () => {
   const guardarConfigEnFirebase = async (nuevaConfig) => { setConfig(nuevaConfig); await setDoc(doc(db, "config", "general"), nuevaConfig); };
   const toggleFavorito = async (insumo) => { await updateDoc(doc(db, "insumos", insumo.id), { esFavorito: !insumo.favorito }); };
   const toggleVisibilidadPlanta = async (insumo) => { const current = insumo.visibleEnPlanta !== false; await updateDoc(doc(db, "insumos", insumo.id), { visibleEnPlanta: !current }); };
-  // --- NUEVAS FUNCIONES: AUTORIZACIÓN DE ALERTAS INTERNAS ---
+  
   const solicitarAlertaPlanta = async (insumo) => {
     try {
       await updateDoc(doc(db, "insumos", insumo.id), { 
@@ -242,13 +233,11 @@ const App = () => {
         alertaRechazadaMotivo: null,
         alertaSolicitadaHora: serverTimestamp() 
       });
-      // NUEVO: Disparamos el cartel profesional y lo ocultamos a los 4 segundos
       setToastMsg("Solicitud enviada. Queda a la espera de aprobación por gerencia.");
       setTimeout(() => setToastMsg(null), 4000);
     } catch (error) { console.error("Error solicitando alerta:", error); }
   };
 
-  // ESTA ES LA FUNCIÓN QUE FALTABA Y TIRABA EL ERROR EN LA CONSOLA
   const marcarAlertaComoVista = async (insumo) => {
     if (insumo.alertaVistaPorOperario === false) {
       try { await updateDoc(doc(db, "insumos", insumo.id), { alertaVistaPorOperario: true }); } 
@@ -260,14 +249,13 @@ const App = () => {
     try {
       await addDoc(collection(db, "reclamos"), { 
         insumoId: insumo.id, 
-        operario: `GERENCIA ➡️ ${insumo.alertaSolicitante || 'Planta'}`, // <--- SE GUARDA EL DESTINATARIO
+        operario: `GERENCIA ➡️ ${insumo.alertaSolicitante || 'Planta'}`,
         mensaje: `APROBACIÓN OFICIAL: ${insumo.nombre}`, 
         cuerpoOriginal: "Autorizado para emitir alerta interna a planta.", 
         fecha: serverTimestamp(), 
         estado: "CERRADO", 
         tipo: "APROBACION GERENCIA" 
       });
-      // ... (el updateDoc queda igual)
       await updateDoc(doc(db, "insumos", insumo.id), { alertaPendiente: false, alertaAprobada: true, alertaAprobadaPor: currentUser.nombre, alertaAprobadaHora: serverTimestamp(), alertaVistaPorOperario: false });
     } catch (error) { console.error("Error aprobando alerta:", error); }
   };
@@ -277,18 +265,16 @@ const App = () => {
     try {
       await addDoc(collection(db, "reclamos"), { 
         insumoId: insumo.id, 
-        operario: `GERENCIA ➡️ ${insumo.alertaSolicitante || 'Planta'}`, // <--- SE GUARDA EL DESTINATARIO
+        operario: `GERENCIA ➡️ ${insumo.alertaSolicitante || 'Planta'}`,
         mensaje: `RECHAZO OFICIAL: ${insumo.nombre}`, 
         cuerpoOriginal: motivo, 
         fecha: serverTimestamp(), 
         estado: "CERRADO", 
         tipo: "RECHAZO GERENCIA" 
       });
-      // ... (el updateDoc queda igual)
       await updateDoc(doc(db, "insumos", insumo.id), { alertaPendiente: false, alertaRechazadaMotivo: motivo, alertaVistaPorOperario: false });
     } catch (error) { console.error("Error en auditoría:", error); }
   };
-  // ----------------------------------------------------------
 
   const calcularFechaQuiebre = (dias) => {
     if (dias >= 999) return "Nunca"; let fecha = new Date(); let agregados = 0;
@@ -336,22 +322,19 @@ const App = () => {
   const abrirRedactorReclamo = (insumo) => {
     const umbral = config?.umbralUrgencia || 15;
     const isGrave = Math.round(insumo.supervivencia) <= umbral;
-    const hasSolpeds = insumo.sp > 0; // ¿Tiene Solpeds pendientes?
+    const hasSolpeds = insumo.sp > 0; 
     const plantillas = getPlantillasDinamicas();
     
-    // INTELIGENCIA DE NIVELES (Selección automática de plantilla)
     let tInicial = null;
     
-    // PRIORIDAD 0: Si tiene una alerta aprobada, vamos directo a la plantilla de Planta
     if (insumo.alertaAprobada) {
       tInicial = plantillas.find(p => p.destino === 'equipo');
     }
     
-    // Si no está aprobada (o no encontró la plantilla), sigue la lógica normal:
-    if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped); // Prioridad 1: S/P
-    if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente); // Prioridad 2: Urgencia
-    if (!tInicial) tInicial = plantillas.find(p => p.isNormal); // Prioridad 3: Normal
-    if (!tInicial) tInicial = plantillas[0]; // Fallback de seguridad
+    if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped); 
+    if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente); 
+    if (!tInicial) tInicial = plantillas.find(p => p.isNormal); 
+    if (!tInicial) tInicial = plantillas[0]; 
 
     const { asunto, cuerpo, destino } = aplicarPlantilla(insumo, tInicial.id);
     
@@ -368,7 +351,6 @@ const App = () => {
   };
   
   const confirmarYGuardarReclamo = async () => {
-    // 1. Armamos la lista de correos (Los que tildaste + el que escribiste a mano)
     const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e=>e);
     const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     
@@ -376,10 +358,8 @@ const App = () => {
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
 
-    // Validamos que haya al menos UN correo por algún lado
     if (correosStr.length === 0) return alert("Seleccioná un destinatario del directorio o ingresá un correo manualmente.");
     
-    // 2. Guardamos el reclamo en Auditoría
     await addDoc(collection(db, "reclamos"), { 
       insumoId: reclamoDraft.insumo.id, 
       operario: currentUser.nombre, 
@@ -390,11 +370,8 @@ const App = () => {
       tipo: reclamoDraft.tipoDestino 
     });
     
-    // --- MAGIA POST-ENVÍO ---
     try {
-      // ACTUALIZADO: Consideramos tanto 'equipo' como 'planta' para alertas internas
       const isAlertaInterna = reclamoDraft.tipoDestino === 'equipo' || reclamoDraft.tipoDestino === 'planta';
-      
       await updateDoc(doc(db, "insumos", reclamoDraft.insumo.id), {
         alertaPendiente: false,
         alertaAprobada: false,
@@ -405,7 +382,6 @@ const App = () => {
         alertaActivaEnPlanta: isAlertaInterna ? true : false 
       });
     } catch (e) { console.error("Error limpiando alerta post-envio:", e); }
-    // -------------------------------------------------
 
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
     setReclamoDraft(null); 
@@ -455,9 +431,6 @@ const App = () => {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
   }
   
-  // ----------------------------------------------------------------------------
-  // LAYOUT PRINCIPAL Y MODALES
-  // ----------------------------------------------------------------------------
   const isTV = currentUser.rol === 'produccion';
   if (cargandoAuth) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-500">Verificando credenciales...</div>;
@@ -480,27 +453,22 @@ const App = () => {
             <div onClick={() => setVistaActiva('auditoria')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'auditoria' ? 'bg-slate-800 text-sky-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-sky-400 hover:bg-slate-800'}`}><History size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Auditoría</span></div>
             <div onClick={() => setVistaActiva('notificaciones')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'notificaciones' ? 'bg-slate-800 text-yellow-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-yellow-400 hover:bg-slate-800'}`}>
             <div className="relative">
-    <Bell size={22} />
-    {/* PUNTO DE NOTIFICACIÓN INTELIGENTE (CON NÚMEROS) */}
-    {(() => {
-      const msjSinLeer = reclamos.filter(r => r.insumoId === "BROADCAST" && r.destinatarioId?.includes(String(currentUser.id)) && !(r.leidoPor || []).includes(currentUser.nombre)).length;
-      const ownerPendientes = currentUser.rol === 'owner' ? insumos.filter(i => i.alertaPendiente).length : 0;
-      const operarioRespuestas = currentUser.rol !== 'owner' ? insumos.filter(i => i.alertaSolicitante === currentUser.nombre && i.alertaVistaPorOperario === false).length : 0;
-      const operarioEnviados = currentUser.rol !== 'owner' ? insumos.filter(i => i.alertaPendiente && i.alertaSolicitante === currentUser.nombre).length : 0;
+              <Bell size={22} />
+              {(() => {
+                const msjSinLeer = reclamos.filter(r => r.insumoId === "BROADCAST" && r.destinatarioId?.includes(String(currentUser.id)) && !(r.leidoPor || []).includes(currentUser.nombre)).length;
+                const ownerPendientes = currentUser.rol === 'owner' ? insumos.filter(i => i.alertaPendiente).length : 0;
+                const operarioRespuestas = currentUser.rol !== 'owner' ? insumos.filter(i => i.alertaSolicitante === currentUser.nombre && i.alertaVistaPorOperario === false).length : 0;
+                const operarioEnviados = currentUser.rol !== 'owner' ? insumos.filter(i => i.alertaPendiente && i.alertaSolicitante === currentUser.nombre).length : 0;
 
-      const totalRojas = msjSinLeer + ownerPendientes + operarioRespuestas;
+                const totalRojas = msjSinLeer + ownerPendientes + operarioRespuestas;
 
-      if (totalRojas > 0) {
-        return <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-900 shadow-[0_0_8px_rgba(239,68,68,0.8)]">{totalRojas}</span>;
-      }
-      if (operarioEnviados > 0) {
-        return <span className="absolute -top-2 -right-2 bg-amber-500 text-amber-900 text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-900 shadow-[0_0_8px_rgba(245,158,11,0.8)]">{operarioEnviados}</span>;
-      }
-      return null;
-    })()}
-  </div>
-  <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Notificaciones</span>
-</div>
+                if (totalRojas > 0) return <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-900 shadow-[0_0_8px_rgba(239,68,68,0.8)]">{totalRojas}</span>;
+                if (operarioEnviados > 0) return <span className="absolute -top-2 -right-2 bg-amber-500 text-amber-900 text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-900 shadow-[0_0_8px_rgba(245,158,11,0.8)]">{operarioEnviados}</span>;
+                return null;
+              })()}
+            </div>
+            <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Notificaciones</span>
+          </div>
           </nav>
           {currentUser.rol === 'owner' && (<div className="mt-auto w-full px-3 relative group"><div onClick={() => setShowSettings(true)} className="p-3 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex justify-center cursor-pointer rounded-xl w-full"><Settings size={22} /><span className="absolute left-16 top-2 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Ajustes Generales</span></div></div>)}
         </aside>
@@ -525,7 +493,7 @@ const App = () => {
             )}
           </div>
           
-       <div className={`flex items-center gap-4 ml-auto border-l pl-8 ${isTV ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className={`flex items-center gap-4 ml-auto border-l pl-8 ${isTV ? 'border-slate-800' : 'border-slate-200'}`}>
             <div className="mr-4 text-right hidden md:block">
               <p className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end ${isTV ? 'text-slate-400' : 'text-slate-400'}`}><Clock size={10}/> Última Actualización Sheets</p>
               <p className={`text-xs font-bold ${isTV ? 'text-white' : 'text-slate-600'}`}>{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
@@ -564,41 +532,41 @@ const App = () => {
         <main className={`flex-1 overflow-auto relative ${isTV ? 'bg-slate-950' : 'bg-[#F8FAFC]'}`}>
           {vistaActiva === 'planta' && <VistaProduccion insumos={insumos} currentUser={currentUser} setActiveInsumo={setActiveInsumo} />}
           {vistaActiva === 'auditoria' && !isTV && (
-  <VistaAuditoria 
-    insumos={insumos} 
-    reclamos={reclamos} 
-    currentUser={currentUser} 
-    formatearFecha={formatearFecha} 
-    obtenerMesAnio={obtenerMesAnio} 
-    setToastMsg={setToastMsg} 
-    cerrarReclamoManual={cerrarReclamoManual}
-    auditoriaFiltroInsumo={auditoriaFiltroInsumo}
-    setAuditoriaFiltroInsumo={setAuditoriaFiltroInsumo}
-    setActiveInsumo={setActiveInsumo} // <--- AGREGÁ ESTA LÍNEA ACÁ
-  />
-)}
+            <VistaAuditoria 
+              insumos={insumos} 
+              reclamos={reclamos} 
+              currentUser={currentUser} 
+              formatearFecha={formatearFecha} 
+              obtenerMesAnio={obtenerMesAnio} 
+              setToastMsg={setToastMsg} 
+              cerrarReclamoManual={cerrarReclamoManual}
+              auditoriaFiltroInsumo={auditoriaFiltroInsumo}
+              setAuditoriaFiltroInsumo={setAuditoriaFiltroInsumo}
+              setActiveInsumo={setActiveInsumo} 
+            />
+          )}
           {vistaActiva === 'mensajeria' && currentUser.rol === 'owner' && (
-  <VistaMensajeria 
-    currentUser={currentUser} 
-    config={config} 
-    reclamos={reclamos} 
-    formatearFecha={formatearFecha} 
-  />
-)}
+            <VistaMensajeria 
+              currentUser={currentUser} 
+              config={config} 
+              reclamos={reclamos} 
+              formatearFecha={formatearFecha} 
+            />
+          )}
           {vistaActiva === 'notificaciones' && (
-  <VistaNotificaciones 
-    currentUser={currentUser}
-    insumos={insumos}
-    reclamos={reclamos}
-    notiTabActiva={notiTabActiva}
-    setNotiTabActiva={setNotiTabActiva}
-    formatearFecha={formatearFecha}
-    setActiveInsumo={setActiveInsumo}
-    rechazarAlertaPlanta={rechazarAlertaPlanta}
-    aprobarAlertaPlanta={aprobarAlertaPlanta}
-    marcarAlertaComoVista={marcarAlertaComoVista}
-  />
-)}
+            <VistaNotificaciones 
+              currentUser={currentUser}
+              insumos={insumos}
+              reclamos={reclamos}
+              notiTabActiva={notiTabActiva}
+              setNotiTabActiva={setNotiTabActiva}
+              formatearFecha={formatearFecha}
+              setActiveInsumo={setActiveInsumo}
+              rechazarAlertaPlanta={rechazarAlertaPlanta}
+              aprobarAlertaPlanta={aprobarAlertaPlanta}
+              marcarAlertaComoVista={marcarAlertaComoVista}
+            />
+          )}
            {vistaActiva === 'gestion' && !isTV && (
             <VistaGestion 
               currentUser={currentUser}
@@ -696,7 +664,6 @@ const App = () => {
         )}
       </AnimatePresence>
       
-      {/* CARTEL FLOTANTE (TOAST) ESTILO ERP */}
       <AnimatePresence>
         {toastMsg && (
           <motion.div 
