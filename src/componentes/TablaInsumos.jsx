@@ -31,7 +31,7 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
         <th className="px-4 py-3 text-[9px] font-black text-blue-500 uppercase tracking-widest text-center cursor-pointer group hover:bg-blue-50 transition-colors" onClick={()=>handleSort('ocFutura')}>O/C Futuras {renderIcon('ocFutura')}</th>
         <th className="px-4 py-3 text-[9px] font-black text-red-500 uppercase tracking-widest text-center cursor-pointer group hover:bg-red-50 transition-colors" onClick={()=>handleSort('ocDemorada')}>Demoras {renderIcon('ocDemorada')}</th>
         <th className="px-4 py-3 text-[9px] font-black text-purple-500 uppercase tracking-widest text-center cursor-pointer group hover:bg-purple-50 transition-colors" onClick={()=>handleSort('sp')}>S/P {renderIcon('sp')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-slate-800 uppercase tracking-widest text-right cursor-pointer group hover:bg-slate-100 transition-colors" onClick={()=>handleSort('supervivencia')}>Cobertura {renderIcon('supervivencia')}</th>
+        <th className="px-4 py-3 text-[9px] font-black text-slate-800 uppercase tracking-widest text-right cursor-pointer group hover:bg-slate-100 transition-colors" onClick={()=>handleSort('supervivencia')}>Cobertura (Límite: {uUrgencia}) {renderIcon('supervivencia')}</th>
         <th className="px-4 py-3 text-[9px] font-black text-orange-600 uppercase tracking-widest text-center cursor-pointer group hover:bg-orange-50 transition-colors" onClick={()=>handleSort('escalados')} title="Nivel de Escalamiento">Escalado {renderIcon('escalados')}</th>
         <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Gestión</th>
       </tr></thead>
