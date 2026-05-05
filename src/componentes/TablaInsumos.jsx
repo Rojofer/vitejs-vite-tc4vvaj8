@@ -8,8 +8,8 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
   const handleSort = (key) => setSortConf({ key, dir: sortConf.key === key && sortConf.dir === 'asc' ? 'desc' : 'asc' });
   const renderIcon = (key) => sortConf.key === key ? <ArrowUpDown size={10} className={`inline ml-1 ${sortConf.dir === 'asc'?'text-slate-800':'text-orange-500'}`}/> : <ArrowUpDown size={10} className="inline ml-1 opacity-0 group-hover:opacity-50"/>;
   
-  // Extraemos el umbral del panel de ajustes (Si no lo encuentra, usa 15 por defecto por seguridad)
-  const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
+  // Extraemos el umbral de tu perilla (Si no lo encuentra, usa 15 por defecto)
+  const uUrgencia = config?.umbralUrgencia !== undefined ? Number(config.umbralUrgencia) : 15;
 
   const datosFiltrados = useMemo(() => {
     return [...datos].sort((a,b) => {
