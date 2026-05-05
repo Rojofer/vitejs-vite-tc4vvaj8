@@ -466,6 +466,9 @@ const App = () => {
   else if (filtroAlerta === 'favoritos') { datosAlerta = insumos.filter(i => i.favorito && i.supervivencia < 15); tituloAlerta = "Favoritos en Riesgo"; } 
   else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
   else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
+  // --- NUEVOS FILTROS DE AUDITORÍA ---
+  else if (filtroAlerta === 'alerta_planta') { datosAlerta = insumos.filter(i => i.alertaActivaEnPlanta || i.alertaAprobada || i.visibleEnPlanta); tituloAlerta = "Alertas Activas en Planta"; }
+  else if (filtroAlerta === 'esperando_aprobacion') { datosAlerta = insumos.filter(i => i.alertaPendiente); tituloAlerta = "Esperando Confirmación"; }
   
   if (currentUser.rol !== 'owner' && currentUser.rol !== 'produccion') {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
