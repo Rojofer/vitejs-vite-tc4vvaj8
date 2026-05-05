@@ -213,13 +213,53 @@ const App = () => {
     if (activeInsumo) { const insumoActualizado = insumos.find(i => i.id === activeInsumo.id); if (insumoActualizado && (insumoActualizado.stock !== activeInsumo.stock || insumoActualizado.ocDemorada !== activeInsumo.ocDemorada)) { setActiveInsumo(insumoActualizado); } }
   }, [insumos]);
 
+  // --- ROBOT HÍBRIDO CON ESCUDO TÁCTICO (SIMBIOSIS PERFECTA) ---
   useEffect(() => {
     if (insumos.length === 0 || reclamos.length === 0) return;
+    
     const ejecutarAutoLimpieza = async () => {
       const reclamosAbiertos = reclamos.filter(r => r.estado === 'ABIERTO' && r.insumoId !== 'BROADCAST');
-      for (const r of reclamosAbiertos) { const insumo = insumos.find(i => i.id === r.insumoId); if (insumo && insumo.supervivencia >= 15) { const reclamoRef = doc(db, "reclamos", r.id); await updateDoc(reclamoRef, { estado: "CERRADO", motivoCierre: "Riesgo Mitigado" }); } }
-    }; ejecutarAutoLimpieza();
-  }, [insumos, reclamos]);
+      let alertasSugeridas = [];
+      // Toma los días del panel de Ajustes (o usa 20 por defecto)
+      const umbral = config?.umbralUrgencia || 20; 
+
+      for (const r of reclamosAbiertos) { 
+        const insumo = insumos.find(i => i.id === r.insumoId); 
+        if (insumo) {
+          // REGLA 1: Calculamos la edad del reclamo en horas para el Escudo
+          const tiempoReclamo = r.fecha?.seconds ? r.fecha.seconds * 1000 : new Date(r.fecha).getTime();
+          const horasAntiguedad = (new Date().getTime() - tiempoReclamo) / (1000 * 60 * 60);
+          const tieneEscudo = horasAntiguedad < 48; // 48 horas de inmunidad garantizada
+
+          if (insumo.supervivencia >= umbral) { 
+            if (insumo.ocDemorada === 0) {
+              // REGLA 2: Cierre Feliz Automático (Solo si ya se quedó sin escudo)
+              if (!tieneEscudo) {
+                const reclamoRef = doc(db, "reclamos", r.id); 
+                await updateDoc(reclamoRef, { estado: "CERRADO", motivoCierre: "Stock Recuperado (Automático)" }); 
+              }
+            } else if (!r.alertaCierreMostrada) {
+              // REGLA 3: Cierre Bajo Observación Manual (Avisa en pantalla pero no cierra)
+              alertasSugeridas.push(insumo.nombre);
+              const reclamoRef = doc(db, "reclamos", r.id);
+              await updateDoc(reclamoRef, { alertaCierreMostrada: true }); 
+            }
+          } else if (insumo.supervivencia < umbral && r.alertaCierreMostrada) {
+            // Si el stock vuelve a caer, le quitamos la marca para avisar de nuevo a futuro
+            const reclamoRef = doc(db, "reclamos", r.id);
+            await updateDoc(reclamoRef, { alertaCierreMostrada: false });
+          }
+        }
+      }
+
+      // Dispara el aviso visual en pantalla
+      if (alertasSugeridas.length > 0) {
+        setToastMsg(`Sugerencia de Auditoría: ${alertasSugeridas.join(', ')} superó los ${umbral} días de stock, pero mantiene OC demoradas.`);
+        setTimeout(() => setToastMsg(null), 8000); 
+      }
+    }; 
+    ejecutarAutoLimpieza();
+  }, [insumos, reclamos, config?.umbralUrgencia]);
 
   const guardarConfigEnFirebase = async (nuevaConfig) => { setConfig(nuevaConfig); await setDoc(doc(db, "config", "general"), nuevaConfig); };
   const toggleFavorito = async (insumo) => { await updateDoc(doc(db, "insumos", insumo.id), { esFavorito: !insumo.favorito }); };
