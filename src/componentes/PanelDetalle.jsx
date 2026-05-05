@@ -198,11 +198,10 @@ const PanelDetalle = ({
                   Cancelar
                 </button>
                 <button 
-                  onClick={async () => {
-                    setConfirmarForzar(false);
-                    // --- REEMPLAZÁ ESTA LÍNEA CON LA LÓGICA QUE TENÍAS EN TU window.confirm ---
-                    await updateDoc(doc(db, "insumos", activeInsumo.id), { alertaAprobada: false, alertaPendiente: false, alertaActivaEnPlanta: false });
-                  }}
+                onClick={() => { 
+          setConfirmarForzar(false);
+          forzarCancelacionAlerta(activeInsumo); 
+        }}
                 >
                   Sí, Limpiar
                 </button>
