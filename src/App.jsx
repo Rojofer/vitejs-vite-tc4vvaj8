@@ -502,8 +502,11 @@ const App = () => {
   const reclamosActivos = activeInsumo ? reclamos.filter(r => r.insumoId === activeInsumo.id) : [];
 
 let datosAlerta = []; let tituloAlerta = "";
+  const uCriticoApp = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
+  const uUrgenciaApp = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
+
   if (filtroAlerta === 'quiebres') { datosAlerta = insumos.filter(i => i.stock <= 0); tituloAlerta = "Quiebres Confirmados"; } 
-  else if (filtroAlerta === 'favoritos') { datosAlerta = insumos.filter(i => i.favorito && i.supervivencia < 15); tituloAlerta = "Favoritos en Riesgo"; } 
+  else if (filtroAlerta === 'favoritos') { datosAlerta = insumos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp && i.supervivencia > uCriticoApp); tituloAlerta = "Favoritos en Riesgo"; } 
   else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
   else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
   // --- FILTROS DE AUDITORÍA REALES ---
