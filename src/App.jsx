@@ -461,13 +461,13 @@ const App = () => {
   const grupos = [...new Set(insumos.map(item => item.grupo || 'SIN CLASIFICAR'))].sort((a, b) => a.localeCompare(b));
   const reclamosActivos = activeInsumo ? reclamos.filter(r => r.insumoId === activeInsumo.id) : [];
 
-  let datosAlerta = []; let tituloAlerta = "";
+let datosAlerta = []; let tituloAlerta = "";
   if (filtroAlerta === 'quiebres') { datosAlerta = insumos.filter(i => i.stock <= 0); tituloAlerta = "Quiebres Confirmados"; } 
   else if (filtroAlerta === 'favoritos') { datosAlerta = insumos.filter(i => i.favorito && i.supervivencia < 15); tituloAlerta = "Favoritos en Riesgo"; } 
   else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
   else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
-  // --- NUEVOS FILTROS DE AUDITORÍA ---
-  else if (filtroAlerta === 'alerta_planta') { datosAlerta = insumos.filter(i => i.alertaActivaEnPlanta || i.alertaAprobada || i.visibleEnPlanta); tituloAlerta = "Alertas Activas en Planta"; }
+  // --- FILTROS DE AUDITORÍA REALES ---
+  else if (filtroAlerta === 'alerta_planta') { datosAlerta = insumos.filter(i => i.alertaActivaEnPlanta || i.alertaAprobada); tituloAlerta = "Alertas Activas en Planta"; }
   else if (filtroAlerta === 'esperando_aprobacion') { datosAlerta = insumos.filter(i => i.alertaPendiente); tituloAlerta = "Esperando Confirmación"; }
   
   if (currentUser.rol !== 'owner' && currentUser.rol !== 'produccion') {
