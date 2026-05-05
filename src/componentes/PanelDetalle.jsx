@@ -22,6 +22,7 @@ const PanelDetalle = ({
   solicitarAlertaPlanta
 }) => {
   const [copiado, setCopiado] = useState(false);
+  const [confirmarForzar, setConfirmarForzar] = useState(false);
 
   return (
     <>
@@ -186,7 +187,34 @@ const PanelDetalle = ({
                       <p className="text-[10px] font-black uppercase tracking-widest text-red-700">⚠️ ALERTA APROBADA - ENVÍO DEMORADO</p>
                       <p className="text-[9px] font-bold mt-0.5 text-red-500">Aprobada hace {horasPasadas.toFixed(1)} hs.</p>
                     </div>
-                    <button onClick={() => { if(window.confirm("¿Forzar limpieza?")) rechazarAlertaPlanta(activeInsumo, "Cierre forzado"); }} className="text-slate-400 hover:text-red-500 text-[9px] font-black uppercase underline">Forzar Cancelación</button>
+                   {confirmarForzar ? (
+              <div className="flex items-center gap-3 bg-red-50 p-2 rounded-xl border border-red-200">
+                <span className="text-[9px] font-black text-red-800 uppercase tracking-widest flex-1 pl-2">¿Seguro de forzar?</span>
+                <button 
+                  onClick={() => setConfirmarForzar(false)} 
+                  className="px-3 py-1.5 bg-white border border-red-200 text-slate-500 rounded-lg text-[9px] font-black uppercase hover:bg-slate-50 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => { 
+                    setConfirmarForzar(false);
+                    // --- REEMPLAZÁ ESTA LÍNEA CON LA LÓGICA QUE TENÍAS EN TU window.confirm ---
+                    await updateDoc(doc(db, "insumos", activeInsumo.id), { alertaAprobada: false, alertaPendiente: false, alertaActivaEnPlanta: false }); 
+                  }} 
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-[9px] font-black uppercase shadow-sm hover:bg-red-700 transition-all"
+                >
+                  Sí, Limpiar
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setConfirmarForzar(true)} 
+                className="text-[10px] font-black uppercase text-red-500 hover:text-red-700 transition-colors underline decoration-red-500/30 underline-offset-4"
+              >
+                FORZAR CANCELACIÓN
+              </button>
+            )}
                   </div>
                 )}
 
