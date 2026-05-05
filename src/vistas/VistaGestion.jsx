@@ -197,7 +197,7 @@ const VistaGestion = ({
                 const kpiMisFavoritos = misInsumosDashboard.filter(i => i.favorito);
                 
                 // --- NUEVOS KPIs TÁCTICOS ---
-                const kpiAlertaPlanta = misInsumosDashboard.filter(i => i.alertaActivaEnPlanta || i.alertaAprobada || i.visibleEnPlanta);
+                const kpiAlertaPlanta = misInsumosDashboard.filter(i => i.alertaActivaEnPlanta || i.alertaAprobada);
                 const kpiEsperando = misInsumosDashboard.filter(i => i.alertaPendiente);
                 
                 const total = misInsumosDashboard.length || 1;
