@@ -186,20 +186,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                   </div>
                   <input type="range" min="0" max="10" value={localConfig.umbralCritico !== undefined ? localConfig.umbralCritico : 0} onChange={(e) => { setLocalConfig({ ...localConfig, umbralCritico: Number(e.target.value) }); }} className="w-full accent-red-500 cursor-pointer h-2 bg-red-200 rounded-lg appearance-none" />
                 </div>
-
-                <div className="bg-orange-50 border border-orange-200 p-6 rounded-2xl shadow-sm">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h5 className="font-black text-orange-800 text-sm uppercase">Alerta Naranja (Riesgo)</h5>
-                      <p className="text-[9px] font-bold text-orange-500 uppercase mt-1">Días de supervivencia</p>
-                    </div>
-                    <div className="bg-orange-100 text-orange-600 px-3 py-1.5 rounded-xl font-black text-2xl border border-orange-200">
-                      {localConfig.umbralUrgencia !== undefined ? localConfig.umbralUrgencia : 15}
-                    </div>
-                  </div>
-                  <input type="range" min="1" max="60" value={localConfig.umbralUrgencia !== undefined ? localConfig.umbralUrgencia : 15} onChange={(e) => { setLocalConfig({ ...localConfig, umbralUrgencia: Number(e.target.value) }); }} className="w-full accent-orange-500 cursor-pointer h-2 bg-orange-200 rounded-lg appearance-none" />
-                </div>
-
+                        
                 <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl shadow-sm md:col-span-2">
                   <div className="flex justify-between items-center mb-6">
                     <div>
