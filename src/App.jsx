@@ -509,7 +509,8 @@ const App = () => {
                   setSimulatedId(perfilesSimulables[nextIndex].id); 
                 } 
               }}
-            ><div className="text-right mr-3">
+            >
+              <div className="text-right mr-3">
                 <p className={`text-[10px] font-bold uppercase tracking-widest ${isTV ? 'text-slate-400' : 'text-slate-400'}`}>
                   {realUser.rol === 'owner' && currentUser.id !== realUser.id ? 'ESPIANDO:' : currentUser.rol}
                 </p>
@@ -517,6 +518,8 @@ const App = () => {
                   {currentUser.nombre}
                 </p>
               </div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : currentUser.rol === 'produccion' ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
+            </div>
             {/* --------------------------- */}
             
             {/* --- BOTÓN CERRAR SESIÓN --- */}
