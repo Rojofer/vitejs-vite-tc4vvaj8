@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, AlertTriangle, Star, Clock, Folder, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, Star, Clock, Folder, ArrowLeft, Activity, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TablaInsumos from '../componentes/TablaInsumos'; // Importamos tu tabla
 
@@ -186,6 +186,8 @@ const VistaGestion = ({
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full mb-10">
               {(() => {
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-5 w-full mb-10">
+              {(() => {
                 const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
                 
                 const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
@@ -193,18 +195,22 @@ const VistaGestion = ({
 
                 const kpiQuiebres = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uCritico);
                 const kpiFavRiesgo = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia && i.supervivencia > uCritico);
-                
                 const kpiDemoras = misInsumosDashboard.filter(i => i.ocDemorada > 0);
                 const kpiMisFavoritos = misInsumosDashboard.filter(i => i.favorito);
+                
+                // --- NUEVOS KPIs TÁCTICOS ---
+                const kpiAlertaPlanta = misInsumosDashboard.filter(i => i.alertaActivaEnPlanta || i.alertaAprobada || i.visibleEnPlanta);
+                const kpiEsperando = misInsumosDashboard.filter(i => i.alertaPendiente);
+                
                 const total = misInsumosDashboard.length || 1;
 
                 return (
                   <>
-                    <div onClick={() => setFiltroAlerta('quiebres')} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                    <div onClick={() => setFiltroAlerta('quiebres')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <AlertTriangle size={16} className="text-red-500"/>
-                          <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">sin stock- revisar favoritos</span>
+                          <AlertTriangle size={16} className="text-red-500 shrink-0"/>
+                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">Sin Stock</span>
                         </div>
                       </div>
                       <div className="w-full h-2.5 flex gap-1 mb-4">
@@ -212,16 +218,16 @@ const VistaGestion = ({
                         <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiQuiebres.length}</p>
+                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiQuiebres.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
                     
-                    <div onClick={() => setFiltroAlerta('favoritos')} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                    <div onClick={() => setFiltroAlerta('favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <Star size={16} className="text-orange-500"/>
-                          <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">en Riesgo - revisar favoritos</span>
+                          <Star size={16} className="text-orange-500 shrink-0"/>
+                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">En Riesgo</span>
                         </div>
                       </div>
                       <div className="w-full h-2.5 flex gap-1 mb-4">
@@ -229,16 +235,16 @@ const VistaGestion = ({
                         <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiFavRiesgo.length}</p>
+                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiFavRiesgo.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
 
-                    <div onClick={() => setFiltroAlerta('oc_tardia')} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                    <div onClick={() => setFiltroAlerta('oc_tardia')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <Clock size={16} className="text-rose-500"/>
-                          <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">O/C Demoradas</span>
+                          <Clock size={16} className="text-rose-500 shrink-0"/>
+                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">Demoradas</span>
                         </div>
                       </div>
                       <div className="w-full h-2.5 flex gap-1 mb-4">
@@ -246,16 +252,16 @@ const VistaGestion = ({
                         <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiDemoras.length}</p>
+                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiDemoras.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
 
-                    <div onClick={() => setFiltroAlerta('mis_favoritos')} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                    <div onClick={() => setFiltroAlerta('mis_favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <Folder size={16} className="text-blue-500"/>
-                          <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">{currentUser.rol === 'owner' ? 'Total Favoritos' : 'Mis Favoritos'}</span>
+                          <Folder size={16} className="text-blue-500 shrink-0"/>
+                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">Favoritos</span>
                         </div>
                       </div>
                       <div className="w-full h-2.5 flex gap-1 mb-4">
@@ -263,10 +269,47 @@ const VistaGestion = ({
                         <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiMisFavoritos.length}</p>
+                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiMisFavoritos.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
+
+                    {/* NUEVO: ALERTA EN PLANTA */}
+                    <div onClick={() => setFiltroAlerta('alerta_planta')} className="bg-white rounded-2xl p-4 sm:p-5 border border-purple-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Activity size={16} className="text-purple-500 shrink-0"/>
+                          <span className="text-[10px] sm:text-[11px] font-black text-purple-600 uppercase tracking-widest leading-tight">En Planta</span>
+                        </div>
+                      </div>
+                      <div className="w-full h-2.5 flex gap-1 mb-4">
+                        <div className="h-full rounded-full bg-purple-500 transition-all duration-700" style={{ width: `${(kpiAlertaPlanta.length/total)*100}%`, minWidth: kpiAlertaPlanta.length>0?'4px':'0' }}></div>
+                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <p className="text-2xl sm:text-3xl font-black text-purple-700 leading-none">{kpiAlertaPlanta.length}</p>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
+                      </div>
+                    </div>
+
+                    {/* NUEVO: ESPERANDO CONFIRMACIÓN */}
+                    <div onClick={() => setFiltroAlerta('esperando_aprobacion')} className="bg-white rounded-2xl p-4 sm:p-5 border border-teal-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Bell size={16} className="text-teal-500 shrink-0"/>
+                          <span className="text-[10px] sm:text-[11px] font-black text-teal-600 uppercase tracking-widest leading-tight">Aprobar</span>
+                        </div>
+                      </div>
+                      <div className="w-full h-2.5 flex gap-1 mb-4">
+                        <div className="h-full rounded-full bg-teal-500 transition-all duration-700" style={{ width: `${(kpiEsperando.length/total)*100}%`, minWidth: kpiEsperando.length>0?'4px':'0' }}></div>
+                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <p className="text-2xl sm:text-3xl font-black text-teal-700 leading-none">{kpiEsperando.length}</p>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
+                      </div>
+                    </div>
+
                   </>
                 );
               })()}
