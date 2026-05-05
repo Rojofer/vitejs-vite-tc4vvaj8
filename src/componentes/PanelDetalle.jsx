@@ -198,12 +198,11 @@ const PanelDetalle = ({
                   Cancelar
                 </button>
                 <button 
-                  onClick={async () => { 
+                  onClick={async () => {
                     setConfirmarForzar(false);
                     // --- REEMPLAZÁ ESTA LÍNEA CON LA LÓGICA QUE TENÍAS EN TU window.confirm ---
-                    await updateDoc(doc(db, "insumos", activeInsumo.id), { alertaAprobada: false, alertaPendiente: false, alertaActivaEnPlanta: false }); 
-                  }} 
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-[9px] font-black uppercase shadow-sm hover:bg-red-700 transition-all"
+                    await updateDoc(doc(db, "insumos", activeInsumo.id), { alertaAprobada: false, alertaPendiente: false, alertaActivaEnPlanta: false });
+                  }}
                 >
                   Sí, Limpiar
                 </button>
