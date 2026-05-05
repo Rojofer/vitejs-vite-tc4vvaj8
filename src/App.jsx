@@ -285,6 +285,17 @@ const App = () => {
     }
   };
 
+  // --- ACÁ PEGAS LA FUNCIÓN NUEVA ---
+  const rechazarAlertaPlanta = async (insumo, motivo) => {
+    try {
+      await addDoc(collection(db, "reclamos"), { 
+      // ... (todo el resto del código que cortaste)
+      setTimeout(() => setToastMsg(null), 4000);
+    } catch (error) { 
+      console.error("Error rechazando alerta:", error); 
+    }
+  };
+        
   const aprobarAlertaPlanta = async (insumo) => {
     try {
       await addDoc(collection(db, "reclamos"), { 
@@ -664,6 +675,7 @@ let datosAlerta = []; let tituloAlerta = "";
             forzarCancelacionAlerta={forzarCancelacionAlerta}
           />
         )}
+        
       </AnimatePresence>
 
       <AnimatePresence>
