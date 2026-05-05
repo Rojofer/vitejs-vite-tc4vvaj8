@@ -300,20 +300,20 @@ const App = () => {
     } catch (error) { console.error("Error aprobando alerta:", error); }
   };
 
-  const rechazarAlertaPlanta = async (insumo, motivo) => {
-    if (!motivo) return alert("Debe ingresar un motivo para el registro de auditoría.");
+  const forzarCancelacionAlerta = async (insumo) => {
     try {
-      await addDoc(collection(db, "reclamos"), { 
-        insumoId: insumo.id, 
-        operario: `GERENCIA ➡️ ${insumo.alertaSolicitante || 'Planta'}`,
-        mensaje: `RECHAZO OFICIAL: ${insumo.nombre}`, 
-        cuerpoOriginal: motivo, 
-        fecha: serverTimestamp(), 
-        estado: "CERRADO", 
-        tipo: "RECHAZO GERENCIA" 
+      await updateDoc(doc(db, "insumos", insumo.id), { 
+        alertaAprobada: false, 
+        alertaPendiente: false, 
+        alertaActivaEnPlanta: false,
+        visibleEnPlanta: false,
+        alertaVistaPorOperario: true
       });
-      await updateDoc(doc(db, "insumos", insumo.id), { alertaPendiente: false, alertaRechazadaMotivo: motivo, alertaVistaPorOperario: false });
-    } catch (error) { console.error("Error en auditoría:", error); }
+      setToastMsg("Alerta cancelada y limpiada forzosamente.");
+      setTimeout(() => setToastMsg(null), 4000);
+    } catch (error) { 
+      console.error("Error cancelando alerta:", error); 
+    }
   };
 
   const calcularFechaQuiebre = (dias) => {
@@ -661,6 +661,7 @@ let datosAlerta = []; let tituloAlerta = "";
             aprobarAlertaPlanta={aprobarAlertaPlanta}
             abrirRedactorReclamo={abrirRedactorReclamo}
             solicitarAlertaPlanta={solicitarAlertaPlanta}
+            forzarCancelacionAlerta={forzarCancelacionAlerta}
           />
         )}
       </AnimatePresence>
