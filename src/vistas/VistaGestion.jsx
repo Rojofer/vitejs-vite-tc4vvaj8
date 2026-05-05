@@ -122,6 +122,7 @@ const VistaGestion = ({
                   ? (filtroResponsable === 'TODOS' ? true : i.owner?.toUpperCase().trim() === filtroResponsable) 
                   : i.owner?.toUpperCase().trim() === currentUser.aliasMatch
               )} 
+              config={config} 
               onGestionar={setActiveInsumo} 
               mostrarGrupo={true} 
               toggleFavorito={toggleFavorito} 
@@ -169,6 +170,7 @@ const VistaGestion = ({
                 
                 <TablaInsumos 
                   datos={datosFiltradosAlerta} 
+                  config={config} 
                   onGestionar={setActiveInsumo} 
                   mostrarGrupo={true} 
                   toggleFavorito={toggleFavorito} 
@@ -520,6 +522,7 @@ const VistaGestion = ({
                 
                 <TablaInsumos 
                   datos={datosFiltradosGrupo} 
+                  config={config} 
                   onGestionar={setActiveInsumo} 
                   toggleFavorito={toggleFavorito} 
                   toggleVisibilidadPlanta={toggleVisibilidadPlanta} 
