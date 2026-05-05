@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowUpDown, Star, StarOff, Eye, EyeOff, Clock, Send, Activity } from 'lucide-react';
 
-// Utilidad para formatear números en la tabla
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 
-const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggleVisibilidadPlanta, isOwner, canEditFav, obtenerColorOwner }) => {
+const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggleVisibilidadPlanta, isOwner, canEditFav, obtenerColorOwner, config }) => {
   const [sortConf, setSortConf] = useState({ key: 'supervivencia', dir: 'asc' });
   const handleSort = (key) => setSortConf({ key, dir: sortConf.key === key && sortConf.dir === 'asc' ? 'desc' : 'asc' });
   const renderIcon = (key) => sortConf.key === key ? <ArrowUpDown size={10} className={`inline ml-1 ${sortConf.dir === 'asc'?'text-slate-800':'text-orange-500'}`}/> : <ArrowUpDown size={10} className="inline ml-1 opacity-0 group-hover:opacity-50"/>;
   
+  // Extraemos el umbral del panel de ajustes (Si no lo encuentra, usa 15 por defecto por seguridad)
+  const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
+
   const datosFiltrados = useMemo(() => {
     return [...datos].sort((a,b) => {
       let vA = a[sortConf.key]; let vB = b[sortConf.key];
@@ -34,7 +36,7 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
         <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Gestión</th>
       </tr></thead>
       <tbody className="divide-y divide-slate-100">{datosFiltrados.map(i => (
-        <tr key={i.id} onClick={() => onGestionar(i)} className={`cursor-pointer transition-colors ${i.supervivencia < 15 ? 'bg-red-50/40 hover:bg-red-100/50' : 'hover:bg-orange-50/50'}`}>
+        <tr key={i.id} onClick={() => onGestionar(i)} className={`cursor-pointer transition-colors ${i.supervivencia <= uUrgencia ? 'bg-red-50/40 hover:bg-red-100/50' : 'hover:bg-orange-50/50'}`}>
           
           <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
             {canEditFav ? (
@@ -85,7 +87,7 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
           <td className="px-4 py-2.5 text-center text-xs font-bold text-blue-600">{i.ocFutura > 0 ? `+${formatoNum(i.ocFutura)}` : '-'}</td>
           <td className="px-4 py-2.5 text-center text-xs font-black text-red-600">{i.ocDemorada > 0 ? `+${formatoNum(i.ocDemorada)}` : '-'}</td>
           <td className="px-4 py-2.5 text-center text-xs font-bold text-purple-600">{i.sp > 0 ? `+${formatoNum(i.sp)}` : '-'}</td>
-          <td className="px-4 py-2.5 text-right"><span className={`text-sm font-black ${i.supervivencia < 15 ? 'text-red-600' : 'text-slate-800'}`}>{i.supervivencia >= 999 ? '∞' : Math.round(i.supervivencia)} <span className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Días</span></span></td>
+          <td className="px-4 py-2.5 text-right"><span className={`text-sm font-black ${i.supervivencia <= uUrgencia ? 'text-red-600' : 'text-slate-800'}`}>{i.supervivencia >= 999 ? '∞' : Math.round(i.supervivencia)} <span className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Días</span></span></td>
           
           <td className="px-4 py-2.5 text-center">
             {i.escalados > 0 ? <span className="bg-orange-500 text-white font-black text-[10px] px-2.5 py-1 rounded shadow-sm border border-orange-600">{i.escalados}</span> : <span className="text-slate-300">-</span>}
