@@ -20,6 +20,7 @@ const PanelDetalle = ({
   aprobarAlertaPlanta,
   abrirRedactorReclamo,
   solicitarAlertaPlanta
+  forzarCancelacionAlerta
 }) => {
   const [copiado, setCopiado] = useState(false);
   const [confirmarForzar, setConfirmarForzar] = useState(false);
