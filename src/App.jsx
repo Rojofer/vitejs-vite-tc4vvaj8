@@ -286,10 +286,27 @@ const App = () => {
   };
 
   // --- ACÁ PEGAS LA FUNCIÓN NUEVA ---
-  const rechazarAlertaPlanta = async (insumo, motivo) => {
+ const rechazarAlertaPlanta = async (insumo, motivo) => {
     try {
+      // 1. Dejamos registro en la auditoría del rechazo y el motivo
       await addDoc(collection(db, "reclamos"), { 
-      // ... (todo el resto del código que cortaste)
+        insumoId: insumo.id, 
+        operario: `GERENCIA ➡️ ${insumo.alertaSolicitante || 'Planta'}`,
+        mensaje: `RECHAZO DE ALERTA: ${insumo.nombre}`, 
+        cuerpoOriginal: `Motivo del rechazo: ${motivo}`, 
+        fecha: serverTimestamp(), 
+        estado: "CERRADO", 
+        tipo: "RECHAZO GERENCIA" 
+      });
+      
+      // 2. Apagamos la solicitud y le mandamos el motivo al operario
+      await updateDoc(doc(db, "insumos", insumo.id), { 
+        alertaPendiente: false, 
+        alertaRechazadaMotivo: motivo, 
+        alertaVistaPorOperario: false 
+      });
+      
+      setToastMsg("Solicitud rechazada. Motivo enviado a la planta.");
       setTimeout(() => setToastMsg(null), 4000);
     } catch (error) { 
       console.error("Error rechazando alerta:", error); 
