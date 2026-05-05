@@ -140,11 +140,11 @@ const App = () => {
 
   const perfilesSimulables = useMemo(() => {
     const base = [
-      { id: 'owner_real', nombre: "Modo Dios", rol: "owner", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true },
-      { id: 'tv', nombre: "Monitor TV", rol: "produccion", inicial: "📺", aliasMatch: "TV", editorFavoritos: false }
+      { id: 'owner_real', nombre: "Dueño VIP", rol: "owner", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true },
+      { id: 'tv', nombre: "Planta TV", rol: "produccion", inicial: "📺", aliasMatch: "TV", editorFavoritos: false }
     ];
     const extras = (config?.contactos || []).filter(c => c.tipo === 'equipo').map((c) => ({
-      id: c.id, nombre: `Visión: ${c.label || 'Operario'}`, rol: "operario", inicial: "👁️", aliasMatch: (c.alias || "").trim().toUpperCase(), editorFavoritos: c.editorFavoritos === true
+      id: c.id, nombre: (c.alias || c.label || 'Operario').toUpperCase(), rol: "operario", inicial: "👁️", aliasMatch: (c.alias || "").trim().toUpperCase(), editorFavoritos: c.editorFavoritos === true
     }));
     return [...base, ...extras];
   }, [config]);
@@ -509,13 +509,14 @@ const App = () => {
                   setSimulatedId(perfilesSimulables[nextIndex].id); 
                 } 
               }}
-            >
-              <div className="text-right mr-3">
-                <p className={`text-[10px] font-bold uppercase tracking-widest ${isTV ? 'text-slate-400' : 'text-slate-400'}`}>{currentUser.rol}</p>
-                <p className={`text-xs font-black ${isTV ? 'text-white' : 'text-slate-800'}`}>{currentUser.nombre.split(' ')[0]}</p>
+            ><div className="text-right mr-3">
+                <p className={`text-[10px] font-bold uppercase tracking-widest ${isTV ? 'text-slate-400' : 'text-slate-400'}`}>
+                  {realUser.rol === 'owner' && currentUser.id !== realUser.id ? 'ESPIANDO:' : currentUser.rol}
+                </p>
+                <p className={`text-xs font-black ${isTV ? 'text-white' : 'text-slate-800'}`}>
+                  {currentUser.nombre}
+                </p>
               </div>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : currentUser.rol === 'produccion' ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
-            </div>
             {/* --------------------------- */}
             
             {/* --- BOTÓN CERRAR SESIÓN --- */}
