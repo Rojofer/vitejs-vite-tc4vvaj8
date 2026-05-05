@@ -288,7 +288,6 @@ const App = () => {
   // --- ACÁ PEGAS LA FUNCIÓN NUEVA ---
  const rechazarAlertaPlanta = async (insumo, motivo) => {
     try {
-      // 1. Dejamos registro en la auditoría del rechazo y el motivo
       await addDoc(collection(db, "reclamos"), { 
         insumoId: insumo.id, 
         operario: `GERENCIA ➡️ ${insumo.alertaSolicitante || 'Planta'}`,
@@ -299,7 +298,6 @@ const App = () => {
         tipo: "RECHAZO GERENCIA" 
       });
       
-      // 2. Apagamos la solicitud y le mandamos el motivo al operario
       await updateDoc(doc(db, "insumos", insumo.id), { 
         alertaPendiente: false, 
         alertaRechazadaMotivo: motivo, 
@@ -308,6 +306,7 @@ const App = () => {
       
       setToastMsg("Solicitud rechazada. Motivo enviado a la planta.");
       setTimeout(() => setToastMsg(null), 4000);
+      setActiveInsumo(null); // <-- Cierra el panel automáticamente
     } catch (error) { 
       console.error("Error rechazando alerta:", error); 
     }
@@ -324,8 +323,21 @@ const App = () => {
         estado: "CERRADO", 
         tipo: "APROBACION GERENCIA" 
       });
-      await updateDoc(doc(db, "insumos", insumo.id), { alertaPendiente: false, alertaAprobada: true, alertaAprobadaPor: currentUser.nombre, alertaAprobadaHora: serverTimestamp(), alertaVistaPorOperario: false });
-    } catch (error) { console.error("Error aprobando alerta:", error); }
+      
+      await updateDoc(doc(db, "insumos", insumo.id), { 
+        alertaPendiente: false, 
+        alertaAprobada: true, 
+        alertaAprobadaPor: currentUser.nombre, 
+        alertaAprobadaHora: serverTimestamp(), 
+        alertaVistaPorOperario: false 
+      });
+      
+      setToastMsg("¡Alerta aprobada! El operario ya puede enviarla.");
+      setTimeout(() => setToastMsg(null), 4000);
+      setActiveInsumo(null); // <-- Cierra el panel automáticamente
+    } catch (error) { 
+      console.error("Error aprobando alerta:", error); 
+    }
   };
 
   const forzarCancelacionAlerta = async (insumo) => {
