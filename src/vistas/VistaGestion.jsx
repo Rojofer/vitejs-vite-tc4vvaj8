@@ -1,7 +1,7 @@
 import React from 'react';
 import { LayoutDashboard, AlertTriangle, Star, Clock, Folder, ArrowLeft, Activity, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import TablaInsumos from '../componentes/TablaInsumos'; // Importamos tu tabla
+import TablaInsumos from '../componentes/TablaInsumos';
 
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 
@@ -184,9 +184,7 @@ const VistaGestion = ({
         ) : !selectedGroup ? (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full mb-10">
-              {(() => {
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-5 w-full mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-5 w-full mb-10">
               {(() => {
                 const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
                 
