@@ -94,23 +94,34 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
           </td>
           
            <td className="px-4 py-2.5 text-center">
-            {i.alertaPendiente && !isOwner ? (
-              <button onClick={(e) => { e.stopPropagation(); onGestionar(i); }} className="bg-amber-100 text-amber-700 text-[9px] font-black px-3 py-1.5 rounded-lg border border-amber-300 shadow-sm flex items-center gap-1 w-max mx-auto">
-                <Clock size={10}/> En Revisión
-              </button>
-            ) : i.alertaAprobada && !isOwner ? (
-              <button onClick={(e) => { e.stopPropagation(); onGestionar(i); }} className="bg-emerald-500 text-white text-[9px] font-black px-3 py-1.5 rounded-lg border border-emerald-600 shadow-sm flex items-center gap-1 w-max mx-auto animate-pulse">
-                <Send size={10}/> ¡Enviar Ya!
-              </button>
-            ) : i.alertaActivaEnPlanta ? (
-              <button onClick={(e) => { e.stopPropagation(); onGestionar(i); }} className="bg-purple-100 text-purple-700 text-[9px] font-black px-3 py-1.5 rounded-lg border border-purple-300 shadow-sm flex items-center gap-1 w-max mx-auto">
-                <Activity size={10}/> Alerta en Planta
-              </button>
-            ) : (
-              <button onClick={(e) => { e.stopPropagation(); onGestionar(i); }} className="bg-slate-100 text-slate-600 text-[9px] font-black px-3 py-1.5 rounded-lg hover:bg-orange-500 hover:text-white transition-all border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-center gap-2">
+              
+              {/* LA VÍA PARALELA 1: ESTADO DE ALERTA (Solo visual, no bloquea) */}
+              {i.alertaPendiente && !isOwner && (
+                <span className="bg-sky-100 text-sky-700 text-[9px] font-black px-2 py-1 rounded border border-sky-200 flex items-center gap-1 shadow-sm" title="Solicitud enviada, esperando firma">
+                  <Clock size={10}/> Solicitado
+                </span>
+              )}
+              {i.alertaAprobada && !isOwner && (
+                <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded border border-emerald-200 flex items-center gap-1 shadow-sm animate-pulse" title="¡Autorizado! Listo para enviar a planta">
+                  <CheckSquare size={10}/> ¡Aprobado!
+                </span>
+              )}
+              {i.alertaActivaEnPlanta && (
+                <span className="bg-purple-100 text-purple-700 text-[9px] font-black px-2 py-1 rounded border border-purple-200 flex items-center gap-1 shadow-sm">
+                  <Activity size={10}/> En Planta
+                </span>
+              )}
+
+              {/* LA VÍA PARALELA 2: EL BOTÓN DE GESTIÓN (Siempre disponible) */}
+              <button 
+                onClick={(e) => { e.stopPropagation(); onGestionar(i); }} 
+                className="bg-slate-800 text-white text-[9px] font-black px-3 py-1.5 rounded-lg hover:bg-orange-500 transition-all border border-slate-700 shadow-sm flex items-center gap-1 shrink-0"
+              >
                 Gestionar
               </button>
-            )}
+              
+            </div>
           </td>
         </tr>
       ))}</tbody>
