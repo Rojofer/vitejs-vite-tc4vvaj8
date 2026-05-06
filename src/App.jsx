@@ -267,15 +267,30 @@ const App = () => {
   
   const solicitarAlertaPlanta = async (insumo) => {
     try {
+      // 1. LA HUELLA TÁCTICA EN AUDITORÍA (El registro para el dueño)
+      await addDoc(collection(db, "reclamos"), { 
+        insumoId: insumo.id, 
+        operario: currentUser.nombre, 
+        mensaje: `SOLICITUD DE ALERTA: ${insumo.nombre}`, 
+        cuerpoOriginal: "El operario solicita autorización para emitir una alerta interna a la planta.", 
+        fecha: serverTimestamp(), 
+        estado: "ABIERTO", 
+        tipo: "SOLICITUD GERENCIA" 
+      });
+
+      // 2. EL CAMBIO DE ESTADO EN EL TABLERO (Para el operario)
       await updateDoc(doc(db, "insumos", insumo.id), { 
         alertaPendiente: true, 
         alertaSolicitante: currentUser.nombre,
         alertaRechazadaMotivo: null,
         alertaSolicitadaHora: serverTimestamp() 
       });
+      
       setToastMsg("Solicitud enviada. Queda a la espera de aprobación por gerencia.");
       setTimeout(() => setToastMsg(null), 4000);
-    } catch (error) { console.error("Error solicitando alerta:", error); }
+    } catch (error) { 
+      console.error("Error solicitando alerta:", error); 
+    }
   };
 
   const marcarAlertaComoVista = async (insumo) => {
