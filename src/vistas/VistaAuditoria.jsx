@@ -7,6 +7,7 @@ import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, Check
 const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo }) => {
     const [filtroMes, setFiltroMes] = useState("TODOS"); 
     const [filtroTipo, setFiltroTipo] = useState("TODOS"); 
+    const [filtroOperario, setFiltroOperario] = useState("TODOS"); // <-- NUEVO ESTADO PARA EL FILTRO
     const [busquedaAuditoria, setBusquedaAuditoria] = useState("");
     const [auditoriaTab, setAuditoriaTab] = useState('abiertos'); 
     const [expandedRow, setExpandedRow] = useState(null);
@@ -85,10 +86,21 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Auditoria_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
     };
 
+    // --- OBTENER LISTA DE OPERARIOS ÚNICOS PARA EL MENÚ ---
+    const operariosUnicos = useMemo(() => {
+      const ops = reclamos.filter(r => r.insumoId !== "BROADCAST").map(r => r.operario).filter(Boolean);
+      return [...new Set(ops)].sort();
+    }, [reclamos]);
+
     let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST");
     
     if (currentUser.rol !== 'owner') {
       filtrados = filtrados.filter(r => r.operario === currentUser.nombre || (r.operario && r.operario.includes(currentUser.nombre)));
+    } else {
+      // Aplicar filtro de operario solo si el usuario es Owner y seleccionó un operario
+      if (filtroOperario !== "TODOS") {
+        filtrados = filtrados.filter(r => r.operario === filtroOperario);
+      }
     }
 
     const mesesDisponibles = useMemo(() => { 
@@ -141,6 +153,16 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 <input type="text" placeholder="Buscar código, insumo o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
               </div>
               
+              {/* NUEVO FILTRO DESPLEGABLE DE OPERADORES (SOLO PARA ADMINS) */}
+              {currentUser.rol === 'owner' && (
+                <select value={filtroOperario} onChange={e => setFiltroOperario(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
+                  <option value="TODOS">Todos los Operarios</option>
+                  {operariosUnicos.map(op => (
+                    <option key={op} value={op}>{op}</option>
+                  ))}
+                </select>
+              )}
+
               <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
                 <option value="TODOS">Todos los Tipos</option>
                 <option value="PROVEEDORES">📦 Reclamos Prov.</option>
@@ -190,7 +212,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     {h.totalReclamos > 1 ? (
                       <button
                         onClick={(e) => {
-                          e.stopPropagation(); // Frena la apertura del panel lateral[cite: 1]
+                          e.stopPropagation();
                           setExpandedRow(isExpanded ? null : h.insumoId);
                         }}
                         className="p-1 rounded bg-white border border-slate-200 text-slate-500 hover:border-slate-400 transition-colors shadow-sm"
@@ -237,7 +259,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <td className="py-4 px-4">
                     <button 
                       onClick={(e) => { 
-                        e.stopPropagation(); // Frena la apertura del panel lateral[cite: 1]
+                        e.stopPropagation();
                         setModalMensaje(h); 
                       }} 
                       className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 transition-colors text-left"
@@ -266,7 +288,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                       {currentUser.rol === 'owner' && (
                         <button 
                           onClick={(e) => { 
-                            e.stopPropagation(); // Frena la apertura del panel lateral
+                            e.stopPropagation();
                             exportarDossierPDF(h); 
                           }} 
                           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-all" 
@@ -297,7 +319,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                       <td colSpan="2" className="py-3 px-4">
                         <button 
                           onClick={(e) => {
-                            e.stopPropagation(); // Frena la apertura del panel lateral[cite: 1]
+                            e.stopPropagation();
                             setModalMensaje(item);
                           }} 
                           className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 text-left"
