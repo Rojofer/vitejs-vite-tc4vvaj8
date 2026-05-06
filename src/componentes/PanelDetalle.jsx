@@ -224,9 +224,10 @@ const PanelDetalle = ({
                     <Activity size={14}/> Solicitud de Alerta Interna en Revisión por Gerencia
                   </div>
                 )}
-                {!isOwner && alertaAprobada && (
-                  <div className="bg-emerald-50 text-emerald-700 p-2 rounded-lg text-[10px] font-black uppercase text-center border border-emerald-200 animate-pulse flex items-center justify-center gap-2">
-                    <CheckCircle size={14}/> Alerta Interna Aprobada - Lista para enviar
+                {/* OPERARIO: Banners informativos de estado */}
+                {!isOwner && alertaPendiente && (
+                  <div className="bg-sky-50 text-sky-700 p-2 rounded-lg text-[10px] font-black uppercase text-center border border-sky-200 flex items-center justify-center gap-2">
+                    <Clock size={14}/> Solicitud de Alerta Interna en Revisión por Gerencia
                   </div>
                 )}
                 {!isOwner && alertaRechazadaMotivo && (
@@ -235,11 +236,25 @@ const PanelDetalle = ({
                   </div>
                 )}
 
-                {/* EL BOTÓN DE SIEMPRE PARA TODOS */}
-                <button onClick={() => abrirRedactorReclamo(activeInsumo)} className={`w-full flex items-center justify-between p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-xs uppercase tracking-widest ${!isOwner && alertaAprobada ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30' : 'bg-orange-500 hover:bg-orange-600'}`}>
-                  <div className="flex items-center gap-3"><Send size={18} /> Iniciar Comunicación</div>
-                  <ChevronRight size={18} />
-                </button>
+                {/* --- VÍAS PARALELAS: LOS BOTONES --- */}
+                {(!isOwner && alertaAprobada) ? (
+                  // Si está aprobada, le mostramos DOS botones (El de planta verde y el de proveedor naranja)
+                  <div className="flex gap-3">
+                    <button onClick={() => abrirRedactorReclamo(activeInsumo, "ALERTA PLANTA")} className="flex-1 flex items-center justify-center gap-2 p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(16,185,129,0.3)] active:scale-[0.98] font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 animate-pulse">
+                      <Activity size={18} /> Enviar a Planta
+                    </button>
+                    <button onClick={() => abrirRedactorReclamo(activeInsumo, "RECLAMO PROVEEDOR")} className="flex-1 flex items-center justify-center gap-2 p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-[10px] uppercase tracking-widest bg-slate-800 hover:bg-slate-900 opacity-90">
+                      <Send size={14} /> Reclamar a Prov.
+                    </button>
+                  </div>
+                ) : (
+                  // Si NO está aprobada (o si es el Administrador), le mostramos el botón grande normal
+                  <button onClick={() => abrirRedactorReclamo(activeInsumo)} className="w-full flex items-center justify-between p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-xs uppercase tracking-widest bg-orange-500 hover:bg-orange-600">
+                    <div className="flex items-center gap-3"><Send size={18} /> Iniciar Comunicación</div>
+                    <ChevronRight size={18} />
+                  </button>
+                )}
+                
               </div>
             );
           })()}
