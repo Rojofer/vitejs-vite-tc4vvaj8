@@ -414,7 +414,7 @@ const App = () => {
     return { asunto: procesar(template.asunto || "⚠️ Asunto vacío"), cuerpo: procesar(template.cuerpo || "⚠️ Cuerpo vacío"), destino: template.destino || "compras" };
   };
 
-  const abrirRedactorReclamo = (insumo) => {
+  const abrirRedactorReclamo = (insumo, tipoAccionForzada = null) => {
     const umbral = config?.umbralUrgencia || 15;
     const isGrave = Math.round(insumo.supervivencia) <= umbral;
     const hasSolpeds = insumo.sp > 0; 
@@ -422,13 +422,18 @@ const App = () => {
     
     let tInicial = null;
     
-    if (insumo.alertaAprobada) {
+    // 1. Si apretó el botón verde "Enviar a Planta"
+    if (tipoAccionForzada === "ALERTA PLANTA") {
       tInicial = plantillas.find(p => p.destino === 'equipo');
+    } 
+    // 2. Si apretó "Reclamar a Prov" o el botón naranja general
+    else {
+      if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped); 
+      if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente); 
+      if (!tInicial) tInicial = plantillas.find(p => p.isNormal); 
     }
-    
-    if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped); 
-    if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente); 
-    if (!tInicial) tInicial = plantillas.find(p => p.isNormal); 
+
+    // Si falló todo, agarramos la primera por defecto
     if (!tInicial) tInicial = plantillas[0]; 
 
     const { asunto, cuerpo, destino } = aplicarPlantilla(insumo, tInicial.id);
