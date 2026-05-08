@@ -137,11 +137,21 @@ const ModalRedactor = ({
               }
             }
 
-            // ADMIN o PROVEEDORES
+            // ADMIN o PROVEEDORES (Nuevos botones duales)
             return (
-              <button onClick={confirmarYGuardarReclamo} className="px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/30 transition-all flex items-center gap-2 active:scale-95">
-                <Send size={16} /> Disparar y Guardar
-              </button>
+              <div className="flex gap-2">
+                {/* Botón A: Opción 2 - Buscador Asistido (El Ticket Mágico) */}
+                {!isAlertaInterna && (
+                  <button onClick={() => confirmarYGuardarReclamo('HILO')} className="px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-800 text-white hover:bg-slate-900 shadow-md transition-all flex items-center gap-2 active:scale-95 border border-slate-700" title="Copia el texto y busca el ticket en tu Gmail para que respondas en el hilo correcto">
+                    <Mail size={14} /> Continuar Hilo
+                  </button>
+                )}
+                
+                {/* Botón B: Nuevo Correo (Genera Ticket Nuevo) */}
+                <button onClick={() => confirmarYGuardarReclamo('NUEVO')} className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest text-white shadow-lg transition-all flex items-center gap-2 active:scale-95 ${isAlertaInterna ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30' : 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30'}`}>
+                  <Send size={16} /> {isAlertaInterna ? 'Disparar y Guardar' : 'Enviar Reclamo Nuevo'}
+                </button>
+              </div>
             );
           })()}
         </div>
