@@ -422,22 +422,24 @@ const App = () => {
     
     let tInicial = null;
     
-    // 1. Si apretó el botón verde "Enviar a Planta"
     if (tipoAccionForzada === "ALERTA PLANTA") {
       tInicial = plantillas.find(p => p.destino === 'equipo');
-    } 
-    // 2. Si apretó "Reclamar a Prov" o el botón naranja general
-    else {
+    } else {
       if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped); 
       if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente); 
       if (!tInicial) tInicial = plantillas.find(p => p.isNormal); 
     }
 
-    // Si falló todo, agarramos la primera por defecto
     if (!tInicial) tInicial = plantillas[0]; 
 
     const { asunto, cuerpo, destino } = aplicarPlantilla(insumo, tInicial.id);
     
+    // --- SISTEMA DE TICKET ÚNICO ---
+    // Si no tiene un ticket guardado, le inventamos uno al azar para este borrador
+    const ticketActual = insumo.ticketReclamo || `#TK-${Math.floor(1000 + Math.random() * 9000)}`;
+    // Le pegamos el ticket al asunto SOLO si es un reclamo hacia afuera
+    const asuntoConTicket = destino === 'equipo' || destino === 'planta' ? asunto : `${asunto} [${ticketActual}]`;
+
     let destinatariosMatch = [];
     if (insumo.owner && insumo.owner !== "Sin asignar") {
         const txtOwner = String(insumo.owner).trim().toLowerCase();
@@ -446,11 +448,18 @@ const App = () => {
     }
 
     setReclamoDraft({ 
-      insumo, destinatarios: destinatariosMatch, asunto, cuerpo, tipoPlantilla: tInicial.id, tipoDestino: destino, showDestinatarios: destinatariosMatch.length === 0 
+      insumo, 
+      destinatarios: destinatariosMatch, 
+      asunto: asuntoConTicket, 
+      cuerpo, 
+      tipoPlantilla: tInicial.id, 
+      tipoDestino: destino, 
+      showDestinatarios: destinatariosMatch.length === 0,
+      ticketBorrador: ticketActual // Lo guardamos en memoria
     });
   };
   
-  const confirmarYGuardarReclamo = async () => {
+  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
     const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e=>e);
     const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     
@@ -458,8 +467,10 @@ const App = () => {
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
 
-    if (correosStr.length === 0) return alert("Seleccioná un destinatario del directorio o ingresá un correo manualmente.");
-    
+    // Validamos que haya un correo (solo si no es modo hilo, porque en hilo usamos la búsqueda)
+    if (correosStr.length === 0 && modoAccion !== 'HILO') return alert("Seleccioná un destinatario del directorio o ingresá un correo manualmente.");
+
+    // 1. Guardamos el registro en la Auditoría
     await addDoc(collection(db, "reclamos"), { 
       insumoId: reclamoDraft.insumo.id, 
       operario: currentUser.nombre, 
@@ -469,10 +480,12 @@ const App = () => {
       estado: "ABIERTO", 
       tipo: reclamoDraft.tipoDestino 
     });
-    
+
+    // 2. Actualizamos el insumo
     try {
       const isAlertaInterna = reclamoDraft.tipoDestino === 'equipo' || reclamoDraft.tipoDestino === 'planta';
-      await updateDoc(doc(db, "insumos", reclamoDraft.insumo.id), {
+      
+      let updates = {
         alertaPendiente: false,
         alertaAprobada: false,
         alertaSolicitante: null,
@@ -480,10 +493,28 @@ const App = () => {
         alertaVistaPorOperario: true,
         visibleEnPlanta: isAlertaInterna ? true : reclamoDraft.insumo.visibleEnPlanta,
         alertaActivaEnPlanta: isAlertaInterna ? true : false 
-      });
-    } catch (e) { console.error("Error limpiando alerta post-envio:", e); }
+      };
 
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
+      // Si es un reclamo a proveedor, grabamos el ticket en la base de datos para recordarlo a futuro
+      if (!isAlertaInterna) {
+        updates.ticketReclamo = reclamoDraft.ticketBorrador;
+      }
+
+      await updateDoc(doc(db, "insumos", reclamoDraft.insumo.id), updates);
+    } catch (e) { console.error("Error actualizando insumo post-envio:", e); }
+
+    // 3. La ejecución en Gmail según el botón tocado
+    if (modoAccion === 'HILO') {
+       // MODO BUSCADOR ASISTIDO: Copia el texto y busca el Ticket en Gmail
+       navigator.clipboard.writeText(reclamoDraft.cuerpo);
+       setToastMsg("📝 Texto copiado. Buscando el hilo en Gmail...");
+       setTimeout(() => setToastMsg(null), 4000);
+       window.open(`https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`, '_blank');
+    } else {
+       // MODO NORMAL: Abre un mail 100% nuevo
+       window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
+    }
+    
     setReclamoDraft(null); 
   };
 
