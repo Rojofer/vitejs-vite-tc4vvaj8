@@ -34,9 +34,13 @@ const ModalRedactor = ({
                 <select 
                   value={reclamoDraft.tipoPlantilla} 
                   onChange={(e) => { 
-                    const val = e.target.value; 
+                    const val = e.target.value;
                     const p = aplicarPlantilla(reclamoDraft.insumo, val); 
-                    setReclamoDraft(prev => ({...prev, tipoPlantilla: val, asunto: p.asunto, cuerpo: p.cuerpo, tipoDestino: p.destino, destinatarios: []})); 
+                    
+                    // Magia: Si cambia de plantilla, le volvemos a inyectar el ticket al final
+                    const asuntoConTicket = p.destino === 'equipo' || p.destino === 'planta' ? p.asunto : `${p.asunto} [${reclamoDraft.ticketBorrador}]`;
+                    
+                    setReclamoDraft(prev => ({...prev, tipoPlantilla: val, asunto: asuntoConTicket, cuerpo: p.cuerpo, tipoDestino: p.destino, destinatarios: []}));
                   }} 
                   className="w-full px-4 py-3 bg-white border-2 border-orange-500 text-orange-600 font-black uppercase tracking-widest text-xs rounded-xl outline-none focus:ring-2 focus:ring-orange-500/50 appearance-none cursor-pointer shadow-sm"
                 >
