@@ -436,7 +436,7 @@ const App = () => {
     
     // --- SISTEMA DE TICKET ÚNICO ---
     // Si no tiene un ticket guardado, le inventamos uno al azar para este borrador
-    const ticketActual = insumo.ticketReclamo || `#TK-${Math.floor(1000 + Math.random() * 9000)}`;
+    const ticketActual = insumo.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     // Le pegamos el ticket al asunto SOLO si es un reclamo hacia afuera
     const asuntoConTicket = destino === 'equipo' || destino === 'planta' ? asunto : `${asunto} [${ticketActual}]`;
 
