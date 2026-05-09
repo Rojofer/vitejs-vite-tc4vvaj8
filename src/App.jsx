@@ -504,12 +504,31 @@ const App = () => {
     } catch (e) { console.error("Error actualizando insumo post-envio:", e); }
 
     // 3. La ejecución en Gmail según el botón tocado
+   // 3. La ejecución en Gmail según el botón tocado
     if (modoAccion === 'HILO') {
-       // MODO BUSCADOR ASISTIDO: Copia el texto y busca el Ticket en Gmail
+       // MODO BUSCADOR ASISTIDO: Copia el texto y avisa con una alerta gigante
        navigator.clipboard.writeText(reclamoDraft.cuerpo);
-       setToastMsg("📝 Texto copiado. Buscando el hilo en Gmail...");
-       setTimeout(() => setToastMsg(null), 4000);
-       window.open(`https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`, '_blank');
+       
+       // Alerta Educativa para el operario
+       const mensajeEducativo = 
+         "⚠️ ¡ATENCIÓN: MODO HILO DE CORREO!\n\n" +
+         "El texto del nuevo reclamo ya fue copiado automáticamente.\n\n" +
+         "PASOS A SEGUIR AHORA:\n" +
+         "1. Se abrirá tu Gmail buscando el ticket anterior.\n" +
+         "2. Abrí ese correo viejo.\n" +
+         "3. Tocá el botón 'Responder' (la flechita de Gmail).\n" +
+         "4. Hacé clic derecho y tocá 'Pegar' (o presioná Ctrl+V).\n\n" +
+         "¿Entendido? Hacé clic en 'Aceptar' para abrir Gmail.";
+
+       // Si el operario dice que sí (que entendió), recién ahí abrimos Gmail
+       if (window.confirm(mensajeEducativo)) {
+         window.open(`https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`, '_blank');
+       } else {
+         // Si pone cancelar, le avisamos que el texto igual quedó copiado
+         setToastMsg("Envío cancelado, pero el texto sigue copiado por si querés mandarlo manual.");
+         setTimeout(() => setToastMsg(null), 4000);
+       }
+       
     } else {
        // MODO NORMAL: Abre un mail 100% nuevo
        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
