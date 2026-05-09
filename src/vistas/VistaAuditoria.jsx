@@ -32,22 +32,17 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       doc.setDrawColor(200);
       doc.setFillColor(248, 250, 252);
       doc.rect(14, 35, 182, 25, 'FD'); 
-      
+            
       doc.setFontSize(11);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont("helvetica", "bold");
-      doc.text("Detalle del Material Auditado:", 18, 42);
-      
-      doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.text(`CÓDIGO: ${insumo.codigo || 'S/C'}`, 18, 49);
       doc.text(`MATERIAL: ${insumo.nombre || 'GENERAL'}`, 18, 55);
 
       const tableData = threadItems.map((item) => {
-        let accion = item.tipo === 'APROBACION GERENCIA' ? 'APROBACIÓN' 
-                   : item.tipo === 'RECHAZO GERENCIA' ? 'RECHAZO' 
+        let accion = item.tipo === 'APROBACION FER' ? 'APROBACIÓN' 
+                   : item.tipo === 'RECHAZO FER' ? 'RECHAZO' 
                    : item.tipo === 'equipo' || item.tipo === 'ALERTA PLANTA' ? 'ALERTA PLANTA' 
-                   : 'RECLAMO PROV.';
+                   : 'RECLAMO A COMPRAS.';
         let operarioLimpio = (item.operario || "").replace(/➡️/g, '->');
                    
         return [
