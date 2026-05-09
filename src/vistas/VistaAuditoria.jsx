@@ -22,7 +22,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.text("AUDITORÍA ERP", 14, 20);
+      doc.text("AUDITORÍA", 14, 20);
       
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
@@ -34,7 +34,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       doc.rect(14, 35, 182, 25, 'FD'); 
             
       doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
+      doc.setFont("helvetica", "bold");
       doc.text(`CÓDIGO: ${insumo.codigo || 'S/C'}`, 18, 49);
       doc.text(`MATERIAL: ${insumo.nombre || 'GENERAL'}`, 18, 55);
 
@@ -61,9 +61,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 3 },
         columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 35 },
-          2: { cellWidth: 30 },
+          0: { cellWidth: 25 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 25 },
           3: { cellWidth: 'auto' }
         }
       });
