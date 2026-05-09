@@ -69,6 +69,7 @@ const App = () => {
   const [auditoriaFiltroInsumo, setAuditoriaFiltroInsumo] = useState(null);
   const [reclamoDraft, setReclamoDraft] = useState(null); 
   const [toastMsg, setToastMsg] = useState(null);
+  const [alertaHilo, setAlertaHilo] = useState(null);
   const [filtroResponsable, setFiltroResponsable] = useState("TODOS"); 
   const [filtroRiesgoGrupo, setFiltroRiesgoGrupo] = useState(false);
   const [filtroVistaLista, setFiltroVistaLista] = useState('todos');
@@ -458,31 +459,37 @@ const App = () => {
       ticketBorrador: ticketActual // Lo guardamos en memoria
     });
   };
-  
   const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
-    const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e=>e);
+    // 1. RECOLECCIÓN DE DATOS Y DESTINATARIOS
+    const correosDirectorio = reclamoDraft.destinatarios
+      .map(id => config.contactos.find(c => c.id === id)?.email)
+      .filter(e => e);
     const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
 
-    // Validamos que haya un correo (solo si no es modo hilo, porque en hilo usamos la búsqueda)
-    if (correosStr.length === 0 && modoAccion !== 'HILO') return alert("Seleccioná un destinatario del directorio o ingresá un correo manualmente.");
+    // Validación de seguridad: debe haber al menos un destino (salvo en modo hilo que ya conocemos al receptor)
+    if (correosStr.length === 0 && modoAccion !== 'HILO') {
+      setToastMsg("⚠️ Error: Seleccioná un destinatario antes de continuar.");
+      setTimeout(() => setToastMsg(null), 4000);
+      return;
+    }
 
-    // 1. Guardamos el registro en la Auditoría
-    await addDoc(collection(db, "reclamos"), { 
-      insumoId: reclamoDraft.insumo.id, 
-      operario: currentUser.nombre, 
-      mensaje: reclamoDraft.asunto, 
-      cuerpoOriginal: reclamoDraft.cuerpo, 
-      fecha: serverTimestamp(), 
-      estado: "ABIERTO", 
-      tipo: reclamoDraft.tipoDestino 
-    });
-
-    // 2. Actualizamos el insumo
+    // 2. GUARDADO EN AUDITORÍA (HISTORIAL TÁCTICO)
     try {
+      await addDoc(collection(db, "reclamos"), { 
+        insumoId: reclamoDraft.insumo.id, 
+        operario: currentUser.nombre, 
+        mensaje: reclamoDraft.asunto, 
+        cuerpoOriginal: reclamoDraft.cuerpo, 
+        fecha: serverTimestamp(), 
+        estado: "ABIERTO", 
+        tipo: reclamoDraft.tipoDestino 
+      });
+
+      // 3. ACTUALIZACIÓN DEL ESTADO DEL INSUMO
       const isAlertaInterna = reclamoDraft.tipoDestino === 'equipo' || reclamoDraft.tipoDestino === 'planta';
       
       let updates = {
@@ -491,61 +498,40 @@ const App = () => {
         alertaSolicitante: null,
         alertaAprobadaHora: null,
         alertaVistaPorOperario: true,
-        visibleEnPlanta: isAlertaInterna ? true : reclamoDraft.insumo.visibleEnPlanta,
+        visibleEnPlanta: isAlertaInterna ? true : (reclamoDraft.insumo.visibleEnPlanta || false),
         alertaActivaEnPlanta: isAlertaInterna ? true : false 
       };
 
-      // Si es un reclamo a proveedor, grabamos el ticket en la base de datos para recordarlo a futuro
+      // Si es reclamo a proveedor, grabamos el Ticket para que el ERP lo recuerde
       if (!isAlertaInterna) {
         updates.ticketReclamo = reclamoDraft.ticketBorrador;
       }
 
       await updateDoc(doc(db, "insumos", reclamoDraft.insumo.id), updates);
-    } catch (e) { console.error("Error actualizando insumo post-envio:", e); }
 
-    // 3. La ejecución en Gmail según el botón tocado
-   // 3. La ejecución en Gmail según el botón tocado
-    if (modoAccion === 'HILO') {
-       // MODO BUSCADOR ASISTIDO: Copia el texto y avisa con una alerta gigante
-       navigator.clipboard.writeText(reclamoDraft.cuerpo);
-       
-       // Alerta Educativa para el operario
-       const mensajeEducativo = 
-         "⚠️ ¡ATENCIÓN: MODO HILO DE CORREO!\n\n" +
-         "El texto del nuevo reclamo ya fue copiado automáticamente.\n\n" +
-         "PASOS A SEGUIR AHORA:\n" +
-         "1. Se abrirá tu Gmail buscando el ticket anterior.\n" +
-         "2. Abrí ese correo viejo.\n" +
-         "3. Tocá el botón 'Responder' (la flechita de Gmail).\n" +
-         "4. Hacé clic derecho y tocá 'Pegar' (o presioná Ctrl+V).\n\n" +
-         "¿Entendido? Hacé clic en 'Aceptar' para abrir Gmail.";
+      // 4. EJECUCIÓN SEGÚN EL MODO ELEGIDO
+      if (modoAccion === 'HILO') {
+        // MODO PROFESIONAL: Copiamos al portapapeles y abrimos el Modal UI de instrucciones
+        navigator.clipboard.writeText(reclamoDraft.cuerpo);
+        setAlertaHilo({
+          url: `https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`
+        });
+        // IMPORTANTE: No cerramos el redactor todavía, lo hará el modal de instrucciones al confirmar
+      } else {
+        // MODO CORREO NUEVO: Abrimos ventana de redacción limpia de Gmail
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`;
+        window.open(gmailUrl, '_blank');
+        
+        // Limpiamos el borrador y avisamos éxito
+        setReclamoDraft(null);
+        setToastMsg("✅ Reclamo registrado y Gmail abierto con éxito.");
+        setTimeout(() => setToastMsg(null), 4000);
+      }
 
-       // Si el operario dice que sí (que entendió), recién ahí abrimos Gmail
-       if (window.confirm(mensajeEducativo)) {
-         window.open(`https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`, '_blank');
-       } else {
-         // Si pone cancelar, le avisamos que el texto igual quedó copiado
-         setToastMsg("Envío cancelado, pero el texto sigue copiado por si querés mandarlo manual.");
-         setTimeout(() => setToastMsg(null), 4000);
-       }
-       
-    } else {
-       // MODO NORMAL: Abre un mail 100% nuevo
-       window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
-    }
-    
-    setReclamoDraft(null); 
-  };
-
-  const marcarComunicadoLeido = async (com) => { const ref = doc(db, "reclamos", com.id); await updateDoc(ref, { leidoPor: [...(com.leidoPor || []), currentUser.nombre] }); };
-
-  const cerrarReclamoManual = async (idReclamo, e) => {
-    e.stopPropagation(); 
-    if (window.confirm("¿Estás seguro de que querés forzar el cierre de este reclamo en la auditoría?")) {
-      try {
-        const reclamoRef = doc(db, "reclamos", idReclamo);
-        await updateDoc(reclamoRef, { estado: "CERRADO", motivoCierre: "Cierre Forzado Manual (Owner)" });
-      } catch (error) { console.error("Error cerrando reclamo:", error); alert("Ocurrió un error de conexión."); }
+    } catch (error) {
+      console.error("Error en la operación de reclamo:", error);
+      setToastMsg("❌ Error al procesar el reclamo. Reintentá.");
+      setTimeout(() => setToastMsg(null), 4000);
     }
   };
 
@@ -780,17 +766,67 @@ let datosAlerta = []; let tituloAlerta = "";
         
       </AnimatePresence>
 
+      {/* MODAL PROFESIONAL DE INSTRUCCIONES PARA EL HILO */}
       <AnimatePresence>
-        {showWelcome && !loading && !isTV && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4"><motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col border-4 border-slate-800"><div className="p-8 text-center bg-slate-900 text-white relative"><div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-white shadow-lg mx-auto mb-4 font-black italic text-3xl">K</div><h2 className="text-3xl font-black uppercase tracking-tight">Hola, {currentUser.nombre.split(" ")[0]}</h2><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Briefing de Inicio de Turno</p></div><div className="p-8 bg-slate-50">
-            {(() => {
-              const misInsumos = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch); const quiebres = misInsumos.filter(i => i.stock <= 0).length; const demoras = misInsumos.filter(i => i.ocDemorada > 0).length; const favCriticos = misInsumos.filter(i => i.favorito && i.supervivencia < 15).length;
-              const misComunicadosNoLeidos = reclamos.filter(r => r.insumoId === "BROADCAST" && (r.destinatarioId === "todos" || r.destinatarioId?.includes(String(currentUser.id))) && !(r.leidoPor || []).includes(currentUser.nombre));
-              return (<><div className="grid grid-cols-3 gap-4 mb-6"><div className="bg-white p-4 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center"><AlertTriangle size={24} className="text-red-500 mb-2" /><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quiebres</p><p className="text-3xl font-black text-red-600">{quiebres}</p></div><div className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm flex flex-col items-center text-center"><Clock size={24} className="text-orange-500 mb-2" /><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Demoras</p><p className="text-3xl font-black text-orange-600">{demoras}</p></div><div className="bg-white p-4 rounded-2xl border border-amber-100 shadow-sm flex flex-col items-center text-center"><span className="text-amber-500 mb-2 text-2xl leading-none block">★</span><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fav. Críticos</p><p className="text-3xl font-black text-amber-500">{favCriticos}</p></div></div>
-              {misComunicadosNoLeidos.length > 0 && (<div className="mb-6 bg-purple-100/50 border border-purple-200 p-4 rounded-2xl"><h4 className="text-[10px] font-black text-purple-700 uppercase tracking-widest mb-3 flex items-center gap-2"><Megaphone size={14}/> Tienes nuevos avisos</h4><div className="space-y-2 max-h-32 overflow-y-auto pr-2">{misComunicadosNoLeidos.map(com => (<div key={com.id} className="bg-white p-3 rounded-xl shadow-sm border border-purple-100 border-l-4 border-l-purple-500 flex justify-between items-center gap-3"><div><p className="text-xs font-bold text-slate-800">{com.mensaje}</p><p className="text-[10px] text-slate-500 mt-1 line-clamp-2 font-mono leading-tight">{com.cuerpoOriginal}</p></div><button onClick={() => marcarComunicadoLeido(com)} className="shrink-0 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-purple-100 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-200 transition-colors"><CheckCircle size={14}/> Entendido</button></div>))}</div></div>)}</>);
-            })()}
-            <button onClick={() => setShowWelcome(false)} className="w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg mt-2"><CheckSquare size={18} /> Iniciar Operaciones</button>
-          </div></motion.div></motion.div>
+        {alertaHilo && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+            <motion.div initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 flex flex-col">
+              
+              <div className="bg-slate-900 p-6 text-center relative">
+                <div className="w-16 h-16 bg-sky-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Mail size={32} className="text-sky-400" />
+                </div>
+                <h3 className="text-white font-black uppercase tracking-widest text-lg">Modo Hilo Activado</h3>
+                <p className="text-slate-400 text-xs font-bold mt-1">El texto ya fue copiado al portapapeles</p>
+              </div>
+              
+              <div className="p-6 bg-slate-50">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Pasos a seguir en Gmail:</p>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs font-bold text-slate-600 space-y-3 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">1</span> 
+                    <p>Se abrirá Gmail buscando el <span className="text-orange-500 font-black">ticket anterior</span>.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">2</span> 
+                    <p>Abrí ese correo viejo.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">3</span> 
+                    <p>Tocá la flecha de <span className="text-sky-600 font-black">Responder</span>.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">4</span> 
+                    <p>Presioná <span className="bg-slate-800 text-white px-1.5 py-0.5 rounded uppercase font-black text-[9px]">Ctrl + V</span> para pegar el reclamo.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-5 bg-white border-t border-slate-100 flex gap-3">
+                <button 
+                  onClick={() => { 
+                    setAlertaHilo(null); 
+                    setToastMsg("Envío pausado. Podés enviarlo manualmente luego."); 
+                    setTimeout(()=>setToastMsg(null),4000); 
+                  }} 
+                  className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => { 
+                    window.open(alertaHilo.url, '_blank'); 
+                    setAlertaHilo(null); 
+                    setReclamoDraft(null); 
+                  }} 
+                  className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-sky-500 text-white hover:bg-sky-600 shadow-[0_5px_15px_rgba(14,165,233,0.3)] transition-all active:scale-95"
+                >
+                  Entendido, Abrir Gmail <ChevronRight size={14}/>
+                </button>
+              </div>
+              
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
       <AnimatePresence>
