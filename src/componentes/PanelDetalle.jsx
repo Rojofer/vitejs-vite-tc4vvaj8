@@ -73,7 +73,26 @@ const PanelDetalle = ({
               <div className="max-h-48 overflow-y-auto">
                 <table className="w-full text-left text-[10px] relative">
                   <thead className="sticky top-0 bg-slate-50/90 backdrop-blur-sm shadow-sm z-10"><tr className="text-[8px] text-slate-400 uppercase"><th className="px-4 py-2">N° S/P</th><th className="px-4 py-2 text-right">Cant.</th><th className="px-4 py-2 text-center">Req. Para</th></tr></thead>
-                  <tbody className="divide-y divide-slate-50">{activeInsumo.detalleSolpeds?.map((sp, idx) => { const f = sp.fecha?.seconds ? new Date(sp.fecha.seconds * 1000) : new Date(sp.fecha); const fechaCorta = isNaN(f.getTime()) ? (sp.fecha || "-") : `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}/${String(f.getFullYear()).slice(-2)}`; return (<tr key={idx} className="hover:bg-slate-50 transition-colors"><td className="px-4 py-2.5 font-bold text-purple-700">{sp.numero}</td><td className="px-4 py-2.5 text-right font-black">{formatoNum(sp.cantidad)}</td><td className="px-4 py-2.5 text-center font-bold text-slate-500">{fechaCorta}</td></tr>); })}{(!activeInsumo.detalleSolpeds || activeInsumo.detalleSolpeds.length === 0) && (<tr><td colSpan="3" className="px-4 py-8 text-center text-slate-400 font-bold uppercase tracking-widest">Sin solicitudes</td></tr>)}</tbody>
+                  <tbody className="divide-y divide-slate-50">
+                    {[...(activeInsumo.detalleSolpeds || [])].sort((a, b) => {
+                      const d1 = a.fecha?.seconds ? new Date(a.fecha.seconds * 1000) : new Date(a.fecha);
+                      const d2 = b.fecha?.seconds ? new Date(b.fecha.seconds * 1000) : new Date(b.fecha);
+                      return d1 - d2; // Ordena de más antiguo a más reciente
+                    }).map((sp, idx) => { 
+                      const f = sp.fecha?.seconds ? new Date(sp.fecha.seconds * 1000) : new Date(sp.fecha); 
+                      const fechaCorta = isNaN(f.getTime()) ? (sp.fecha || "-") : `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}/${String(f.getFullYear()).slice(-2)}`; 
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-2.5 font-bold text-purple-700">{sp.numero}</td>
+                          <td className="px-4 py-2.5 text-right font-black">{formatoNum(sp.cantidad)}</td>
+                          <td className="px-4 py-2.5 text-center font-bold text-slate-500">{fechaCorta}</td>
+                        </tr>
+                      ); 
+                    })}
+                    {(!activeInsumo.detalleSolpeds || activeInsumo.detalleSolpeds.length === 0) && (
+                      <tr><td colSpan="3" className="px-4 py-8 text-center text-slate-400 font-bold uppercase tracking-widest">Sin solicitudes</td></tr>
+                    )}
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -82,7 +101,40 @@ const PanelDetalle = ({
               <div className="max-h-48 overflow-y-auto">
                 <table className="w-full text-left text-[10px] relative">
                   <thead className="sticky top-0 bg-slate-50/90 backdrop-blur-sm shadow-sm z-10"><tr className="text-[8px] text-slate-400 uppercase"><th className="px-4 py-2">N° OC</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Cant.</th><th className="px-4 py-2 text-center">Entrega</th></tr></thead>
-                  <tbody className="divide-y divide-slate-50">{activeInsumo.detalleOCs?.map((oc, idx) => { const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha); const os = oc.estado?.toUpperCase().trim() || ""; let st = "PENDIENTE"; let badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-300"; if (os.includes('DOCUM.SUBSIGUIENTES') || os.includes('ENVIADO') || os.includes('APROBADO')) { st = 'APROBADO'; badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200"; } let isDemorada = false; let rowClass = "hover:bg-slate-50 transition-colors border-b border-slate-50"; const hoyCheck = new Date(); hoyCheck.setHours(0,0,0,0); const fCheck = new Date(f); fCheck.setHours(0,0,0,0); if (fCheck < hoyCheck) { badgeClass = "bg-red-500 text-white border-red-700 animate-pulse shadow-md"; rowClass = "bg-red-50 hover:bg-red-100 border-b border-red-100"; isDemorada = true; } const fechaCorta = isNaN(f.getTime()) ? (oc.fecha || "-") : `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}/${String(f.getFullYear()).slice(-2)}`; return (<tr key={idx} className={rowClass}><td className={`px-4 py-2.5 font-bold ${isDemorada ? 'text-red-700' : 'text-slate-700'}`}>{oc.numero}</td><td className="px-4 py-2.5"><span className={`px-2 py-1 rounded-md border text-[8px] font-black ${badgeClass}`}>{st}</span></td><td className={`px-4 py-2.5 text-right font-black ${isDemorada ? 'text-red-700' : ''}`}>{formatoNum(oc.cantidad)}</td><td className={`px-4 py-2.5 text-center font-bold ${isDemorada ? 'text-red-600 font-black' : 'text-slate-500'}`}>{fechaCorta}</td></tr>); })}</tbody>
+                  <tbody className="divide-y divide-slate-50">
+                    {[...(activeInsumo.detalleOCs || [])].sort((a, b) => {
+                      const d1 = a.fecha?.seconds ? new Date(a.fecha.seconds * 1000) : new Date(a.fecha);
+                      const d2 = b.fecha?.seconds ? new Date(b.fecha.seconds * 1000) : new Date(b.fecha);
+                      return d1 - d2; // Ordena de más antiguo a más reciente
+                    }).map((oc, idx) => { 
+                      const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha); 
+                      const os = oc.estado?.toUpperCase().trim() || ""; 
+                      let st = "PENDIENTE";
+                      let badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-300"; 
+                      if (os.includes('DOCUM.SUBSIGUIENTES') || os.includes('ENVIADO') || os.includes('APROBADO')) { 
+                        st = 'APROBADO';
+                        badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200"; 
+                      } 
+                      let isDemorada = false; 
+                      let rowClass = "hover:bg-slate-50 transition-colors border-b border-slate-50";
+                      const hoyCheck = new Date(); hoyCheck.setHours(0,0,0,0); 
+                      const fCheck = new Date(f); fCheck.setHours(0,0,0,0);
+                      if (fCheck < hoyCheck) { 
+                        badgeClass = "bg-red-500 text-white border-red-700 animate-pulse shadow-md"; 
+                        rowClass = "bg-red-50 hover:bg-red-100 border-b border-red-100";
+                        isDemorada = true; 
+                      } 
+                      const fechaCorta = isNaN(f.getTime()) ? (oc.fecha || "-") : `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}/${String(f.getFullYear()).slice(-2)}`;
+                      return (
+                        <tr key={idx} className={rowClass}>
+                          <td className={`px-4 py-2.5 font-bold ${isDemorada ? 'text-red-700' : 'text-slate-700'}`}>{oc.numero}</td>
+                          <td className="px-4 py-2.5"><span className={`px-2 py-1 rounded-md border text-[8px] font-black ${badgeClass}`}>{st}</span></td>
+                          <td className={`px-4 py-2.5 text-right font-black ${isDemorada ? 'text-red-700' : ''}`}>{formatoNum(oc.cantidad)}</td>
+                          <td className={`px-4 py-2.5 text-center font-bold ${isDemorada ? 'text-red-600 font-black' : 'text-slate-500'}`}>{fechaCorta}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </div>
             </div>
