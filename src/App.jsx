@@ -41,11 +41,11 @@ const obtenerMesAnio = (fecha) => {
   } catch (e) { return "Sin Fecha"; }
 };
 
-const marcarMensajeComoLeido = async (noti) => {
+const marcarMensajeComoLeido = async (noti, nombreUsuario) => {
     try {
       const yaLeidos = noti.leidoPor || [];
-      if (!yaLeidos.includes(currentUser.nombre)) {
-        await updateDoc(doc(db, "reclamos", noti.id), { leidoPor: [...yaLeidos, currentUser.nombre] });
+      if (!yaLeidos.includes(nombreUsuario)) {
+        await updateDoc(doc(db, "reclamos", noti.id), { leidoPor: [...yaLeidos, nombreUsuario] });
       }
     } catch (e) { console.error("Error al leer:", e); }
   };
