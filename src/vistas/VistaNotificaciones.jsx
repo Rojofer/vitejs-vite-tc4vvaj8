@@ -14,7 +14,8 @@ const VistaNotificaciones = ({
   setActiveInsumo, 
   rechazarAlertaPlanta, 
   aprobarAlertaPlanta, 
-  marcarAlertaComoVista 
+  marcarAlertaComoVista
+  marcarMensajeComoLeido
 }) => {
   const [filtroNoti, setFiltroNoti] = useState("");
   const isOwner = currentUser.rol === 'owner';
@@ -56,7 +57,17 @@ const VistaNotificaciones = ({
                 <div key={noti.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-2 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">{noti.fecha?.seconds ? new Date(noti.fecha.seconds * 1000).toLocaleString() : 'Recién'}</span>
-                    {!(noti.leidoPor || []).includes(currentUser.nombre) && <span className="bg-orange-100 text-orange-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Nuevo</span>}
+                    {!(noti.leidoPor || []).includes(currentUser.nombre) && (
+                      <div className="flex items-center gap-3">
+                        <span className="bg-orange-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase animate-pulse">Nuevo</span>
+                        <button 
+                          onClick={() => marcarMensajeComoLeido(noti.id)} 
+                          className="text-[10px] font-black uppercase text-sky-500 hover:text-sky-700 bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-100 transition-all active:scale-95"
+                        >
+                          ✔ Marcar como leído
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <h3 className="text-sm font-black text-slate-800 uppercase leading-tight">{noti.mensaje}</h3>
                   <p className="text-xs text-slate-500 leading-relaxed mt-2">{noti.cuerpoOriginal}</p>
