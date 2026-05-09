@@ -41,6 +41,18 @@ const obtenerMesAnio = (fecha) => {
   } catch (e) { return "Sin Fecha"; }
 };
 
+const marcarMensajeComoLeido = async (mensajeId) => {
+    try {
+      const msj = reclamos.find(r => r.id === mensajeId);
+      if (msj) {
+        const yaLeidos = msj.leidoPor || [];
+        if (!yaLeidos.includes(currentUser.nombre)) {
+          await updateDoc(doc(db, "reclamos", mensajeId), { leidoPor: [...yaLeidos, currentUser.nombre] });
+        }
+      }
+    } catch (e) { console.error("Error al leer:", e); }
+  };
+
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 
 const App = () => {
@@ -703,6 +715,7 @@ let datosAlerta = []; let tituloAlerta = "";
           )}
           {vistaActiva === 'notificaciones' && (
             <VistaNotificaciones 
+              marcarMensajeComoLeido={marcarMensajeComoLeido}
               currentUser={currentUser}
               insumos={insumos}
               reclamos={reclamos}
@@ -887,6 +900,36 @@ let datosAlerta = []; let tituloAlerta = "";
             </button>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* MODAL DE BIENVENIDA INTELIGENTE */}
+      <AnimatePresence>
+        {showWelcome && currentUser.rol !== 'produccion' && (() => {
+          const msjsNuevos = reclamos.filter(r => r.insumoId === "BROADCAST" && r.destinatarioId?.includes(String(currentUser.id)) && !(r.leidoPor || []).includes(currentUser.nombre)).length;
+          const alertasPend = currentUser.rol === 'owner' ? insumos.filter(i => i.alertaPendiente).length : 0;
+          const totalPendientes = msjsNuevos + alertasPend;
+
+          if (totalPendientes === 0) return null; // Si está todo al día, no molestamos
+
+          return (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+              <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+                <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Bell size={40} className="text-orange-500 animate-bounce" />
+                </div>
+                <h2 className="text-white font-black uppercase tracking-tighter text-2xl">¡Hola {currentUser.nombre.split(' ')[0]}!</h2>
+                <p className="text-slate-400 font-bold text-sm mt-2">Tenés <span className="text-orange-500">{totalPendientes}</span> novedades tácticas hoy.</p>
+                
+                <button onClick={() => { setShowWelcome(false); setVistaActiva('notificaciones'); }} className="w-full mt-8 py-4 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-orange-900/20 transition-all active:scale-95 flex items-center justify-center gap-2">
+                   Ver Novedades <ChevronRight size={16}/>
+                </button>
+                <button onClick={() => setShowWelcome(false)} className="w-full mt-3 py-2 text-slate-500 hover:text-white font-black uppercase text-[10px] tracking-widest transition-colors">
+                  Omitir por ahora
+                </button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
       
     </div>
