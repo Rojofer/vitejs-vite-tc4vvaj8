@@ -459,100 +459,81 @@ const App = () => {
       ticketBorrador: ticketActual // Lo guardamos en memoria
     });
   };
-  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
-    // 1. RECOLECCIÓN DE DATOS Y DESTINATARIOS
-    const correosDirectorio = reclamoDraft.destinatarios
-      .map(id => config.contactos.find(c => c.id === id)?.email)
-      .filter(e => e);
-    const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
+
+  // Helper para guardar en BD (solo se llama cuando realmente se confirma el envío)
+  const procesarGuardadoBD = async (draft) => {
+    await addDoc(collection(db, "reclamos"), { 
+      insumoId: draft.insumo.id, operario: currentUser.nombre, mensaje: draft.asunto, 
+      cuerpoOriginal: draft.cuerpo, fecha: serverTimestamp(), estado: "ABIERTO", tipo: draft.tipoDestino 
+    });
+
+    const isAlertaInterna = draft.tipoDestino === 'equipo' || draft.tipoDestino === 'planta';
+    let updates = {
+      alertaPendiente: false, alertaAprobada: false, alertaSolicitante: null,
+      alertaAprobadaHora: null, alertaVistaPorOperario: true,
+      visibleEnPlanta: isAlertaInterna ? true : (draft.insumo.visibleEnPlanta || false),
+      alertaActivaEnPlanta: isAlertaInterna ? true : false 
+    };
+    if (!isAlertaInterna) updates.ticketReclamo = draft.ticketBorrador;
     
+    await updateDoc(doc(db, "insumos", draft.insumo.id), updates);
+  };
+  
+  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
+    const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
+    const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
 
-    // Validación de seguridad: debe haber al menos un destino (salvo en modo hilo que ya conocemos al receptor)
     if (correosStr.length === 0 && modoAccion !== 'HILO') {
       setToastMsg("⚠️ Error: Seleccioná un destinatario antes de continuar.");
       setTimeout(() => setToastMsg(null), 4000);
       return;
     }
 
-    // 2. GUARDADO EN AUDITORÍA (HISTORIAL TÁCTICO)
-    try {
-      await addDoc(collection(db, "reclamos"), { 
-        insumoId: reclamoDraft.insumo.id, 
-        operario: currentUser.nombre, 
-        mensaje: reclamoDraft.asunto, 
-        cuerpoOriginal: reclamoDraft.cuerpo, 
-        fecha: serverTimestamp(), 
-        estado: "ABIERTO", 
-        tipo: reclamoDraft.tipoDestino 
+    if (modoAccion === 'HILO') {
+      // MODO HILO: Solo copiamos y abrimos modal. ¡NO GUARDAMOS EN BD TODAVÍA!
+      navigator.clipboard.writeText(reclamoDraft.cuerpo);
+      setAlertaHilo({
+        url: `https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`,
+        reclamoData: reclamoDraft 
       });
-
-      // 3. ACTUALIZACIÓN DEL ESTADO DEL INSUMO
-      const isAlertaInterna = reclamoDraft.tipoDestino === 'equipo' || reclamoDraft.tipoDestino === 'planta';
-      
-      let updates = {
-        alertaPendiente: false,
-        alertaAprobada: false,
-        alertaSolicitante: null,
-        alertaAprobadaHora: null,
-        alertaVistaPorOperario: true,
-        visibleEnPlanta: isAlertaInterna ? true : (reclamoDraft.insumo.visibleEnPlanta || false),
-        alertaActivaEnPlanta: isAlertaInterna ? true : false 
-      };
-
-      // Si es reclamo a proveedor, grabamos el Ticket para que el ERP lo recuerde
-      if (!isAlertaInterna) {
-        updates.ticketReclamo = reclamoDraft.ticketBorrador;
-      }
-
-      await updateDoc(doc(db, "insumos", reclamoDraft.insumo.id), updates);
-
-      // 4. EJECUCIÓN SEGÚN EL MODO ELEGIDO
-      if (modoAccion === 'HILO') {
-        // MODO PROFESIONAL: Copiamos al portapapeles y abrimos el Modal UI de instrucciones
-        navigator.clipboard.writeText(reclamoDraft.cuerpo);
-        setAlertaHilo({
-          url: `https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`
-        });
-        // IMPORTANTE: No cerramos el redactor todavía, lo hará el modal de instrucciones al confirmar
-      } else {
-        // MODO CORREO NUEVO: Abrimos ventana de redacción limpia de Gmail
-        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`;
-        window.open(gmailUrl, '_blank');
-        
-        // Limpiamos el borrador y avisamos éxito
-        setReclamoDraft(null);
-        setToastMsg("✅ Reclamo registrado y Gmail abierto con éxito.");
-        setTimeout(() => setToastMsg(null), 4000);
-      }
-
-    } catch (error) {
-      console.error("Error en la operación de reclamo:", error);
-      setToastMsg("❌ Error al procesar el reclamo. Reintentá.");
+      return; // Frenamos la ejecución acá hasta que acepte el modal
+    } 
+    
+    // MODO NUEVO: Guarda directo en BD y abre Gmail
+    try {
+      await procesarGuardadoBD(reclamoDraft);
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
+      setReclamoDraft(null);
+      setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
       setTimeout(() => setToastMsg(null), 4000);
+    } catch (error) {
+      console.error("Error guardando reclamo:", error);
     }
   };
 
   const cerrarReclamoManual = async (reclamoId, e) => {
-    // Frenamos el clic para que no se abra el panel lateral por accidente
     if (e) e.stopPropagation(); 
-    
     try {
-      // Apuntamos directo a la base de datos y le bajamos el martillo
-      await updateDoc(doc(db, "reclamos", reclamoId), {
-        estado: 'CERRADO'
-      });
+      // 1. Buscamos a qué insumo pertenece el reclamo que estamos cerrando
+      const reclamoObj = reclamos.find(r => r.id === reclamoId);
       
-      // Aviso elegante y moderno
-      setToastMsg("✅ Reclamo cerrado y archivado en el historial.");
+      // 2. Cerramos el reclamo en el historial
+      await updateDoc(doc(db, "reclamos", reclamoId), { estado: 'CERRADO' });
+      
+      // 3. LA MAGIA: Le borramos el ticket al insumo para limpiar la pizarra a futuro
+      if (reclamoObj && reclamoObj.insumoId) {
+         await updateDoc(doc(db, "insumos", reclamoObj.insumoId), {
+           ticketReclamo: null
+         });
+      }
+      
+      setToastMsg("✅ Reclamo cerrado y pizarra limpia para futuros avisos.");
       setTimeout(() => setToastMsg(null), 4000);
-      
     } catch (error) {
       console.error("Error táctico cerrando el reclamo:", error);
-      setToastMsg("❌ Ocurrió un error al intentar cerrar el registro.");
-      setTimeout(() => setToastMsg(null), 4000);
     }
   };
   
@@ -835,10 +816,13 @@ let datosAlerta = []; let tituloAlerta = "";
                   Cancelar
                 </button>
                 <button 
-                  onClick={() => { 
+                  onClick={async () => { 
+                    await procesarGuardadoBD(alertaHilo.reclamoData);
                     window.open(alertaHilo.url, '_blank'); 
                     setAlertaHilo(null); 
                     setReclamoDraft(null); 
+                    setToastMsg("✅ Reclamo sumado al hilo y registrado en auditoría.");
+                    setTimeout(() => setToastMsg(null), 4000);
                   }} 
                   className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-sky-500 text-white hover:bg-sky-600 shadow-[0_5px_15px_rgba(14,165,233,0.3)] transition-all active:scale-95"
                 >
