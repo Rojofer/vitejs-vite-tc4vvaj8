@@ -29,82 +29,145 @@ const VistaGestion = ({
   obtenerColorOwner,
   renderRadarDinamico
 }) => {
+  
+  // --- MOTOR ANALÍTICO DEL NUEVO TABLERO SAAS ---
+  const totalInsumos = insumos.length;
+  const quiebres = insumos.filter(i => i.supervivencia <= 0).length;
+  const riesgo = insumos.filter(i => i.supervivencia > 0 && i.supervivencia <= 30).length;
+  const sanos = totalInsumos - quiebres - riesgo;
+
+  const pctSanos = totalInsumos === 0 ? 0 : Math.round((sanos / totalInsumos) * 100);
+  const pctRiesgo = totalInsumos === 0 ? 0 : Math.round((riesgo / totalInsumos) * 100);
+  const pctQuiebres = totalInsumos === 0 ? 0 : Math.round((quiebres / totalInsumos) * 100);
+
+  // Mapeo de Operarios y Grupos
+  const operariosData = insumos.reduce((acc, ins) => {
+    const owner = (ins.owner && ins.owner.trim() !== "") ? ins.owner : "SIN ASIGNAR";
+    if (!acc[owner]) acc[owner] = { insumos: 0, grupos: new Set(), quiebres: 0, riesgo: 0 };
+    acc[owner].insumos += 1;
+    if (ins.grupo) acc[owner].grupos.add(ins.grupo);
+    if (ins.supervivencia <= 0) acc[owner].quiebres += 1;
+    if (ins.supervivencia > 0 && ins.supervivencia <= 30) acc[owner].riesgo += 1;
+    return acc;
+  }, {});
+
+  const totalGruposEsperados = 26;
+  const gruposAsignados = new Set(insumos.filter(i => i.owner && i.owner.trim() !== "" && i.owner !== "SIN ASIGNAR").map(i => i.grupo)).size;
+  const pctCobertura = Math.round((gruposAsignados / totalGruposEsperados) * 100);
+  const isCoberturaTotal = gruposAsignados >= totalGruposEsperados;
+  // ----------------------------------------------
+  
   return (
-    <div className="p-4 md:p-6 h-full max-w-full">
-      {/* CABECERA PRINCIPAL GESTIÓN ERP Y BARRA DE SALUD */}
-      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mb-8 gap-6">
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center shadow-lg">
-            <LayoutDashboard size={24} className="text-orange-500" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black uppercase text-slate-800 tracking-tight leading-none">Gestión de insumos </h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Hola {currentUser.nombre.split(' ')[0]}</p>
-          </div>
-        </div>
-
-        {/* BARRA DE SALUD OPERATIVA (HEADER) */}
-        {(() => {
-          const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
-          const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
-          const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
-
-          const totalFavs = misInsumosDashboard.filter(i => i.favorito).length;
-          if (totalFavs === 0) return null;
-
-          const quiebres = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uCritico).length;
-          const riesgos = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia && i.supervivencia > uCritico).length;
+    {/* NUEVO TABLERO ANALÍTICO OWNER */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        {/* COLUMNA IZQUIERDA: SALUD Y KPIs (Ocupa 2/3) */}
+        <div className="lg:col-span-2 space-y-6">
           
-          const sanos = Math.max(0, totalFavs - quiebres - riesgos);
-          const score = totalFavs > 0 ? Math.round((sanos / totalFavs) * 100) : 100;
+          {/* 1. Barra de Salud Fragmentada */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Activity size={14} className="text-slate-400"/> Salud Operativa Global
+            </h3>
+            
+            {/* Barra Visual */}
+            <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden flex mb-4">
+              <div style={{ width: `${pctSanos}%` }} className="h-full bg-emerald-500 transition-all duration-500"></div>
+              <div style={{ width: `${pctRiesgo}%` }} className="h-full bg-yellow-400 transition-all duration-500"></div>
+              <div style={{ width: `${pctQuiebres}%` }} className="h-full bg-red-500 transition-all duration-500"></div>
+            </div>
 
-          let colorClass = "bg-emerald-500"; let bgClass = "bg-emerald-50"; let borderClass = "border-emerald-200"; let textClass = "text-emerald-700";
-          let msj = currentUser.rol === 'owner' ? "Operación global impecable." : "Cobertura total de tus FAVORITOS.";
-
-          if (score < 100 && score >= 80) {
-            colorClass = "bg-amber-500"; bgClass = "bg-amber-50"; borderClass = "border-amber-200"; textClass = "text-amber-700"; msj = "Frentes que requieren atención.";
-          } else if (score < 80) {
-            colorClass = "bg-red-500"; bgClass = "bg-red-50"; borderClass = "border-red-200"; textClass = "text-red-700"; msj = "Riesgo de quiebres inminentes.";
-          }
-
-          return (
-            <div className={`flex-1 w-full max-w-3xl rounded-2xl border ${borderClass} ${bgClass} px-5 py-4 shadow-sm flex items-center gap-6 relative overflow-hidden`}>
-              <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none ${colorClass}`}></div>
-              
-              <div className="flex-1 relative z-10">
-                <div className="flex justify-between items-end mb-2">
-                  <div>
-                    <h3 className={`font-black uppercase tracking-tight text-[13px] leading-none ${textClass}`}>{currentUser.rol === 'owner' ? 'Salud Operativa Global - FAVORITOS' : 'Salud Operativa del Inventario -SOLO DE FAVORITOS'}</h3>
-                    <p className={`text-[9px] font-bold uppercase tracking-widest opacity-80 mt-1 ${textClass}`}>{msj}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-2xl font-black leading-none tracking-tighter ${textClass}`}>{score}%</span>
-                  </div>
-                </div>
-                
-                <div className="w-full h-3 rounded-full bg-white/60 overflow-hidden relative border border-white/50 shadow-inner">
-                  <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000, #000 4px, transparent 4px, transparent 8px)' }}></div>
-                  <div className={`h-full rounded-full ${colorClass} transition-all duration-1000 relative z-10`} style={{ width: `${score}%` }}></div>
-                </div>
+            {/* Métricas Visuales */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-2xl font-black text-slate-800">{sanos}</p>
+                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Sanos</p>
               </div>
-              
-              <div className={`hidden sm:flex flex-col gap-1.5 shrink-0 border-l pl-4 relative z-10 ${borderClass}`}>
-                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-sm bg-emerald-500 shadow-sm"></div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{sanos}</strong> Sanos</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-sm bg-amber-500 shadow-sm"></div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{riesgos}</strong> Riesgo</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-sm bg-red-500 shadow-sm ${quiebres > 0 ? 'animate-pulse' : ''}`}></div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{quiebres}</strong> Quiebres</span>
-                 </div>
+              <div>
+                <p className="text-2xl font-black text-slate-800">{riesgo}</p>
+                <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400"></span> En Riesgo</p>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-800">{quiebres}</p>
+                <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Quiebres</p>
               </div>
             </div>
-          );
-        })()}
+          </div>
+
+          {/* 2. Tarjetas Minimalistas de KPIs (Aca irán tus 6 bloques, por ahora pongo los 3 críticos para armar la grilla) */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-red-300 hover:shadow-md transition-all cursor-pointer">
+              <AlertTriangle size={16} className="text-red-500 mb-2"/>
+              <p className="text-3xl font-black text-slate-800">{quiebres}</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sin Stock</p>
+            </div>
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-yellow-300 hover:shadow-md transition-all cursor-pointer">
+              <Clock size={16} className="text-yellow-500 mb-2"/>
+              <p className="text-3xl font-black text-slate-800">{riesgo}</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Críticos (30d)</p>
+            </div>
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-orange-300 hover:shadow-md transition-all cursor-pointer">
+              <AlertCircle size={16} className="text-orange-500 mb-2"/>
+              <p className="text-3xl font-black text-slate-800">{insumos.filter(i => i.alertaPendiente).length}</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Alertas Planta</p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* COLUMNA DERECHA: INTEGRIDAD Y EQUIPO (Ocupa 1/3) */}
+        <div className="space-y-6">
+          
+          {/* 3. Semáforo de Integridad (El "Peaje") */}
+          <div className={`p-6 rounded-2xl border shadow-sm relative overflow-hidden ${isCoberturaTotal ? 'bg-emerald-500 border-emerald-600' : 'bg-red-500 border-red-600'}`}>
+            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
+            <h3 className="text-[10px] font-black text-white/80 uppercase tracking-widest mb-1">Integridad de Grupos</h3>
+            <p className="text-3xl font-black text-white mb-2">{pctCobertura}%</p>
+            {isCoberturaTotal ? (
+              <p className="text-xs font-bold text-emerald-100 flex items-center gap-1">✔ 26/26 Asignados</p>
+            ) : (
+              <p className="text-xs font-bold text-white flex items-center gap-1">⚠️ {gruposAsignados}/{totalGruposEsperados} Asignados</p>
+            )}
+          </div>
+
+          {/* 4. Lista de Operarios (Botonera Modo Foco) */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Star size={14} className="text-slate-400"/> Equipo Táctico
+            </h3>
+            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2">
+              
+              {/* Tarjeta Fantasma: SIN ASIGNAR */}
+              {operariosData["SIN ASIGNAR"] && (
+                <button className="w-full flex items-center justify-between p-3 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 transition-all group">
+                  <div className="text-left">
+                    <p className="text-xs font-black text-red-700 uppercase tracking-widest">SIN ASIGNAR</p>
+                    <p className="text-[9px] font-bold text-red-500 uppercase mt-0.5">{operariosData["SIN ASIGNAR"].grupos.size} Grupos Huérfanos</p>
+                  </div>
+                  <div className="bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-lg">
+                    {operariosData["SIN ASIGNAR"].insumos} Item
+                  </div>
+                </button>
+              )}
+
+              {/* Tarjetas del Equipo Real */}
+              {Object.entries(operariosData).filter(([nombre]) => nombre !== "SIN ASIGNAR").map(([nombre, stats]) => (
+                <button key={nombre} className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-300 hover:shadow-sm transition-all group">
+                  <div className="text-left">
+                    <p className="text-xs font-black text-slate-800 uppercase tracking-widest">{nombre}</p>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">{stats.grupos.size} Grupos Asignados</p>
+                  </div>
+                  <div className="flex gap-1">
+                    {stats.quiebres > 0 && <span className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-1 rounded-lg">{stats.quiebres}</span>}
+                    {stats.riesgo > 0 && <span className="bg-yellow-100 text-yellow-600 text-[10px] font-black px-2 py-1 rounded-lg">{stats.riesgo}</span>}
+                  </div>
+                </button>
+              ))}
+
+            </div>
+          </div>
+
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
