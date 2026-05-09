@@ -535,6 +535,27 @@ const App = () => {
     }
   };
 
+  const cerrarReclamoManual = async (reclamoId, e) => {
+    // Frenamos el clic para que no se abra el panel lateral por accidente
+    if (e) e.stopPropagation(); 
+    
+    try {
+      // Apuntamos directo a la base de datos y le bajamos el martillo
+      await updateDoc(doc(db, "reclamos", reclamoId), {
+        estado: 'CERRADO'
+      });
+      
+      // Aviso elegante y moderno
+      setToastMsg("✅ Reclamo cerrado y archivado en el historial.");
+      setTimeout(() => setToastMsg(null), 4000);
+      
+    } catch (error) {
+      console.error("Error táctico cerrando el reclamo:", error);
+      setToastMsg("❌ Ocurrió un error al intentar cerrar el registro.");
+      setTimeout(() => setToastMsg(null), 4000);
+    }
+  };
+  
   const exportarBackupDB = () => {
     const data = JSON.stringify({ insumos: insumosRaw, reclamos: reclamosRaw, config }, null, 2);
     const blob = new Blob([data], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Backup_ERP_${new Date().toISOString().split('T')[0]}.json`; link.click();
