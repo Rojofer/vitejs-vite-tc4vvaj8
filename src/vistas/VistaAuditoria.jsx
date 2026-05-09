@@ -68,7 +68,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         }
       });
 
-      doc.save(`Trazabilidad_${insumo.codigo_${insumo.nombre|| 'Auditoria'}.pdf`);
+      doc.save(`Trazabilidad_${insumo.nombre || 'Auditoria'}.pdf`);
       setToastMsg("Dossier PDF generado y descargado con éxito.");
       setTimeout(() => setToastMsg(null), 4000);
     };
