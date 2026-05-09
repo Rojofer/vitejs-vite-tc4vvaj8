@@ -14,8 +14,8 @@ const VistaNotificaciones = ({
   setActiveInsumo, 
   rechazarAlertaPlanta, 
   aprobarAlertaPlanta, 
-  marcarAlertaComoVista
-  marcarMensajeComoLeido
+  marcarAlertaComoVista,
+  marcarMensajeComoLeido,
 }) => {
   const [filtroNoti, setFiltroNoti] = useState("");
   const isOwner = currentUser.rol === 'owner';
