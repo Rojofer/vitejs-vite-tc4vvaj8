@@ -41,14 +41,11 @@ const obtenerMesAnio = (fecha) => {
   } catch (e) { return "Sin Fecha"; }
 };
 
-const marcarMensajeComoLeido = async (mensajeId) => {
+const marcarMensajeComoLeido = async (noti) => {
     try {
-      const msj = reclamos.find(r => r.id === mensajeId);
-      if (msj) {
-        const yaLeidos = msj.leidoPor || [];
-        if (!yaLeidos.includes(currentUser.nombre)) {
-          await updateDoc(doc(db, "reclamos", mensajeId), { leidoPor: [...yaLeidos, currentUser.nombre] });
-        }
+      const yaLeidos = noti.leidoPor || [];
+      if (!yaLeidos.includes(currentUser.nombre)) {
+        await updateDoc(doc(db, "reclamos", noti.id), { leidoPor: [...yaLeidos, currentUser.nombre] });
       }
     } catch (e) { console.error("Error al leer:", e); }
   };
