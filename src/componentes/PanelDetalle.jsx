@@ -295,7 +295,7 @@ const PanelDetalle = ({
                     <button onClick={() => abrirRedactorReclamo(activeInsumo, "ALERTA PLANTA")} className="flex-1 flex items-center justify-center gap-2 p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(16,185,129,0.3)] active:scale-[0.98] font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 animate-pulse">
                       <Activity size={18} /> Enviar a Planta
                     </button>
-                    <button onClick={() => abrirRedactorReclamo(activeInsumo, "RECLAMO PROVEEDOR")} className="flex-1 flex items-center justify-center gap-2 p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-[10px] uppercase tracking-widest bg-slate-800 hover:bg-slate-900 opacity-90">
+                    <button onClick={() => abrirRedactorReclamo(activeInsumo, "RECLAMO COMPRAS")} className="flex-1 flex items-center justify-center gap-2 p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-[10px] uppercase tracking-widest bg-slate-800 hover:bg-slate-900 opacity-90">
                       <Send size={14} /> Reclamar a Prov.
                     </button>
                   </div>
