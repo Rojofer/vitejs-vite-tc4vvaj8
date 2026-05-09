@@ -61,7 +61,7 @@ const VistaNotificaciones = ({
                       <div className="flex items-center gap-3">
                         <span className="bg-orange-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase animate-pulse">Nuevo</span>
                         <button 
-                          onClick={() => marcarMensajeComoLeido(noti)} 
+                          onClick={() => marcarMensajeComoLeido(noti, currentUser.nombre)}
                           className="text-[10px] font-black uppercase text-sky-500 hover:text-sky-700 bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-100 transition-all active:scale-95"
                         >
                           ✔ Marcar como leído
