@@ -81,7 +81,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     // --- DESCARGAR EXCEL INTERNO ---
     const descargarExcelAuditoria = (filtrados) => {
       let csv = "Fecha,Estado,Tipo,Insumo,Mensaje,Operario\n";
-      filtrados.forEach(r => { const ins = insumos.find(i => i.id === r.insumoId)?.nombre || 'Eliminado'; csv += `"${formatearFecha(r.fecha)}","${r.estado}","${r.tipo === 'equipo'?'Alerta Interna':'Reclamo Prov.'}","${ins}","${r.mensaje}","${r.operario}"\n`; });
+      filtrados.forEach(r => { const ins = insumos.find(i => i.id === r.insumoId)?.nombre || 'Eliminado'; csv += `"${formatearFecha(r.fecha)}","${r.estado}","${r.tipo === 'equipo'?'Alerta Interna':'Reclamo Compras'}","${ins}","${r.mensaje}","${r.operario}"\n`; });
       const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Auditoria_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
     };
@@ -120,7 +120,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       if (filtroTipo === "RECHAZOS") filtrados = filtrados.filter(r => r.tipo === "RECHAZO GERENCIA");
       if (filtroTipo === "APROBACIONES") filtrados = filtrados.filter(r => r.tipo === "APROBACION GERENCIA");
       if (filtroTipo === "ALERTAS") filtrados = filtrados.filter(r => r.tipo === "equipo");
-      if (filtroTipo === "PROVEEDORES") filtrados = filtrados.filter(r => r.tipo === "compras");
+      if (filtroTipo === "COMPRAS") filtrados = filtrados.filter(r => r.tipo === "compras");
     }
 
     if (auditoriaTab === 'abiertos') {
@@ -165,7 +165,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
               <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
                 <option value="TODOS">Todos los Tipos</option>
-                <option value="PROVEEDORES">📦 Reclamos Prov.</option>
+                <option value="COMPRAS">📦 Reclamos a Compras</option>
                 <option value="ALERTAS">📢 Alertas Planta</option>
                 <option value="APROBACIONES">✅ Aprobaciones</option>
                 <option value="RECHAZOS">🚫 Rechazos</option>
@@ -252,7 +252,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     ) : h.tipo === "RECHAZO GERENCIA" ? (
                       <span className="text-[9px] font-black text-slate-600 bg-slate-100 border border-slate-300 px-2 py-1 rounded shadow-sm flex items-center gap-1 w-max"><X size={10}/> RECHAZO</span>
                     ) : (
-                      <span className="text-[9px] font-black text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded flex items-center gap-1 w-max shadow-sm"><AlertCircle size={10}/> RECLAMO PROV.</span>
+                      <span className="text-[9px] font-black text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded flex items-center gap-1 w-max shadow-sm"><AlertCircle size={10}/> RECLAMO COMPRAS</span>
                     )}
                   </td>
 
