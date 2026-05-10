@@ -91,35 +91,38 @@ const VistaGestion = ({
           return (
             <div className="flex flex-col lg:flex-row items-stretch justify-end gap-4 flex-1 w-full xl:w-auto">
               
-              {/* LOS 3 MINI-KPIS NUEVOS (FORMATO SAAS ELEGANTE) */}
-              <div className="flex gap-2 sm:gap-3 shrink-0">
-                
-                <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 flex flex-col shadow-sm min-w-[90px] hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1.5">
-                    <Package size={14} className="text-slate-400" />
-                    <span className="text-xl font-black text-slate-800 leading-none">{formatoNum(totalProductos)}</span>
+              {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
+                {/* Cabecera de la Tarjeta */}
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumen de Inventario</h3>
+                  <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${tieneFantasmas ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-100 shadow-sm'}`}>
+                    Grupos: {gruposSanos}/{totalGrupos}
                   </div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-5">Productos</span>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 flex flex-col shadow-sm min-w-[90px] hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1.5">
-                    <Star size={14} className="text-orange-400" />
-                    <span className="text-xl font-black text-slate-800 leading-none">{formatoNum(totalFavs)}</span>
-                  </div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-5">Favoritos</span>
+                {/* Barra Segmentada (Naranja para Favs, Gris para Estándar) */}
+                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden flex mb-3 border border-slate-50">
+                  <div style={{ width: `${totalProductos > 0 ? Math.round((totalFavs / totalProductos) * 100) : 0}%` }} className="h-full bg-orange-400 transition-all duration-500"></div>
                 </div>
 
-                <div className={`border rounded-lg px-3 py-2 flex flex-col shadow-sm min-w-[90px] transition-all duration-300 ${tieneFantasmas ? 'bg-red-50 border-red-300 shadow-red-100/50' : 'bg-white border-slate-200 hover:shadow-md'}`}>
-                  <div className="flex items-center gap-1.5">
-                    <Folder size={14} className={tieneFantasmas ? 'text-red-500 animate-pulse' : 'text-blue-400'} />
-                    <span className={`text-xl font-black leading-none ${tieneFantasmas ? 'text-red-700' : 'text-slate-800'}`}>
-                      {gruposSanos}/{totalGrupos}
-                    </span>
+                {/* Pie: Números Sutiles y Proporcionados */}
+                <div className="flex items-center justify-between mt-auto">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
+                      <span className="text-[10px] font-black text-slate-800">{formatoNum(totalFavs)} <span className="font-bold text-slate-400 uppercase tracking-widest">Favs</span></span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
+                      <span className="text-[10px] font-black text-slate-800">{formatoNum(totalProductos - totalFavs)} <span className="font-bold text-slate-400 uppercase tracking-widest">Estándar</span></span>
+                    </div>
                   </div>
-                  <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 ml-5 ${tieneFantasmas ? 'text-red-600' : 'text-slate-400'}`}>Grupos</span>
+                  <div className="flex items-center gap-1.5 pl-3 border-l border-slate-100">
+                    <Package size={12} className="text-slate-400" />
+                    <span className="text-[10px] font-black text-slate-800">{formatoNum(totalProductos)} <span className="font-bold text-slate-400 uppercase tracking-widest">Total</span></span>
+                  </div>
                 </div>
-
               </div>
 
               {/* TU BARRA DE SALUD OPERATIVA ORIGINAL INTACTA */}
