@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, AlertTriangle, Star, Clock, Folder, ArrowLeft, Activity, Bell } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, Star, Clock, Folder, ArrowLeft, Activity, Bell, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TablaInsumos from '../componentes/TablaInsumos';
 
@@ -43,69 +43,117 @@ const VistaGestion = ({
           </div>
         </div>
 
-        {/* BARRA DE SALUD OPERATIVA (HEADER) */}
+        {/* BARRA DE SALUD OPERATIVA (HEADER) CON MINI-KPIS */}
         {(() => {
           const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
+          
+          // --- LÓGICA DE LOS 3 MINI-KPIs ---
+          const totalProductos = misInsumosDashboard.length;
+          const totalFavs = misInsumosDashboard.filter(i => i.favorito).length;
+          
+          const gruposDelUsuario = [...new Set(misInsumosDashboard.map(i => i.grupo || 'SIN CLASIFICAR'))];
+          const totalGrupos = gruposDelUsuario.length;
+          
+          let gruposSanos = totalGrupos;
+          let tieneFantasmas = false;
+          
+          if (currentUser.rol === 'owner') {
+            const gruposConFantasmas = gruposDelUsuario.filter(g => {
+              return misInsumosDashboard.some(i => (i.grupo || 'SIN CLASIFICAR') === g && (!i.owner || i.owner.trim() === '' || i.owner.toUpperCase().trim() === 'SIN ASIGNAR'));
+            });
+            gruposSanos = totalGrupos - gruposConFantasmas.length;
+            tieneFantasmas = gruposConFantasmas.length > 0;
+          }
+          // ---------------------------------
+
           const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
           const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
 
-          const totalFavs = misInsumosDashboard.filter(i => i.favorito).length;
           if (totalFavs === 0) return null;
 
           const quiebres = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uCritico).length;
           const riesgos = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia && i.supervivencia > uCritico).length;
-          
           const sanos = Math.max(0, totalFavs - quiebres - riesgos);
           const score = totalFavs > 0 ? Math.round((sanos / totalFavs) * 100) : 100;
 
-          let colorClass = "bg-emerald-500"; let bgClass = "bg-emerald-50"; let borderClass = "border-emerald-200"; let textClass = "text-emerald-700";
+          let colorClass = "bg-emerald-500"; let bgClass = "bg-emerald-50"; let borderClass = "border-emerald-200";
+          let textClass = "text-emerald-700";
           let msj = currentUser.rol === 'owner' ? "Operación global impecable." : "Cobertura total de tus FAVORITOS.";
 
           if (score < 100 && score >= 80) {
-            colorClass = "bg-amber-500"; bgClass = "bg-amber-50"; borderClass = "border-amber-200"; textClass = "text-amber-700"; msj = "Frentes que requieren atención.";
+            colorClass = "bg-amber-500";
+            bgClass = "bg-amber-50"; borderClass = "border-amber-200"; textClass = "text-amber-700"; msj = "Frentes que requieren atención.";
           } else if (score < 80) {
-            colorClass = "bg-red-500"; bgClass = "bg-red-50"; borderClass = "border-red-200"; textClass = "text-red-700"; msj = "Riesgo de quiebres inminentes.";
+            colorClass = "bg-red-500";
+            bgClass = "bg-red-50"; borderClass = "border-red-200"; textClass = "text-red-700"; msj = "Riesgo de quiebres inminentes.";
           }
 
           return (
-            <div className={`flex-1 w-full max-w-3xl rounded-2xl border ${borderClass} ${bgClass} px-5 py-4 shadow-sm flex items-center gap-6 relative overflow-hidden`}>
-              <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none ${colorClass}`}></div>
+            <div className="flex flex-col lg:flex-row items-stretch justify-end gap-4 flex-1 w-full xl:w-auto">
               
-              <div className="flex-1 relative z-10">
-                <div className="flex justify-between items-end mb-2">
-                  <div>
-                    <h3 className={`font-black uppercase tracking-tight text-[13px] leading-none ${textClass}`}>{currentUser.rol === 'owner' ? 'Salud Operativa Global - FAVORITOS' : 'Salud Operativa del Inventario -SOLO DE FAVORITOS'}</h3>
-                    <p className={`text-[9px] font-bold uppercase tracking-widest opacity-80 mt-1 ${textClass}`}>{msj}</p>
+              {/* LOS 3 MINI-KPIS NUEVOS */}
+              <div className="flex gap-2 sm:gap-3 shrink-0">
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-col justify-center items-start shadow-sm min-w-[70px] sm:min-w-[84px] hover:shadow-md transition-shadow">
+                  <Package size={16} className="text-slate-400 mb-1" />
+                  <p className="text-lg sm:text-2xl font-black text-slate-800 leading-none">{totalProductos}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-col justify-center items-start shadow-sm min-w-[70px] sm:min-w-[84px] hover:shadow-md transition-shadow">
+                  <Star size={16} className="text-orange-400 mb-1" />
+                  <p className="text-lg sm:text-2xl font-black text-slate-800 leading-none">{totalFavs}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Favs</p>
+                </div>
+                <div className={`border rounded-2xl p-3 flex flex-col justify-center items-start shadow-sm min-w-[70px] sm:min-w-[84px] transition-all duration-300 ${tieneFantasmas ? 'bg-red-50 border-red-300 shadow-red-100/50' : 'bg-white border-slate-200 hover:shadow-md'}`}>
+                  <Folder size={16} className={tieneFantasmas ? 'text-red-500 mb-1 animate-pulse' : 'text-blue-400 mb-1'} />
+                  <p className={`text-lg sm:text-2xl font-black leading-none ${tieneFantasmas ? 'text-red-700' : 'text-slate-800'}`}>
+                    {gruposSanos}/{totalGrupos}
+                  </p>
+                  <p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${tieneFantasmas ? 'text-red-600' : 'text-slate-400'}`}>
+                    Grupos
+                  </p>
+                </div>
+              </div>
+
+              {/* TU BARRA DE SALUD OPERATIVA ORIGINAL INTACTA */}
+              <div className={`w-full max-w-3xl rounded-2xl border ${borderClass} ${bgClass} px-5 py-4 shadow-sm flex items-center gap-6 relative overflow-hidden`}>
+                <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none ${colorClass}`}></div>
+                
+                <div className="flex-1 relative z-10">
+                   <div className="flex justify-between items-end mb-2">
+                    <div>
+                      <h3 className={`font-black uppercase tracking-tight text-[13px] leading-none ${textClass}`}>{currentUser.rol === 'owner' ? 'Salud Operativa Global - FAVORITOS' : 'Salud Operativa del Inventario -SOLO DE FAVORITOS'}</h3>
+                      <p className={`text-[9px] font-bold uppercase tracking-widest opacity-80 mt-1 ${textClass}`}>{msj}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-2xl font-black leading-none tracking-tighter ${textClass}`}>{score}%</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`text-2xl font-black leading-none tracking-tighter ${textClass}`}>{score}%</span>
+                  
+                  <div className="w-full h-3 rounded-full bg-white/60 overflow-hidden relative border border-white/50 shadow-inner">
+                    <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000, #000 4px, transparent 4px, transparent 8px)' }}></div>
+                    <div className={`h-full rounded-full ${colorClass} transition-all duration-1000 relative z-10`} style={{ width: `${score}%` }}></div>
                   </div>
                 </div>
                 
-                <div className="w-full h-3 rounded-full bg-white/60 overflow-hidden relative border border-white/50 shadow-inner">
-                  <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000, #000 4px, transparent 4px, transparent 8px)' }}></div>
-                  <div className={`h-full rounded-full ${colorClass} transition-all duration-1000 relative z-10`} style={{ width: `${score}%` }}></div>
+                <div className={`hidden sm:flex flex-col gap-1.5 shrink-0 border-l pl-4 relative z-10 ${borderClass}`}>
+                   <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-sm bg-emerald-500 shadow-sm"></div>
+                      <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{sanos}</strong> Sanos</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-sm bg-amber-500 shadow-sm"></div>
+                      <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{riesgos}</strong> Riesgo</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-sm bg-red-500 shadow-sm ${quiebres > 0 ? 'animate-pulse' : ''}`}></div>
+                      <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{quiebres}</strong> Quiebres</span>
+                   </div>
                 </div>
               </div>
-              
-              <div className={`hidden sm:flex flex-col gap-1.5 shrink-0 border-l pl-4 relative z-10 ${borderClass}`}>
-                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-sm bg-emerald-500 shadow-sm"></div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{sanos}</strong> Sanos</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-sm bg-amber-500 shadow-sm"></div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{riesgos}</strong> Riesgo</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-sm bg-red-500 shadow-sm ${quiebres > 0 ? 'animate-pulse' : ''}`}></div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{quiebres}</strong> Quiebres</span>
-                 </div>
-              </div>
+
             </div>
           );
         })()}
-      </div>
 
       <AnimatePresence mode="wait">
       {searchTerm !== "" ? (
