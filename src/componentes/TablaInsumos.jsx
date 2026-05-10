@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowUpDown, Star, StarOff, Eye, EyeOff, Clock, Send, Activity, CheckSquare } from 'lucide-react';
+import { ArrowUpDown, Star, StarOff, Eye, EyeOff, Clock, Send, Activity, CheckSquare, Bell, Check, X, BellOff } from 'lucide-react';
 
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 
@@ -95,32 +95,63 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
           
            <td className="px-4 py-2.5 text-center">
             <div className="flex items-center justify-center gap-2">
-              
-              {/* LA VÍA PARALELA 1: ESTADO DE ALERTA (Solo visual, no bloquea) */}
-              {i.alertaPendiente && !isOwner && (
-                <span className="bg-sky-100 text-sky-700 text-[9px] font-black px-2 py-1 rounded border border-sky-200 flex items-center gap-1 shadow-sm" title="Solicitud enviada, esperando firma">
-                  <Clock size={10}/> Solicitado
-                </span>
-              )}
-              {i.alertaAprobada && !isOwner && (
-                <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded border border-emerald-200 flex items-center gap-1 shadow-sm animate-pulse" title="¡Autorizado! Listo para enviar a planta">
-                  <CheckSquare size={10}/> ¡Aprobado!
-                </span>
-              )}
-              {i.alertaActivaEnPlanta && (
-                <span className="bg-purple-100 text-purple-700 text-[9px] font-black px-2 py-1 rounded border border-purple-200 flex items-center gap-1 shadow-sm">
-                  <Activity size={10}/> En Planta
-                </span>
+
+              {/* CIRCUITO DE ALERTAS - NUEVA LÓGICA */}
+              {isOwner ? (
+                /* --- VISTA EXCLUSIVA DEL OWNER --- */
+                <>
+                  {i.alertaPendiente && !i.alertaActivaEnPlanta ? (
+                    // 1. Bandeja: Esperando tu aprobación
+                    <div className="flex items-center gap-1 bg-yellow-50 p-1 rounded-lg border border-yellow-200 shadow-sm">
+                      <button onClick={(e) => { e.stopPropagation(); console.log("Falta conectar rechazo"); }} className="p-1 text-red-500 hover:bg-red-100 rounded transition-colors" title="Rechazar Solicitud">
+                        <X size={14} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); console.log("Falta conectar aprobación"); }} className="p-1 text-emerald-600 hover:bg-emerald-100 rounded transition-colors" title="Aprobar y Enviar a Planta">
+                        <Check size={14} />
+                      </button>
+                    </div>
+                  ) : i.alertaActivaEnPlanta ? (
+                    // 2. Alerta Viva: Solo vos podés apagarla
+                    <button onClick={(e) => { e.stopPropagation(); console.log("Falta conectar apagado"); }} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-[9px] font-black px-2 py-1.5 rounded border border-purple-300 shadow-sm flex items-center gap-1 transition-all" title="Apagar Alerta en Planta">
+                      <BellOff size={12} /> Apagar
+                    </button>
+                  ) : (
+                    // 3. Normal: Botón para que vos actives directo si querés
+                    <button onClick={(e) => { e.stopPropagation(); console.log("Falta conectar activación directa"); }} className="text-slate-300 hover:text-purple-600 hover:bg-purple-50 p-1.5 rounded transition-all" title="Activar Alerta Directa">
+                      <Bell size={14} />
+                    </button>
+                  )}
+                </>
+              ) : (
+                /* --- VISTA DEL OPERARIO --- */
+                <>
+                  {i.alertaActivaEnPlanta ? (
+                    // 1. Alerta Viva: Solo lectura y aviso
+                    <span className="bg-purple-100 text-purple-700 text-[9px] font-black px-2 py-1.5 rounded border border-purple-200 flex items-center gap-1 shadow-sm animate-pulse">
+                      <Activity size={12} /> ACTIVA EN PLANTA
+                    </span>
+                  ) : i.alertaPendiente ? (
+                    // 2. Esperando: Botón para arrepentirse/cancelar
+                    <button onClick={(e) => { e.stopPropagation(); console.log("Falta conectar cancelación"); }} className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-[9px] font-black px-2 py-1.5 rounded border border-yellow-300 shadow-sm flex items-center gap-1 transition-all" title="Click para cancelar solicitud">
+                      <Clock size={12} /> Esperando...
+                    </button>
+                  ) : (
+                    // 3. Normal: Tocar para solicitar tu permiso
+                    <button onClick={(e) => { e.stopPropagation(); console.log("Falta conectar solicitud"); }} className="text-slate-300 hover:text-yellow-500 hover:bg-yellow-50 p-1.5 rounded transition-all" title="Solicitar Alerta">
+                      <Bell size={14} />
+                    </button>
+                  )}
+                </>
               )}
 
-              {/* LA VÍA PARALELA 2: EL BOTÓN DE GESTIÓN (Siempre disponible) */}
-              <button 
-                onClick={(e) => { e.stopPropagation(); onGestionar(i); }} 
-                className="bg-slate-800 text-white text-[9px] font-black px-3 py-1.5 rounded-lg hover:bg-orange-500 transition-all border border-slate-700 shadow-sm flex items-center gap-1 shrink-0"
+              {/* BOTÓN DE GESTIÓN CLÁSICO (Siempre disponible) */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onGestionar(i); }}
+                className="bg-slate-800 text-white text-[9px] font-black px-3 py-1.5 rounded-lg hover:bg-orange-500 transition-all border border-slate-700 shadow-sm flex items-center gap-1 shrink-0 ml-1"
               >
                 Gestionar
               </button>
-              
+
             </div>
           </td>
         </tr>
