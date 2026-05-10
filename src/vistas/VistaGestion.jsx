@@ -154,6 +154,7 @@ const VistaGestion = ({
             </div>
           );
         })()}
+      </div>
 
       <AnimatePresence mode="wait">
       {searchTerm !== "" ? (
