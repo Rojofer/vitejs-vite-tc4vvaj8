@@ -91,33 +91,33 @@ const VistaGestion = ({
           return (
             <div className="flex flex-col lg:flex-row items-stretch justify-end gap-4 flex-1 w-full xl:w-auto">
               
-              {/* LOS 3 MINI-KPIS NUEVOS (FORMATO PÍLDORA) */}
+              {/* LOS 3 MINI-KPIS NUEVOS (FORMATO SAAS ELEGANTE) */}
               <div className="flex gap-2 sm:gap-3 shrink-0">
                 
-                <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex flex-col justify-center items-center shadow-sm min-w-[90px] sm:min-w-[100px] hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 flex flex-col shadow-sm min-w-[90px] hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-1.5">
                     <Package size={14} className="text-slate-400" />
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Total</span>
+                    <span className="text-xl font-black text-slate-800 leading-none">{formatoNum(totalProductos)}</span>
                   </div>
-                  <p className="text-xl font-black text-slate-800 leading-none">{formatoNum(totalProductos)}</p>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-5">Productos</span>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex flex-col justify-center items-center shadow-sm min-w-[90px] sm:min-w-[100px] hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 flex flex-col shadow-sm min-w-[90px] hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-1.5">
                     <Star size={14} className="text-orange-400" />
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Favs</span>
+                    <span className="text-xl font-black text-slate-800 leading-none">{formatoNum(totalFavs)}</span>
                   </div>
-                  <p className="text-xl font-black text-slate-800 leading-none">{formatoNum(totalFavs)}</p>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-5">Favoritos</span>
                 </div>
 
-                <div className={`border rounded-xl px-4 py-2.5 flex flex-col justify-center items-center shadow-sm min-w-[90px] sm:min-w-[100px] transition-all duration-300 ${tieneFantasmas ? 'bg-red-50 border-red-300 shadow-red-100/50' : 'bg-white border-slate-200 hover:shadow-md'}`}>
-                  <div className="flex items-center gap-1.5 mb-1.5">
+                <div className={`border rounded-lg px-3 py-2 flex flex-col shadow-sm min-w-[90px] transition-all duration-300 ${tieneFantasmas ? 'bg-red-50 border-red-300 shadow-red-100/50' : 'bg-white border-slate-200 hover:shadow-md'}`}>
+                  <div className="flex items-center gap-1.5">
                     <Folder size={14} className={tieneFantasmas ? 'text-red-500 animate-pulse' : 'text-blue-400'} />
-                    <span className={`text-[9px] font-bold uppercase tracking-widest leading-none ${tieneFantasmas ? 'text-red-600' : 'text-slate-400'}`}>Grupos</span>
+                    <span className={`text-xl font-black leading-none ${tieneFantasmas ? 'text-red-700' : 'text-slate-800'}`}>
+                      {gruposSanos}/{totalGrupos}
+                    </span>
                   </div>
-                  <p className={`text-xl font-black leading-none ${tieneFantasmas ? 'text-red-700' : 'text-slate-800'}`}>
-                    {gruposSanos}/{totalGrupos}
-                  </p>
+                  <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 ml-5 ${tieneFantasmas ? 'text-red-600' : 'text-slate-400'}`}>Grupos</span>
                 </div>
 
               </div>
