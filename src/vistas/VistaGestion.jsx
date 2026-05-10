@@ -94,17 +94,17 @@ const VistaGestion = ({
               {/* LOS 3 MINI-KPIS NUEVOS */}
               <div className="flex gap-2 sm:gap-3 shrink-0">
                 <div className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-col justify-center items-start shadow-sm min-w-[70px] sm:min-w-[84px] hover:shadow-md transition-shadow">
-                  <Package size={16} className="text-slate-400 mb-1" />
-                  <p className="text-lg sm:text-2xl font-black text-slate-800 leading-none">{totalProductos}</p>
+                  <Package size={20} className="text-slate-400 mb-1" />
+                  <p className="text-lg sm:text-2xl font-black text-slate-800 leading-none">{formatoNum(totalProductos)}</p>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-col justify-center items-start shadow-sm min-w-[70px] sm:min-w-[84px] hover:shadow-md transition-shadow">
-                  <Star size={16} className="text-orange-400 mb-1" />
-                  <p className="text-lg sm:text-2xl font-black text-slate-800 leading-none">{totalFavs}</p>
+                  <Star size={20} className="text-orange-400 mb-1" />
+                  <p className="text-lg sm:text-2xl font-black text-slate-800 leading-none">{formatoNum(totalFavs)}</p>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Favs</p>
                 </div>
                 <div className={`border rounded-2xl p-3 flex flex-col justify-center items-start shadow-sm min-w-[70px] sm:min-w-[84px] transition-all duration-300 ${tieneFantasmas ? 'bg-red-50 border-red-300 shadow-red-100/50' : 'bg-white border-slate-200 hover:shadow-md'}`}>
-                  <Folder size={16} className={tieneFantasmas ? 'text-red-500 mb-1 animate-pulse' : 'text-blue-400 mb-1'} />
+                  <Folder size={20} className={tieneFantasmas ? 'text-red-500 mb-1 animate-pulse' : 'text-blue-400 mb-1'} />
                   <p className={`text-lg sm:text-2xl font-black leading-none ${tieneFantasmas ? 'text-red-700' : 'text-slate-800'}`}>
                     {gruposSanos}/{totalGrupos}
                   </p>
