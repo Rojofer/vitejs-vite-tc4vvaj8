@@ -333,48 +333,12 @@ const VistaGestion = ({
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
-
-                    {/* NUEVO: ALERTA EN PLANTA */}
-                    <div onClick={() => setFiltroAlerta('alerta_planta')} className="bg-white rounded-2xl p-4 sm:p-5 border border-purple-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Activity size={16} className="text-purple-500 shrink-0"/>
-                          <span className="text-[10px] sm:text-[11px] font-black text-purple-600 uppercase tracking-widest leading-tight">En Planta</span>
-                        </div>
-                      </div>
-                      <div className="w-full h-2.5 flex gap-1 mb-4">
-                        <div className="h-full rounded-full bg-purple-500 transition-all duration-700" style={{ width: `${(kpiAlertaPlanta.length/total)*100}%`, minWidth: kpiAlertaPlanta.length>0?'4px':'0' }}></div>
-                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <p className="text-2xl sm:text-3xl font-black text-purple-700 leading-none">{kpiAlertaPlanta.length}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
-                      </div>
-                    </div>
-
-                    {/* NUEVO: ESPERANDO CONFIRMACIÓN */}
-                    <div onClick={() => setFiltroAlerta('esperando_aprobacion')} className="bg-white rounded-2xl p-4 sm:p-5 border border-teal-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Bell size={16} className="text-teal-500 shrink-0"/>
-                          <span className="text-[10px] sm:text-[11px] font-black text-teal-600 uppercase tracking-widest leading-tight">Aprobar</span>
-                        </div>
-                      </div>
-                      <div className="w-full h-2.5 flex gap-1 mb-4">
-                        <div className="h-full rounded-full bg-teal-500 transition-all duration-700" style={{ width: `${(kpiEsperando.length/total)*100}%`, minWidth: kpiEsperando.length>0?'4px':'0' }}></div>
-                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <p className="text-2xl sm:text-3xl font-black text-teal-700 leading-none">{kpiEsperando.length}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
-                      </div>
-                    </div>
-
+             
                   </>
                 );
               })()}
             </div>
-            
+                        
             {/* DETALLE DE SALUD POR OPERARIO (SOLO ADMIN) */}
             {currentUser.rol === 'owner' && (() => {
               const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
