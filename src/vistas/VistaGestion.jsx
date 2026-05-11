@@ -27,7 +27,7 @@ const VistaGestion = ({
   toggleFavorito,
   toggleVisibilidadPlanta,
   obtenerColorOwner,
-  renderRadarDinamico
+  renderRadarDinamico,
   setSimulatedId,
   perfilesSimulables
 }) => {
