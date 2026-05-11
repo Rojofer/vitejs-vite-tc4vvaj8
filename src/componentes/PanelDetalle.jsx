@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Star, StarOff, Eye, EyeOff, CheckCircle, Copy, Clock, Send, ChevronRight, Activity, CheckSquare } from 'lucide-react';
+import { X, Star, StarOff, CheckCircle, Copy, Clock, Send, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
@@ -8,7 +8,7 @@ const PanelDetalle = ({
   activeInsumo,
   setActiveInsumo,
   currentUser,
-  config,
+  config,<Star>
   toggleFavorito,
   toggleVisibilidadPlanta,
   formatearFecha,
@@ -140,36 +140,18 @@ const PanelDetalle = ({
             {reclamosActivos.length > 0 ? (
               <div className="space-y-2 max-h-56 overflow-y-auto pr-2 pb-4">
                 {reclamosActivos.map(r => {
-                  const isGerencia = r.tipo?.includes('GERENCIA');
-                  const isAprobacion = r.tipo === 'APROBACION GERENCIA';
-                  const isRechazo = r.tipo === 'RECHAZO GERENCIA';
-                  const isResuelto = r.estado === 'CERRADO' && !isGerencia;
+                  const isResuelto = r.estado === 'CERRADO';
                   
                   let bgColor = 'bg-orange-50 border-orange-200';
                   let icon = <Clock size={16} className="text-orange-600 mt-0.5" />;
                   let titleColor = 'text-slate-800';
-                  let titleText = 'Reclamo Proveedor';
+                  let titleText = 'Reclamo Compras';
 
                   if (isResuelto) {
                     bgColor = 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100';
                     icon = <CheckCircle size={16} className="text-emerald-500 mt-0.5" />;
                     titleColor = 'text-slate-500';
                     titleText = 'Reclamo Resuelto';
-                  } else if (isAprobacion) {
-                    bgColor = 'bg-indigo-50 border-indigo-200 opacity-90';
-                    icon = <CheckSquare size={16} className="text-indigo-600 mt-0.5" />;
-                    titleColor = 'text-indigo-800';
-                    titleText = 'Autorización Interna';
-                  } else if (isRechazo) {
-                    bgColor = 'bg-slate-100 border-slate-300 opacity-80';
-                    icon = <X size={16} className="text-slate-500 mt-0.5" />;
-                    titleColor = 'text-slate-600';
-                    titleText = 'Permiso Denegado';
-                  } else if (r.tipo === 'equipo') {
-                    bgColor = 'bg-purple-50 border-purple-200';
-                    icon = <Activity size={16} className="text-purple-600 mt-0.5" />;
-                    titleColor = 'text-purple-800';
-                    titleText = 'Alerta a Planta';
                   }
 
                   return (
@@ -197,117 +179,11 @@ const PanelDetalle = ({
         
         {/* PIE DEL PANEL (BOTONERAS DE ACCIÓN) */}
         <div className="p-6 bg-white border-t border-slate-100 shrink-0">
-          {(() => {
-            const isOwner = currentUser.rol === 'owner';
-            const { alertaPendiente, alertaAprobada, alertaSolicitante, alertaRechazadaMotivo, alertaAprobadaHora } = activeInsumo;
-            
-            let horasPasadas = 0; let delayVencido = false;
-            if (alertaAprobada && alertaAprobadaHora) {
-              const horaAprob = alertaAprobadaHora.seconds ? new Date(alertaAprobadaHora.seconds * 1000) : new Date(alertaAprobadaHora);
-              horasPasadas = (new Date() - horaAprob) / (1000 * 60 * 60);
-              const limite = config.tiempoDelayAlerta || 2;
-              delayVencido = horasPasadas > limite;
-            }
-
-            return (
-              <div className="flex flex-col gap-3">
-                {/* ADMIN: Panel de Aprobación */}
-                {isOwner && alertaPendiente && (
-                  <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-3 w-3 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
-                      </span>
-                      <p className="text-[10px] font-black text-purple-800 uppercase tracking-widest">Solicitud Alerta Planta: <span className="text-purple-600">{alertaSolicitante}</span></p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => { const motivo = window.prompt("Motivo del rechazo:"); if (motivo) rechazarAlertaPlanta(activeInsumo, motivo); }} className="px-3 py-1.5 bg-white text-slate-500 border border-slate-200 rounded-lg text-[9px] font-black uppercase hover:text-red-500 hover:border-red-200 transition-colors">Rechazar</button>
-                      <button onClick={() => aprobarAlertaPlanta(activeInsumo)} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-purple-700 shadow-md transition-colors">Aprobar</button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ADMIN: Panel de Delay */}
-                {isOwner && alertaAprobada && delayVencido && (
-                  <div className="p-3 rounded-xl flex items-center justify-between border bg-red-50 border-red-200">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-red-700">⚠️ ALERTA APROBADA - ENVÍO DEMORADO</p>
-                      <p className="text-[9px] font-bold mt-0.5 text-red-500">Aprobada hace {horasPasadas.toFixed(1)} hs.</p>
-                    </div>
-                    {confirmarForzar ? (
-                      <div className="flex items-center gap-3 bg-red-50 p-2 rounded-xl border border-red-200">
-                        <span className="text-[9px] font-black text-red-800 uppercase tracking-widest flex-1 pl-2">¿Seguro de forzar?</span>
-                        <button 
-                          onClick={() => setConfirmarForzar(false)} 
-                          className="px-3 py-1.5 bg-white border border-red-200 text-slate-500 rounded-lg text-[9px] font-black uppercase hover:bg-slate-50 transition-all"
-                        >
-                          Cancelar
-                        </button>
-                        <button 
-                          onClick={() => { 
-                            setConfirmarForzar(false);
-                            forzarCancelacionAlerta(activeInsumo); 
-                          }} 
-                          className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-[9px] font-black uppercase shadow-sm hover:bg-red-700 transition-all"
-                        >
-                          Sí, Limpiar
-                        </button>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => setConfirmarForzar(true)} 
-                        className="text-[10px] font-black uppercase text-red-500 hover:text-red-700 transition-colors underline decoration-red-500/30 underline-offset-4"
-                      >
-                        FORZAR CANCELACIÓN
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* OPERARIO: Banners informativos de estado */}
-                {!isOwner && alertaPendiente && (
-                  <div className="bg-amber-50 text-amber-700 p-2 rounded-lg text-[10px] font-black uppercase text-center border border-amber-200 flex items-center justify-center gap-2">
-                    <Activity size={14}/> Solicitud de Alerta Interna en Revisión por Gerencia
-                  </div>
-                )}
-                {/* OPERARIO: Banners informativos de estado */}
-                {!isOwner && alertaPendiente && (
-                  <div className="bg-sky-50 text-sky-700 p-2 rounded-lg text-[10px] font-black uppercase text-center border border-sky-200 flex items-center justify-center gap-2">
-                    <Clock size={14}/> Solicitud de Alerta Interna en Revisión por Gerencia
-                  </div>
-                )}
-                {!isOwner && alertaRechazadaMotivo && (
-                  <div className="bg-slate-50 text-slate-500 p-2 rounded-lg text-[10px] font-black uppercase text-center border border-slate-200 flex items-center justify-center gap-2">
-                    <X size={14} className="text-red-500"/> Rechazada: {alertaRechazadaMotivo}
-                  </div>
-                )}
-
-                {/* --- VÍAS PARALELAS: LOS BOTONES --- */}
-                {(!isOwner && alertaAprobada) ? (
-                  // Si está aprobada, le mostramos DOS botones (El de planta verde y el de proveedor naranja)
-                  <div className="flex gap-3">
-                    <button onClick={() => abrirRedactorReclamo(activeInsumo, "ALERTA PLANTA")} className="flex-1 flex items-center justify-center gap-2 p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(16,185,129,0.3)] active:scale-[0.98] font-black text-xs uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 animate-pulse">
-                      <Activity size={18} /> Enviar a Planta
-                    </button>
-                    <button onClick={() => abrirRedactorReclamo(activeInsumo, "RECLAMO COMPRAS")} className="flex-1 flex items-center justify-center gap-2 p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-[10px] uppercase tracking-widest bg-slate-800 hover:bg-slate-900 opacity-90">
-                      <Send size={14} /> Reclamar a Prov.
-                    </button>
-                  </div>
-                ) : (
-                  // Si NO está aprobada (o si es el Administrador), le mostramos el botón grande normal
-                  <button onClick={() => abrirRedactorReclamo(activeInsumo)} className="w-full flex items-center justify-between p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-xs uppercase tracking-widest bg-orange-500 hover:bg-orange-600">
-                    <div className="flex items-center gap-3"><Send size={18} /> Iniciar Comunicación</div>
-                    <ChevronRight size={18} />
-                  </button>
-                )}
-                
-              </div>
-            );
-          })()}
+          <button onClick={() => abrirRedactorReclamo(activeInsumo)} className="w-full flex items-center justify-between p-4 text-white rounded-2xl transition-all shadow-[0_10px_20px_rgba(249,115,22,0.3)] active:scale-[0.98] font-black text-xs uppercase tracking-widest bg-orange-500 hover:bg-orange-600">
+            <div className="flex items-center gap-3"><Send size={18} /> Iniciar Comunicación</div>
+            <ChevronRight size={18} />
+          </button>
         </div>
-
-      </motion.div>
     </>
   );
 };
