@@ -45,12 +45,7 @@ const PanelDetalle = ({
                   {activeInsumo.favorito ? <Star size={22} className="text-emerald-500" fill="currentColor"/> : <StarOff size={22} className="text-slate-400" />}
                 </div>
               )}
-              
-              {currentUser.rol === 'owner' && (
-                <button onClick={() => { setActiveInsumo({...activeInsumo, visibleEnPlanta: !activeInsumo.visibleEnPlanta}); toggleVisibilidadPlanta(activeInsumo); }} className="p-2 rounded-lg transition-all hover:bg-slate-50 active:scale-95" title="Alternar Visibilidad en Planta">
-                  {activeInsumo.visibleEnPlanta ? <Eye size={22} className="text-emerald-500"/> : <EyeOff size={22} className="text-red-500"/>}
-                </button>
-              )}
+                            
             </div>
           </div>
           <div className="flex items-center gap-3 mt-2 pr-8">
