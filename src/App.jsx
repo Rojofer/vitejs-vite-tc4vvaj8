@@ -762,17 +762,10 @@ let datosAlerta = []; let tituloAlerta = "";
             currentUser={currentUser}
             config={config}
             toggleFavorito={toggleFavorito}
-            toggleVisibilidadPlanta={toggleVisibilidadPlanta}
             formatearFecha={formatearFecha}
             reclamosActivos={reclamosActivos}
-            cerrarReclamoManual={cerrarReclamoManual}
-            setAuditoriaFiltroInsumo={setAuditoriaFiltroInsumo}
-            setVistaActiva={setVistaActiva}
-            rechazarAlertaPlanta={rechazarAlertaPlanta}
-            aprobarAlertaPlanta={aprobarAlertaPlanta}
             abrirRedactorReclamo={abrirRedactorReclamo}
-            solicitarAlertaPlanta={solicitarAlertaPlanta}
-            forzarCancelacionAlerta={forzarCancelacionAlerta}
+            obtenerColorOwner={obtenerColorOwner}
           />
         )}
         
