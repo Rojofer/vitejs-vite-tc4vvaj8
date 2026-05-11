@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, AlertTriangle, Star, Clock, Folder, ArrowLeft, Activity, Bell, Package } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, Star, Clock, ArrowLeft, Package, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TablaInsumos from '../componentes/TablaInsumos';
 
@@ -31,6 +31,7 @@ const VistaGestion = ({
 }) => {
   return (
     <div className="p-4 md:p-6 h-full max-w-full">
+      
       {/* CABECERA PRINCIPAL GESTIÓN ERP Y BARRA DE SALUD */}
       <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mb-8 gap-6">
         <div className="flex items-center gap-4 shrink-0">
@@ -47,7 +48,6 @@ const VistaGestion = ({
         {(() => {
           const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
           
-          // --- LÓGICA DE LOS 3 MINI-KPIs ---
           const totalProductos = misInsumosDashboard.length;
           const totalFavs = misInsumosDashboard.filter(i => i.favorito).length;
           
@@ -64,73 +64,63 @@ const VistaGestion = ({
             gruposSanos = totalGrupos - gruposConFantasmas.length;
             tieneFantasmas = gruposConFantasmas.length > 0;
           }
-          // ---------------------------------
 
           const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
           const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
 
           if (totalFavs === 0) return null;
-
+          
           const quiebres = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uCritico).length;
           const riesgos = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia && i.supervivencia > uCritico).length;
           const sanos = Math.max(0, totalFavs - quiebres - riesgos);
           const score = totalFavs > 0 ? Math.round((sanos / totalFavs) * 100) : 100;
 
-          let colorClass = "bg-emerald-500"; let bgClass = "bg-emerald-50"; let borderClass = "border-emerald-200";
-          let textClass = "text-emerald-700";
+          let colorClass = "bg-emerald-500"; let bgClass = "bg-emerald-50"; let borderClass = "border-emerald-200"; let textClass = "text-emerald-700";
           let msj = currentUser.rol === 'owner' ? "Operación global impecable." : "Cobertura total de tus FAVORITOS.";
-
+          
           if (score < 100 && score >= 80) {
-            colorClass = "bg-amber-500";
-            bgClass = "bg-amber-50"; borderClass = "border-amber-200"; textClass = "text-amber-700"; msj = "Frentes que requieren atención.";
+            colorClass = "bg-amber-500"; bgClass = "bg-amber-50"; borderClass = "border-amber-200"; textClass = "text-amber-700"; msj = "Frentes que requieren atención.";
           } else if (score < 80) {
-            colorClass = "bg-red-500";
-            bgClass = "bg-red-50"; borderClass = "border-red-200"; textClass = "text-red-700"; msj = "Riesgo de quiebres inminentes.";
+            colorClass = "bg-red-500"; bgClass = "bg-red-50"; borderClass = "border-red-200"; textClass = "text-red-700"; msj = "Riesgo de quiebres inminentes.";
           }
 
           return (
             <div className="flex flex-col lg:flex-row items-stretch justify-end gap-4 flex-1 w-full xl:w-auto">
               
-              {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO */}
+              {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO (SÓLO OWNER - Cuadro Fantasma Solucionado) */}
               {currentUser?.rol === 'owner' && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
-             
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumen de Inventario</h3>
+                    <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${tieneFantasmas ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-100 shadow-sm'}`}>
+                      Grupos: {gruposSanos}/{totalGrupos}
+                    </div>
+                  </div>
+
+                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden flex mb-3 border border-slate-50">
+                    <div style={{ width: `${totalProductos > 0 ? Math.round((totalFavs / totalProductos) * 100) : 0}%` }} className="h-full bg-orange-400 transition-all duration-500"></div>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-auto">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
+                        <span className="text-[10px] font-black text-slate-800">{formatoNum(totalFavs)} <span className="font-bold text-slate-400 uppercase tracking-widest">Favs</span></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
+                        <span className="text-[10px] font-black text-slate-800">{formatoNum(totalProductos - totalFavs)} <span className="font-bold text-slate-400 uppercase tracking-widest">Estándar</span></span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 pl-3 border-l border-slate-100">
+                      <Package size={12} className="text-slate-400" />
+                      <span className="text-[10px] font-black text-slate-800">{formatoNum(totalProductos)} <span className="font-bold text-slate-400 uppercase tracking-widest">Total</span></span>
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
-                {/* Cabecera de la Tarjeta */}
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumen de Inventario</h3>
-                  <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${tieneFantasmas ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-100 shadow-sm'}`}>
-                    Grupos: {gruposSanos}/{totalGrupos}
-                  </div>
-                </div>
 
-                {/* Barra Segmentada (Naranja para Favs, Gris para Estándar) */}
-                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden flex mb-3 border border-slate-50">
-                  <div style={{ width: `${totalProductos > 0 ? Math.round((totalFavs / totalProductos) * 100) : 0}%` }} className="h-full bg-orange-400 transition-all duration-500"></div>
-                </div>
-
-                {/* Pie: Números Sutiles y Proporcionados */}
-                <div className="flex items-center justify-between mt-auto">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                      <span className="text-[10px] font-black text-slate-800">{formatoNum(totalFavs)} <span className="font-bold text-slate-400 uppercase tracking-widest">Favs</span></span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
-                      <span className="text-[10px] font-black text-slate-800">{formatoNum(totalProductos - totalFavs)} <span className="font-bold text-slate-400 uppercase tracking-widest">Estándar</span></span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 pl-3 border-l border-slate-100">
-                    <Package size={12} className="text-slate-400" />
-                    <span className="text-[10px] font-black text-slate-800">{formatoNum(totalProductos)} <span className="font-bold text-slate-400 uppercase tracking-widest">Total</span></span>
-                  </div>
-                </div>
-              </div>
-
-              {/* TU BARRA DE SALUD OPERATIVA ORIGINAL INTACTA */}
+              {/* BARRA DE SALUD OPERATIVA */}
               <div className={`w-full max-w-3xl rounded-2xl border ${borderClass} ${bgClass} px-5 py-4 shadow-sm flex items-center gap-6 relative overflow-hidden`}>
                 <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none ${colorClass}`}></div>
                 
@@ -145,8 +135,7 @@ const VistaGestion = ({
                     </div>
                   </div>
                   
-                  <div className="w-full h-3 rounded-full bg-white/60 overflow-hidden relative border border-white/50 shadow-inner">
-                    <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000, #000 4px, transparent 4px, transparent 8px)' }}></div>
+                  <div className="w-full h-2 rounded-full bg-white/60 overflow-hidden relative shadow-inner">
                     <div className={`h-full rounded-full ${colorClass} transition-all duration-1000 relative z-10`} style={{ width: `${score}%` }}></div>
                   </div>
                 </div>
@@ -173,20 +162,14 @@ const VistaGestion = ({
       </div>
 
       <AnimatePresence mode="wait">
-      {searchTerm !== "" ? (
+        {searchTerm !== "" ? (
           <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <h2 className="text-xl font-black uppercase tracking-tight">Resultados: {searchTerm}</h2>
-              {renderRadarDinamico(resultadosBusqueda.filter(i => 
-                currentUser.rol === 'owner' || i.owner?.toUpperCase().trim() === currentUser.aliasMatch
-              ))}
+              {renderRadarDinamico(resultadosBusqueda.filter(i => currentUser.rol === 'owner' || i.owner?.toUpperCase().trim() === currentUser.aliasMatch))}
             </div>
             <TablaInsumos 
-              datos={resultadosBusqueda.filter(i => 
-                currentUser.rol === 'owner' 
-                  ? (filtroResponsable === 'TODOS' ? true : i.owner?.toUpperCase().trim() === filtroResponsable) 
-                  : i.owner?.toUpperCase().trim() === currentUser.aliasMatch
-              )} 
+              datos={resultadosBusqueda.filter(i => currentUser.rol === 'owner' ? (filtroResponsable === 'TODOS' ? true : i.owner?.toUpperCase().trim() === filtroResponsable) : i.owner?.toUpperCase().trim() === currentUser.aliasMatch)} 
               config={config} 
               onGestionar={setActiveInsumo} 
               mostrarGrupo={true} 
@@ -197,6 +180,7 @@ const VistaGestion = ({
               obtenerColorOwner={obtenerColorOwner} 
             />
           </motion.div>
+
         ) : filtroAlerta ? (
           (() => {
             const datosFiltradosAlerta = datosAlerta
@@ -207,10 +191,7 @@ const VistaGestion = ({
               <motion.div key="alerta" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => { setFiltroAlerta(null); setFiltroVistaLista('todos'); }} 
-                      className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors"
-                    >
+                    <button onClick={() => { setFiltroAlerta(null); setFiltroVistaLista('todos'); }} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
                       <ArrowLeft size={14} /> Volver
                     </button>
                     <h2 className="text-lg font-medium text-slate-700 tracking-tight">{tituloAlerta}</h2>
@@ -246,7 +227,8 @@ const VistaGestion = ({
         ) : !selectedGroup ? (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-5 w-full mb-10">
+            {/* GRILLA DE KPIS - 4 COLUMNAS SIMÉTRICAS SIN RUIDO VISUAL */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
               {(() => {
                 const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
                 
@@ -258,88 +240,59 @@ const VistaGestion = ({
                 const kpiDemoras = misInsumosDashboard.filter(i => i.ocDemorada > 0);
                 const kpiMisFavoritos = misInsumosDashboard.filter(i => i.favorito);
                 
-                // --- NUEVOS KPIs TÁCTICOS ---
-                const kpiAlertaPlanta = misInsumosDashboard.filter(i => i.alertaActivaEnPlanta || i.alertaAprobada);
-                const kpiEsperando = misInsumosDashboard.filter(i => i.alertaPendiente);
-                
                 const total = misInsumosDashboard.length || 1;
 
                 return (
                   <>
-                    <div onClick={() => setFiltroAlerta('quiebres')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle size={16} className="text-red-500 shrink-0"/>
-                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">Sin Stock</span>
-                        </div>
-                      </div>
-                      <div className="w-full h-2.5 flex gap-1 mb-4">
-                        <div className="h-full rounded-full bg-red-500 transition-all duration-700" style={{ width: `${(kpiQuiebres.length/total)*100}%`, minWidth: kpiQuiebres.length>0?'4px':'0' }}></div>
-                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
+                    <div onClick={() => setFiltroAlerta('quiebres')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-red-200 transition-all duration-300 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] sm:text-[11px] font-black text-red-500 uppercase tracking-widest leading-tight">Sin Stock</span>
+                        <div className="p-2 bg-red-50 rounded-xl"><AlertTriangle size={16} className="text-red-500"/></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiQuiebres.length}</p>
+                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiQuiebres.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
                     
-                    <div onClick={() => setFiltroAlerta('favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Star size={16} className="text-orange-500 shrink-0"/>
-                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">En Riesgo</span>
-                        </div>
-                      </div>
-                      <div className="w-full h-2.5 flex gap-1 mb-4">
-                        <div className="h-full rounded-full bg-orange-500 transition-all duration-700" style={{ width: `${(kpiFavRiesgo.length/total)*100}%`, minWidth: kpiFavRiesgo.length>0?'4px':'0' }}></div>
-                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
+                    <div onClick={() => setFiltroAlerta('favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-orange-200 transition-all duration-300 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] sm:text-[11px] font-black text-orange-500 uppercase tracking-widest leading-tight">En Riesgo</span>
+                        <div className="p-2 bg-orange-50 rounded-xl"><Activity size={16} className="text-orange-500"/></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiFavRiesgo.length}</p>
+                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiFavRiesgo.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
 
-                    <div onClick={() => setFiltroAlerta('oc_tardia')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} className="text-rose-500 shrink-0"/>
-                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">Demoradas</span>
-                        </div>
-                      </div>
-                      <div className="w-full h-2.5 flex gap-1 mb-4">
-                        <div className="h-full rounded-full bg-rose-500 transition-all duration-700" style={{ width: `${(kpiDemoras.length/total)*100}%`, minWidth: kpiDemoras.length>0?'4px':'0' }}></div>
-                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
+                    <div onClick={() => setFiltroAlerta('oc_tardia')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-rose-200 transition-all duration-300 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] sm:text-[11px] font-black text-rose-500 uppercase tracking-widest leading-tight">Demoradas</span>
+                        <div className="p-2 bg-rose-50 rounded-xl"><Clock size={16} className="text-rose-500"/></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiDemoras.length}</p>
+                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiDemoras.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
 
-                    <div onClick={() => setFiltroAlerta('mis_favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Folder size={16} className="text-blue-500 shrink-0"/>
-                          <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">Favoritos</span>
-                        </div>
-                      </div>
-                      <div className="w-full h-2.5 flex gap-1 mb-4">
-                        <div className="h-full rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${(kpiMisFavoritos.length/total)*100}%`, minWidth: kpiMisFavoritos.length>0?'4px':'0' }}></div>
-                        <div className="h-full rounded-full flex-1 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px)' }}></div>
+                    <div onClick={() => setFiltroAlerta('mis_favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-yellow-200 transition-all duration-300 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] sm:text-[11px] font-black text-yellow-500 uppercase tracking-widest leading-tight">Favoritos</span>
+                        <div className="p-2 bg-yellow-50 rounded-xl"><Star size={16} className="text-yellow-500"/></div>
                       </div>
                       <div className="flex items-end justify-between">
-                        <p className="text-2xl sm:text-3xl font-black text-slate-800 leading-none">{kpiMisFavoritos.length}</p>
+                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiMisFavoritos.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
-             
                   </>
                 );
               })()}
             </div>
                         
-            {/* DETALLE DE SALUD POR OPERARIO (SOLO ADMIN) */}
+            {/* DETALLE DE SALUD POR OPERARIO (SOLO ADMIN) - LIMPIADO */}
             {currentUser.rol === 'owner' && (() => {
               const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
               const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
@@ -359,7 +312,6 @@ const VistaGestion = ({
               });
               
               operariosStats.sort((a,b) => a.score - b.score);
-
               if (operariosStats.length === 0) return null;
 
               return (
@@ -384,9 +336,8 @@ const VistaGestion = ({
                             </span>
                           </div>
                           
-                          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden relative mt-0.5 mb-1">
-                            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000, #000 3px, transparent 3px, transparent 6px)' }}></div>
-                            <div className={`h-full rounded-full ${opColorBar} relative z-10 transition-all duration-1000`} style={{ width: `${op.score}%` }}></div>
+                          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden mt-0.5 mb-1">
+                            <div className={`h-full rounded-full ${opColorBar} transition-all duration-1000`} style={{ width: `${op.score}%` }}></div>
                           </div>
                           
                           <div className="flex justify-between items-center text-[8px] font-black uppercase text-slate-400">
@@ -409,7 +360,7 @@ const VistaGestion = ({
             
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
               <div className="flex items-center gap-4">
-                <h2 className="text-lg font-black uppercase tracking-tight">estos son tus Grupos</h2>
+                <h2 className="text-lg font-black uppercase tracking-tight">Tus Grupos</h2>
                 <button onClick={() => setFiltroRiesgoGrupo(!filtroRiesgoGrupo)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all border shadow-sm ${filtroRiesgoGrupo ? 'bg-red-500 text-white border-red-600' : 'bg-white text-red-500 border-red-200 hover:bg-red-50'}`}>
                   <AlertTriangle size={12} /> {filtroRiesgoGrupo ? 'Mostrando Riesgos' : 'Filtrar Riesgos'}
                 </button>
@@ -417,7 +368,7 @@ const VistaGestion = ({
               {renderRadarDinamico(insumos)}
             </div>
             
-            {/* DIRECTORIO NUEVO CON TARJETAS DE ALERTA COLOREADAS */}
+            {/* DIRECTORIO DE GRUPOS - EFECTO SEMÁFORO ELIMINADO */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
               {(() => {
                 let gruposAMostrar = grupos;
@@ -452,22 +403,20 @@ const VistaGestion = ({
                   const rG = favsDelGrupo.filter(i => i.supervivencia <= uUrgencia && i.supervivencia > uCritico).length;
                   const sG = Math.max(0, favsDelGrupo.length - qG - rG);
                   const scoreG = favsDelGrupo.length > 0 ? Math.round((sG / favsDelGrupo.length) * 100) : 100;
-                  
                   const colorG = scoreG < 80 ? 'bg-red-500' : scoreG < 100 ? 'bg-amber-500' : 'bg-emerald-500';
-                  const borderG = scoreG < 80 ? 'border-red-400' : scoreG < 100 ? 'border-orange-400' : 'border-slate-200';
-                
+
                   return (
-                    <div key={grupo} onClick={() => setSelectedGroup(grupo)} className={`rounded-2xl p-5 cursor-pointer hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between min-h-[210px] relative group bg-white border-2 ${borderG}`}>
-                      <div className={`absolute top-0 left-0 bottom-0 w-1 ${colorG} opacity-70`}></div>
+                    <div key={grupo} onClick={() => setSelectedGroup(grupo)} className="bg-white rounded-2xl p-5 cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-slate-300 transition-all duration-300 flex flex-col justify-between min-h-[210px] relative border border-slate-200 group">
+                      
                       <div className="z-10">
-                        <div className="flex justify-between items-center mb-1 pl-1">
+                        <div className="flex justify-between items-center mb-1">
                          <h3 className="font-black text-2xl uppercase tracking-tighter text-slate-800 truncate pr-4" title={grupo}>{grupo}</h3>
-                         <span className={`text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm transition-colors border ${scoreG < 80 ? 'bg-red-50 text-red-700 border-red-200' : scoreG < 100 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                         <span className={`text-[9px] font-black px-2.5 py-1 rounded shadow-sm transition-colors border ${scoreG < 80 ? 'bg-red-50 text-red-700 border-red-200' : scoreG < 100 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                            {scoreG}% SALUD
                          </span>
                         </div>
                         <div className="h-[1px] w-full bg-slate-100 mb-5"></div>
-                        <div className="flex justify-between items-center gap-4 mb-6 pl-1">
+                        <div className="flex justify-between items-center gap-4 mb-6">
                           <div className="flex flex-wrap gap-2 flex-1">
                             {currentUser.rol === 'owner' && responsablesUnicos.map(resp => {
                               const cStyle = obtenerColorOwner(resp);
@@ -479,23 +428,23 @@ const VistaGestion = ({
                               );
                             })}
                           </div>
-                          <div className="flex gap-1.5 shrink-0 items-center">
-                            {qG > 0 && <span className="px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase bg-red-100 text-red-600 border border-red-200 shadow-sm animate-pulse">❌ {qG} QUIEBRE</span>}
-                            {rG > 0 && <span className="px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase bg-amber-100 text-amber-600 border border-orange-200 shadow-sm">⚠️ {rG} RIESGO</span>}
+                          <div className="flex gap-1.5 shrink-0 items-center flex-col">
+                            {qG > 0 && <span className="px-2 py-1 rounded-md text-[8px] font-black uppercase bg-red-50 text-red-600 border border-red-200 shadow-sm animate-pulse w-full text-center">{qG} QUIEBRE</span>}
+                            {rG > 0 && <span className="px-2 py-1 rounded-md text-[8px] font-black uppercase bg-amber-50 text-amber-600 border border-orange-200 shadow-sm w-full text-center">{rG} RIESGO</span>}
                           </div>
                         </div>
                       </div>
-                      <div className="mb-4 mt-auto pl-1">
-                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden relative border border-slate-50/50">
+                      <div className="mb-4 mt-auto">
+                        <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden relative">
                           <div className={`h-full rounded-full transition-all duration-1000 ${colorG}`} style={{ width: `${scoreG}%` }}></div>
                         </div>
                       </div>
-                      <div className="flex justify-between items-end border-t pt-3 pl-1 border-slate-50">
+                      <div className="flex justify-between items-end border-t pt-3 border-slate-50">
                         <div className="flex flex-col">
                           <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Métricas de Stock</span>
                           <div className="flex items-baseline gap-2 mt-1">
                             <span className="text-xl font-black text-slate-800 leading-none">{itemsDelGrupo.length}</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase">Ítems Totales</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">Ítems</span>
                           </div>
                         </div>
                         <div className="flex flex-col text-right">
@@ -523,10 +472,7 @@ const VistaGestion = ({
               <motion.div key="tabla-grupo" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => { setSelectedGroup(null); setFiltroVistaLista('todos'); }} 
-                      className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors"
-                    >
+                    <button onClick={() => { setSelectedGroup(null); setFiltroVistaLista('todos'); }} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
                       <ArrowLeft size={14} /> Volver
                     </button>
                     <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight flex items-center gap-3">
