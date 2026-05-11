@@ -24,7 +24,6 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
      <thead className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
         <tr>
           <th className="w-10 px-4 py-3"></th>
-          {/* Columna del Ojo eliminada */}
           <th className="px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('codigo')}>Código {renderIcon('codigo')}</th>
           <th className="px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('nombre')}>Material {renderIcon('nombre')}</th>
           {mostrarGrupo && <th className="px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('grupo')}>Grupo {renderIcon('grupo')}</th>}
