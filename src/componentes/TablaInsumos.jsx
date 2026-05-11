@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowUpDown, Star, StarOff, Eye, EyeOff, Clock, Send, Activity, CheckSquare, AlertTriangle } from 'lucide-react';
+import { ArrowUpDown, Star } from 'lucide-react';
 
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 
@@ -21,115 +21,91 @@ const TablaInsumos = ({ datos, onGestionar, mostrarGrupo, toggleFavorito, toggle
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 relative"><table className="w-full text-left border-collapse">
-      <thead className="sticky top-0 z-40 bg-slate-50 shadow-[0_4px_10px_-2px_rgba(0,0,0,0.15)]"><tr className="border-b border-slate-200">
-        <th className="w-10 px-4 py-3"></th>
-        <th className="w-10 px-4 py-3 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest" title="Visibilidad en Planta">TV</th>
-        <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors" onClick={()=>handleSort('codigo')}>Código {renderIcon('codigo')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors" onClick={()=>handleSort('nombre')}>Material {renderIcon('nombre')}</th>
-        {mostrarGrupo && <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors" onClick={()=>handleSort('grupo')}>Grupo {renderIcon('grupo')}</th>}
-        <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center cursor-pointer group hover:bg-slate-100 transition-colors" onClick={()=>handleSort('stock')}>Stock {renderIcon('stock')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-blue-500 uppercase tracking-widest text-center cursor-pointer group hover:bg-blue-50 transition-colors" onClick={()=>handleSort('ocFutura')}>O/C Futuras {renderIcon('ocFutura')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-red-500 uppercase tracking-widest text-center cursor-pointer group hover:bg-red-50 transition-colors" onClick={()=>handleSort('ocDemorada')}>Demoras {renderIcon('ocDemorada')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-purple-500 uppercase tracking-widest text-center cursor-pointer group hover:bg-purple-50 transition-colors" onClick={()=>handleSort('sp')}>S/P {renderIcon('sp')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-slate-800 uppercase tracking-widest text-right cursor-pointer group hover:bg-slate-100 transition-colors" onClick={()=>handleSort('supervivencia')}>Cobertura (Límite: {uUrgencia}) {renderIcon('supervivencia')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-orange-600 uppercase tracking-widest text-center cursor-pointer group hover:bg-orange-50 transition-colors" onClick={()=>handleSort('escalados')} title="Nivel de Escalamiento">Escalado {renderIcon('escalados')}</th>
-        <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Gestión</th>
-      </tr></thead>
-      <tbody className="divide-y divide-slate-100">{datosFiltrados.map(i => (
-        <tr key={i.id} onClick={() => onGestionar(i)} className={`cursor-pointer transition-colors ${i.supervivencia <= uUrgencia ? 'bg-red-50/40 hover:bg-red-100/50' : 'hover:bg-orange-50/50'}`}>
-          
-          <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-            {canEditFav ? (
-              <button onClick={(e) => { e.stopPropagation(); toggleFavorito(i); }} className="transition-all hover:scale-110">
-                {i.favorito ? <Star size={18} className="text-emerald-500" fill="currentColor"/> : <StarOff size={18} className="text-red-500"/>}
-              </button>
-            ) : (
-              <div className="opacity-40 cursor-not-allowed" title="Solo visualización">
-                {i.favorito ? <Star size={18} className="text-emerald-500" fill="currentColor"/> : <StarOff size={18} className="text-slate-400"/>}
-              </div>
-            )}
-          </td>
-          <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-            {isOwner ? (
-              <button onClick={(e) => { e.stopPropagation(); toggleVisibilidadPlanta(i); }} className="transition-all hover:scale-110">
-                {i.visibleEnPlanta ? <Eye size={18} className="text-emerald-500"/> : <EyeOff size={18} className="text-red-500"/>}
-              </button>
-            ) : (
-              <div className="opacity-40 cursor-not-allowed" title="Solo visualización">
-                {i.visibleEnPlanta ? <Eye size={18} className="text-emerald-500"/> : <EyeOff size={18} className="text-red-500"/>}
-              </div>
-            )}
-          </td>
-
-          <td className="px-4 py-2.5 text-[10px] font-mono text-slate-500">{i.codigo}</td>
-          <td className="px-4 py-2.5">
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-tight">{i.nombre}</span>
-              {isOwner && (
-                (() => {
-                  const ownerStr = i.owner?.toUpperCase().trim() || 'SIN ASIGNAR';
-                  if (ownerStr === 'SIN ASIGNAR') {
-                     return <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 opacity-80">SIN ASIGNAR</span>;
-                  }
-                  const cStyle = obtenerColorOwner ? obtenerColorOwner(ownerStr) : { text: 'text-slate-500', dot: 'bg-slate-400' };
-                  return (
-                    <span className={`text-[9px] font-black uppercase tracking-widest mt-0.5 flex items-center gap-1 opacity-90 ${cStyle.text}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${cStyle.dot}`}></span>
-                      {ownerStr}
-                    </span>
-                  );
-                })()
-              )}
-            </div>
-          </td>
-          {mostrarGrupo && (<td className="px-4 py-2.5"><span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase border border-slate-200">{i.grupo}</span></td>)}
-          <td className="px-4 py-2.5 text-center text-sm font-bold text-slate-800">{formatoNum(i.stock)}</td>
-          <td className="px-4 py-2.5 text-center text-xs font-bold text-blue-600">{i.ocFutura > 0 ? `+${formatoNum(i.ocFutura)}` : '-'}</td>
-          <td className="px-4 py-2.5 text-center text-xs font-black text-red-600">{i.ocDemorada > 0 ? `+${formatoNum(i.ocDemorada)}` : '-'}</td>
-          <td className="px-4 py-2.5 text-center text-xs font-bold text-purple-600">{i.sp > 0 ? `+${formatoNum(i.sp)}` : '-'}</td>
-          <td className="px-4 py-2.5 text-right"><span className={`text-sm font-black ${i.supervivencia <= uUrgencia ? 'text-red-600' : 'text-slate-800'}`}>{i.supervivencia >= 999 ? '∞' : Math.round(i.supervivencia)} <span className="text-[9px] font-bold text-slate-400 uppercase ml-0.5">Días</span></span></td>
-          
-          <td className="px-4 py-2.5 text-center">
-            {i.escalados > 0 ? <span className="bg-orange-500 text-white font-black text-[10px] px-2.5 py-1 rounded shadow-sm border border-orange-600">{i.escalados}</span> : <span className="text-slate-300">-</span>}
-          </td>
-          
-           <td className="px-4 py-2.5 text-center">
-            <div className="flex items-center justify-center gap-2">
-
-              {/* ALERTA DE COBERTURA (SIMPLE Y DIRECTA) */}
-              {i.alertaActivaEnPlanta || i.alertaPendiente ? (
-                // ESTADO: ALERTA ENCENDIDA
-                <button 
-                  onClick={(e) => { e.stopPropagation(); forzarCancelacionAlerta(i); }} 
-                  className="bg-red-50 text-red-700 hover:bg-red-100 text-[10px] font-black px-2.5 py-1.5 rounded-lg border border-red-200 shadow-sm flex items-center gap-1.5 transition-all" 
-                  title="Alerta activa - Clic para apagar"
-                >
-                  <AlertTriangle size={14} className="text-red-500 animate-pulse" /> 
-                  RIESGO QUIEBRE
-                </button>
-              ) : (
-                // ESTADO: NORMAL
-                <button 
-                  onClick={(e) => { e.stopPropagation(); solicitarAlertaPlanta(i); }} 
-                  className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all" 
-                  title="Encender Alerta de Cobertura"
-                >
-                  <AlertTriangle size={16} />
-                </button>
-              )}
-
-              {/* BOTÓN DE GESTIÓN (Acceso al historial de reclamos) */}
-              <button
-                onClick={(e) => { e.stopPropagation(); onGestionar(i); }}
-                className="bg-slate-800 text-white text-[10px] font-black px-3 py-1.5 rounded-lg hover:bg-orange-500 transition-all border border-slate-700 shadow-sm flex items-center gap-1 shrink-0 ml-1"
-              >
-                Gestionar
-              </button>
-
-            </div>
-          </td>
+     <thead className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
+        <tr>
+          <th className="w-10 px-4 py-3"></th>
+          {/* Columna del Ojo eliminada */}
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('codigo')}>Código {renderIcon('codigo')}</th>
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('nombre')}>Material {renderIcon('nombre')}</th>
+          {mostrarGrupo && <th className="px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('grupo')}>Grupo {renderIcon('grupo')}</th>}
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 text-center cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('stock')}>Stock {renderIcon('stock')}</th>
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 text-center cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('ocFutura')}>O/C Futuras {renderIcon('ocFutura')}</th>
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 text-center cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('ocDemorada')}>Demoras {renderIcon('ocDemorada')}</th>
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 text-center cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('sp')}>S/P {renderIcon('sp')}</th>
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 text-right cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('supervivencia')}>Cobertura {renderIcon('supervivencia')}</th>
+          <th className="px-4 py-3 text-xs font-medium text-slate-500 text-center cursor-pointer group hover:text-slate-800 transition-colors" onClick={()=>handleSort('escalados')}>Escalado {renderIcon('escalados')}</th>
+          <th className="px-4 py-3"></th>
         </tr>
-      ))}</tbody>
+      </thead>
+      <tbody className="divide-y divide-slate-50">
+        {datosFiltrados.map(i => {
+          const enRiesgo = i.supervivencia <= uUrgencia;
+          
+          return (
+            <tr key={i.id} onClick={() => onGestionar(i)} className={`cursor-pointer transition-colors ${enRiesgo ? 'bg-red-50/30 hover:bg-red-50/60' : 'hover:bg-slate-50'}`}>
+              
+              {/* FAVORITO MINIMALISTA */}
+              <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                <button onClick={(e) => { e.stopPropagation(); if(canEditFav) toggleFavorito(i); }} className={`transition-all ${canEditFav ? 'hover:scale-110' : 'cursor-not-allowed'}`}>
+                  <Star size={16} className={i.favorito ? "text-yellow-400" : "text-slate-200 hover:text-slate-300"} fill={i.favorito ? "currentColor" : "none"} />
+                </button>
+              </td>
+
+              {/* DATOS CON TONOS PASTEL Y TEXTOS SUAVES */}
+              <td className="px-4 py-3 text-xs font-mono text-slate-400">{i.codigo}</td>
+              <td className="px-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-slate-700">{i.nombre}</span>
+                  {isOwner && (
+                    (() => {
+                      const ownerStr = i.owner?.toUpperCase().trim() || 'SIN ASIGNAR';
+                      if (ownerStr === 'SIN ASIGNAR') return <span className="text-[10px] font-medium text-slate-400 mt-0.5">Sin Asignar</span>;
+                      
+                      const cStyle = obtenerColorOwner ? obtenerColorOwner(ownerStr) : { text: 'text-slate-500', dot: 'bg-slate-400' };
+                      return (
+                        <span className={`text-[10px] font-medium mt-0.5 flex items-center gap-1.5 opacity-80 ${cStyle.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${cStyle.dot}`}></span>
+                          {ownerStr}
+                        </span>
+                      );
+                    })()
+                  )}
+                </div>
+              </td>
+              {mostrarGrupo && (<td className="px-4 py-3"><span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">{i.grupo}</span></td>)}
+              <td className="px-4 py-3 text-center text-sm font-medium text-slate-700">{formatoNum(i.stock)}</td>
+              
+              <td className="px-4 py-3 text-center text-xs font-medium text-sky-400/90">{i.ocFutura > 0 ? `+${formatoNum(i.ocFutura)}` : '-'}</td>
+              <td className="px-4 py-3 text-center text-xs font-medium text-rose-400/90">{i.ocDemorada > 0 ? `+${formatoNum(i.ocDemorada)}` : '-'}</td>
+              <td className="px-4 py-3 text-center text-xs font-medium text-violet-400/90">{i.sp > 0 ? `+${formatoNum(i.sp)}` : '-'}</td>
+              
+              <td className="px-4 py-3 text-right">
+                <span className={`text-sm font-semibold ${enRiesgo ? 'text-red-500' : 'text-slate-600'}`}>
+                  {i.supervivencia >= 999 ? '∞' : Math.round(i.supervivencia)} <span className="text-xs font-normal text-slate-400 ml-0.5">días</span>
+                </span>
+              </td>
+              
+              <td className="px-4 py-3 text-center">
+                {i.escalados > 0 ? <span className="bg-orange-50 text-orange-500 font-medium text-xs px-2 py-0.5 rounded-md border border-orange-100">{i.escalados}</span> : <span className="text-slate-200">-</span>}
+              </td>
+              
+              {/* BOTÓN MINIMALISTA INTELIGENTE */}
+              <td className="px-4 py-3 text-right">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onGestionar(i); }} 
+                  className={`text-xs font-medium px-3 py-1.5 rounded-md transition-all border ${
+                    enRiesgo 
+                      ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100 hover:border-red-200 shadow-sm' 
+                      : 'bg-transparent text-slate-400 border-transparent hover:text-slate-700 hover:bg-slate-100 hover:border-slate-200'
+                  }`}
+                >
+                  {enRiesgo ? 'Reclamar' : 'Gestionar'}
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
     </table></div>
   );
 };
