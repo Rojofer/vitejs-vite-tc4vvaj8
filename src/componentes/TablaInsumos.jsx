@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowUpDown, Star, StarOff, Eye, EyeOff, Clock, Send, Activity, CheckSquare, Bell, Check, X, BellOff } from 'lucide-react';
+import { ArrowUpDown, Star, StarOff, Eye, EyeOff, Clock, Send, Activity, CheckSquare, AlertTriangle } from 'lucide-react';
 
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 
