@@ -29,7 +29,7 @@ const VistaGestion = ({
   obtenerColorOwner,
   renderRadarDinamico,
   setSimulatedId,
-  perfilesSimulables
+  perfilesSimulables,
 }) => {
   return (
     <div className="p-4 md:p-6 h-full max-w-full">
