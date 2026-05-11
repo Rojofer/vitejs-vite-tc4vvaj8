@@ -92,7 +92,7 @@ const VistaGestion = ({
             <div className="flex flex-col lg:flex-row items-stretch justify-end gap-4 flex-1 w-full xl:w-auto">
               
               {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO */}
-              {isOwner && (
+              {currentUser?.rol === 'owner' && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
              
                 </div>
