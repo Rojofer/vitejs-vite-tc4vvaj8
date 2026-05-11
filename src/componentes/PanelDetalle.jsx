@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Star, StarOff, CheckCircle, Copy, Clock, Send, ChevronRight, Package, AlertCircle } from 'lucide-react';
+import { X, Star, StarOff, CheckCircle, Copy, Clock, Send, ChevronRight, Package, AlertCircle, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
@@ -102,6 +102,66 @@ const PanelDetalle = ({
             </div>
           </div>
 
+          {/* ESTADO DE COMPRAS (S/P y OCs) */}
+          <div className="space-y-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Estado de Suministros</p>
+            
+            <div className="grid grid-cols-1 gap-3">
+              {/* SOLPEDS */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText size={14} className="text-violet-500" />
+                  <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">S/P en Curso</span>
+                </div>
+                {activeInsumo.detalleSolpeds && activeInsumo.detalleSolpeds.length > 0 ? (
+                  <div className="space-y-2">
+                    {activeInsumo.detalleSolpeds.map((sp, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-white px-3 py-2 rounded-xl border border-slate-100 shadow-sm">
+                        <span className="text-xs font-mono font-bold text-slate-600">S/P {sp.numero}</span>
+                        <span className="text-xs font-black text-violet-600">{formatoNum(sp.cantidad)} un.</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 font-medium italic">Sin solicitudes (S/P) activas.</p>
+                )}
+              </div>
+
+              {/* ORDENES DE COMPRA */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package size={14} className="text-sky-500" />
+                  <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Órdenes de Compra</span>
+                </div>
+                {activeInsumo.detalleOCs && activeInsumo.detalleOCs.length > 0 ? (
+                  <div className="space-y-2">
+                    {activeInsumo.detalleOCs.map((oc, idx) => {
+                      const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha);
+                      const hoyCheck = new Date(); hoyCheck.setHours(0,0,0,0);
+                      const isDemorada = f < hoyCheck;
+                      
+                      return (
+                        <div key={idx} className={`flex justify-between items-center bg-white px-3 py-2 rounded-xl border shadow-sm ${isDemorada ? 'border-red-200' : 'border-slate-100'}`}>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-mono font-bold text-slate-600">OC {oc.numero}</span>
+                            <span className={`text-[9px] font-black tracking-widest uppercase mt-0.5 ${isDemorada ? 'text-red-500' : 'text-slate-400'}`}>
+                              {isDemorada ? 'Venció: ' : 'Entrega: '}{formatearFecha(f).split(' ')[0]}
+                            </span>
+                          </div>
+                          <span className={`text-xs font-black ${isDemorada ? 'text-red-600' : 'text-sky-600'}`}>
+                            {formatoNum(oc.cantidad)} un.
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 font-medium italic">Sin OCs a futuro o demoradas.</p>
+                )}
+              </div>
+            </div>
+          </div>
+          
           {/* ASIGNACIÓN (SÓLO OWNER) */}
           {isOwner && (
             <div className="space-y-2">
