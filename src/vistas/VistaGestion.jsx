@@ -319,7 +319,7 @@ const VistaGestion = ({
               return (
                 <div className="mb-10">
                   <h3 className="text-[10px] font-black uppercase tracking-widest mb-3 text-slate-400">Radiografía Táctica del Equipo</h3>
-<div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[repeat(7,minmax(0,1fr))] gap-3 w-full">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[repeat(7,minmax(0,1fr))] gap-3 w-full">
                     {operariosStats.map(op => {
                       const cStyle = obtenerColorOwner(op.nombre);
                       let opColorBar = "bg-emerald-500";
