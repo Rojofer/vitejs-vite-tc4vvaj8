@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from './firebase';
 import TablaInsumos from './componentes/TablaInsumos';
-import VistaProduccion from './vistas/VistaProduccion';
 import VistaAuditoria from './vistas/VistaAuditoria';
-import VistaMensajeria from './vistas/VistaMensajeria';
 import VistaNotificaciones from './vistas/VistaNotificaciones';
 import PanelAjustes from './componentes/PanelAjustes';
 import PanelDetalle from './componentes/PanelDetalle';
@@ -15,7 +13,7 @@ import { auth } from './firebase';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { 
   LayoutDashboard, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, 
-  Activity, History, Bell, Package 
+  History, Bell, Package 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -130,7 +128,6 @@ const App = () => {
     if (emailLogueado === 'fachaval@devesa.com' || emailLogueado === 'fernandocomex1@gmail.com') {
       return { id: 'owner_real', email: emailLogueado, nombre: emailLogueado === 'fachaval@devesa.com' ? "Fernando (Dueño)" : "Fer (Tester)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
     }
-    if (emailLogueado === 'tv@devesa.com') return { id: 'tv', email: emailLogueado, nombre: "Monitor TV", rol: "produccion", inicial: "TV", aliasMatch: "TV", editorFavoritos: false };
     
     const operarioMatch = (config?.contactos || []).filter(c => c.tipo === 'equipo').find(c => c.email && c.email.toLowerCase() === emailLogueado);
     if (operarioMatch) return { id: operarioMatch.id, email: emailLogueado, nombre: operarioMatch.label || operarioMatch.email, rol: "operario", inicial: (operarioMatch.label || operarioMatch.email || "O").charAt(0).toUpperCase(), aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), editorFavoritos: operarioMatch.editorFavoritos === true };
@@ -139,8 +136,7 @@ const App = () => {
 
   const perfilesSimulables = useMemo(() => {
     const base = [
-      { id: 'owner_real', nombre: "Dueño VIP", rol: "owner", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true },
-      { id: 'tv', nombre: "Planta TV", rol: "produccion", inicial: "📺", aliasMatch: "TV", editorFavoritos: false }
+      { id: 'owner_real', nombre: "Dueño VIP", rol: "owner", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true }
     ];
     const extras = (config?.contactos || []).filter(c => c.tipo === 'equipo').map((c) => ({
       id: c.id, nombre: (c.alias || c.label || 'Operario').toUpperCase(), rol: "operario", inicial: "👁️", aliasMatch: (c.alias || "").trim().toUpperCase(), editorFavoritos: c.editorFavoritos === true
@@ -157,13 +153,6 @@ const App = () => {
   }, [realUser, simulatedId, perfilesSimulables]);
 
   const [showWelcome, setShowWelcome] = useState(true);
-  
-  useEffect(() => { 
-    if (currentUser.rol === 'produccion') {
-      setShowWelcome(false);
-      if (vistaActiva !== 'cartelera' && vistaActiva !== 'planta') setVistaActiva('planta'); 
-    } 
-  }, [currentUser]);
 
   useEffect(() => {
     const unsubConfig = onSnapshot(doc(db, "config", "general"), (docSnap) => { if (docSnap.exists()) setConfig(docSnap.data()); else setDoc(doc(db, "config", "general"), config); });
@@ -429,65 +418,52 @@ const App = () => {
   else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
   else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
   
-  if (currentUser.rol !== 'owner' && currentUser.rol !== 'produccion') {
+  if (currentUser.rol !== 'owner') {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
   }
   
-  const isTV = currentUser.rol === 'produccion';
   if (cargandoAuth) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-500">Verificando credenciales...</div>;
   if (!usuarioLogueado) return <VistaLogin />;
 
   return (
-    <div className={`flex h-screen w-screen font-sans overflow-hidden ${isTV ? 'bg-slate-950 text-white' : 'bg-[#F8FAFC] text-slate-800'}`}>
+    <div className="flex h-screen w-screen font-sans overflow-hidden bg-[#F8FAFC] text-slate-800">
       
-      {!isTV && (
-        <aside className="w-20 bg-slate-900 flex flex-col items-center py-6 border-r border-slate-800 z-[60] shadow-2xl shrink-0 h-full relative">
-          <div onClick={() => setShowWelcome(true)} className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg mb-10 font-black italic text-xl cursor-pointer hover:scale-105 transition-all">K</div>
-          <nav className="flex flex-col gap-6 w-full px-3">
-            <div onClick={() => setVistaActiva('gestion')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'gestion' ? 'bg-slate-800 text-orange-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-orange-400 hover:bg-slate-800'}`}><LayoutDashboard size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Gestión ERP</span></div>
-            <div onClick={() => setVistaActiva('planta')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'planta' ? 'bg-slate-800 text-purple-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-purple-400 hover:bg-slate-800'}`}><Activity size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Monitoreo</span></div>
-            <div onClick={() => setVistaActiva('auditoria')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'auditoria' ? 'bg-slate-800 text-sky-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-sky-400 hover:bg-slate-800'}`}><History size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Auditoría</span></div>
-            <div onClick={() => setVistaActiva('notificaciones')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'notificaciones' ? 'bg-slate-800 text-yellow-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-yellow-400 hover:bg-slate-800'}`}>
-            <div className="relative">
-              <Bell size={22} />
-              {(() => {
-                const msjSinLeer = reclamos.filter(r => r.insumoId === "BROADCAST" && r.destinatarioId?.includes(String(currentUser.id)) && !(r.leidoPor || []).includes(currentUser.nombre)).length;
-                if (msjSinLeer > 0) return <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-900 shadow-[0_0_8px_rgba(239,68,68,0.8)]">{msjSinLeer}</span>;
-                return null;
-              })()}
-            </div>
-            <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Notificaciones</span>
+      <aside className="w-20 bg-slate-900 flex flex-col items-center py-6 border-r border-slate-800 z-[60] shadow-2xl shrink-0 h-full relative">
+        <div onClick={() => setShowWelcome(true)} className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg mb-10 font-black italic text-xl cursor-pointer hover:scale-105 transition-all">K</div>
+        <nav className="flex flex-col gap-6 w-full px-3">
+          <div onClick={() => setVistaActiva('gestion')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'gestion' ? 'bg-slate-800 text-orange-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-orange-400 hover:bg-slate-800'}`}><LayoutDashboard size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Gestión ERP</span></div>
+          <div onClick={() => setVistaActiva('auditoria')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'auditoria' ? 'bg-slate-800 text-sky-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-sky-400 hover:bg-slate-800'}`}><History size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Auditoría</span></div>
+          <div onClick={() => setVistaActiva('notificaciones')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'notificaciones' ? 'bg-slate-800 text-yellow-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-yellow-400 hover:bg-slate-800'}`}>
+          <div className="relative">
+            <Bell size={22} />
+            {(() => {
+              const msjSinLeer = reclamos.filter(r => r.insumoId === "BROADCAST" && r.destinatarioId?.includes(String(currentUser.id)) && !(r.leidoPor || []).includes(currentUser.nombre)).length;
+              if (msjSinLeer > 0) return <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-900 shadow-[0_0_8px_rgba(239,68,68,0.8)]">{msjSinLeer}</span>;
+              return null;
+            })()}
           </div>
-          </nav>
-          {currentUser.rol === 'owner' && (<div className="mt-auto w-full px-3 relative group"><div onClick={() => setShowSettings(true)} className="p-3 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex justify-center cursor-pointer rounded-xl w-full"><Settings size={22} /><span className="absolute left-16 top-2 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Ajustes Generales</span></div></div>)}
-        </aside>
-      )}
+          <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Notificaciones</span>
+        </div>
+        </nav>
+        {currentUser.rol === 'owner' && (<div className="mt-auto w-full px-3 relative group"><div onClick={() => setShowSettings(true)} className="p-3 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex justify-center cursor-pointer rounded-xl w-full"><Settings size={22} /><span className="absolute left-16 top-2 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Ajustes Generales</span></div></div>)}
+      </aside>
 
       <div className="flex-1 flex flex-col h-full min-w-0 relative">
-        <header className={`h-20 flex items-center px-8 gap-8 shrink-0 z-10 ${isTV ? 'bg-slate-900 border-b border-slate-800 shadow-[0_4px_30px_rgba(0,0,0,0.5)]' : 'bg-white border-b border-slate-200 shadow-sm'}`}>
+        <header className="h-20 flex items-center px-8 gap-8 shrink-0 z-10 bg-white border-b border-slate-200 shadow-sm">
           <div className="relative flex-1 max-w-3xl flex items-center gap-4">
-            {!isTV && (
-              <>
-                <Search className="absolute left-4 top-3 text-slate-400" size={20} />
-                <input type="text" placeholder="Buscar insumo..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setFiltroAlerta(null); setSelectedGroup(null); if (vistaActiva !== 'gestion') setVistaActiva('gestion'); }} className="w-full pl-12 pr-4 py-2.5 bg-slate-100 rounded-xl text-sm font-bold uppercase outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 transition-all" />
-                {searchTerm && (<X onClick={() => {setSearchTerm(""); setFiltroAlerta(null)}} className="absolute right-4 top-3 text-slate-400 cursor-pointer hover:text-orange-500 transition-colors" size={20} />)}
-              </>
-            )}
-            {isTV && (
-              <div className="flex gap-4">
-                <button onClick={() => setVistaActiva('planta')} className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${vistaActiva === 'planta' ? 'text-yellow-400 border border-yellow-500 bg-slate-900 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'text-white border border-slate-700 hover:border-slate-500 hover:bg-slate-800'}`}><Activity size={16} className="-mt-0.5" /> Monitor</button>
-              </div>
-            )}
+            <Search className="absolute left-4 top-3 text-slate-400" size={20} />
+            <input type="text" placeholder="Buscar insumo..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setFiltroAlerta(null); setSelectedGroup(null); if (vistaActiva !== 'gestion') setVistaActiva('gestion'); }} className="w-full pl-12 pr-4 py-2.5 bg-slate-100 rounded-xl text-sm font-bold uppercase outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 transition-all" />
+            {searchTerm && (<X onClick={() => {setSearchTerm(""); setFiltroAlerta(null)}} className="absolute right-4 top-3 text-slate-400 cursor-pointer hover:text-orange-500 transition-colors" size={20} />)}
           </div>
           
-          <div className={`flex items-center gap-4 ml-auto border-l pl-8 ${isTV ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className="flex items-center gap-4 ml-auto border-l pl-8 border-slate-200">
             <div className="mr-4 text-right hidden md:block">
-              <p className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end ${isTV ? 'text-slate-400' : 'text-slate-400'}`}><Clock size={10}/> Última Actualización Sheets</p>
-              <p className={`text-xs font-bold ${isTV ? 'text-white' : 'text-slate-600'}`}>{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
+              <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> Última Actualización Sheets</p>
+              <p className="text-xs font-bold text-slate-600">{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
             
             <div 
-              className={`flex items-center group p-2 rounded-xl border relative transition-all ${isTV ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} ${realUser.rol === 'owner' ? 'cursor-pointer hover:border-orange-500 hover:shadow-md' : ''}`}
+              className={`flex items-center group p-2 rounded-xl border relative transition-all bg-slate-50 border-slate-200 ${realUser.rol === 'owner' ? 'cursor-pointer hover:border-orange-500 hover:shadow-md' : ''}`}
               onClick={() => { 
                 if (realUser.rol === 'owner') {
                   const currentIndex = perfilesSimulables.findIndex(p => p.id === currentUser.id);
@@ -497,14 +473,14 @@ const App = () => {
               }}
             >
               <div className="text-right mr-3">
-                <p className={`text-[10px] font-bold uppercase tracking-widest ${isTV ? 'text-slate-400' : 'text-slate-400'}`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                   {realUser.rol === 'owner' && currentUser.id !== realUser.id ? 'ESPIANDO:' : currentUser.rol}
                 </p>
-                <p className={`text-xs font-black ${isTV ? 'text-white' : 'text-slate-800'}`}>
+                <p className="text-xs font-black text-slate-800">
                   {currentUser.nombre}
                 </p>
               </div>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : currentUser.rol === 'produccion' ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
             </div>
             
             <button 
@@ -516,9 +492,8 @@ const App = () => {
           </div>
         </header>
 
-        <main className={`flex-1 overflow-auto relative ${isTV ? 'bg-slate-950' : 'bg-[#F8FAFC]'}`}>
-          {vistaActiva === 'planta' && <VistaProduccion insumos={insumos} currentUser={currentUser} setActiveInsumo={setActiveInsumo} />}
-          {vistaActiva === 'auditoria' && !isTV && (
+        <main className="flex-1 overflow-auto relative bg-[#F8FAFC]">
+          {vistaActiva === 'auditoria' && (
             <VistaAuditoria 
               insumos={insumos} 
               reclamos={reclamos} 
@@ -543,7 +518,7 @@ const App = () => {
               setActiveInsumo={setActiveInsumo}
             />
           )}
-           {vistaActiva === 'gestion' && !isTV && (
+           {vistaActiva === 'gestion' && (
             <VistaGestion 
               currentUser={currentUser}
               insumos={insumos}
@@ -587,7 +562,6 @@ const App = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL PROFESIONAL DE INSTRUCCIONES PARA EL HILO */}
       <AnimatePresence>
         {alertaHilo && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
@@ -652,6 +626,7 @@ const App = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
       <AnimatePresence>
         {reclamoDraft && (
           <ModalRedactor 
