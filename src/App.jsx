@@ -450,38 +450,32 @@ const App = () => {
 
       <div className="flex-1 flex flex-col h-full min-w-0 relative">
         <header className="h-20 flex items-center px-8 gap-8 shrink-0 z-10 bg-white border-b border-slate-200 shadow-sm">
-          <div className="relative flex-1 max-w-3xl flex items-center gap-4">
-            <Search className="absolute left-4 top-3 text-slate-400" size={20} />
-            <input type="text" placeholder="Buscar insumo..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setFiltroAlerta(null); setSelectedGroup(null); if (vistaActiva !== 'gestion') setVistaActiva('gestion'); }} className="w-full pl-12 pr-4 py-2.5 bg-slate-100 rounded-xl text-sm font-bold uppercase outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 transition-all" />
-            {searchTerm && (<X onClick={() => {setSearchTerm(""); setFiltroAlerta(null)}} className="absolute right-4 top-3 text-slate-400 cursor-pointer hover:text-orange-500 transition-colors" size={20} />)}
-          </div>
-          
-          <div className="flex items-center gap-4 ml-auto border-l pl-8 border-slate-200">
+<div className="flex items-center gap-4 ml-auto border-l pl-8 border-slate-200">
             <div className="mr-4 text-right hidden md:block">
               <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> Última Actualización Sheets</p>
               <p className="text-xs font-bold text-slate-600">{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
             
-            <div 
-              className={`flex items-center group p-2 rounded-xl border relative transition-all bg-slate-50 border-slate-200 ${realUser.rol === 'owner' ? 'cursor-pointer hover:border-orange-500 hover:shadow-md' : ''}`}
-              onClick={() => { 
-                if (realUser.rol === 'owner') {
-                  const currentIndex = perfilesSimulables.findIndex(p => p.id === currentUser.id);
-                  const nextIndex = (currentIndex + 1) % perfilesSimulables.length; 
-                  setSimulatedId(perfilesSimulables[nextIndex].id); 
-                } 
-              }}
-            >
-              <div className="text-right mr-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  {realUser.rol === 'owner' && currentUser.id !== realUser.id ? 'ESPIANDO:' : currentUser.rol}
-                </p>
-                <p className="text-xs font-black text-slate-800">
-                  {currentUser.nombre}
-                </p>
+            {realUser.rol === 'owner' && currentUser.id !== realUser.id ? (
+              <button 
+                onClick={() => setSimulatedId('owner_real')}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all animate-pulse"
+              >
+                Salir del Modo Espía
+              </button>
+            ) : (
+              <div className="flex items-center group p-2 rounded-xl border relative transition-all bg-slate-50 border-slate-200">
+                <div className="text-right mr-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    {currentUser.rol}
+                  </p>
+                  <p className="text-xs font-black text-slate-800">
+                    {currentUser.nombre}
+                  </p>
+                </div>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
               </div>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md transition-transform group-hover:scale-105 ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
-            </div>
+            )}
             
             <button 
               onClick={() => signOut(auth)} 
@@ -541,6 +535,8 @@ const App = () => {
               toggleFavorito={toggleFavorito}
               obtenerColorOwner={obtenerColorOwner}
               renderRadarDinamico={renderRadarDinamico}
+              setSimulatedId={setSimulatedId}
+              perfilesSimulables={perfilesSimulables}
             />
           )}
         </main>
