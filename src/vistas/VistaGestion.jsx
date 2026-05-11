@@ -38,8 +38,8 @@ const VistaGestion = ({
             <LayoutDashboard size={24} className="text-orange-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-black uppercase text-slate-800 tracking-tight leading-none">Gestión de insumos </h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Hola {currentUser.nombre.split(' ')[0]}</p>
+            <h1 className="text-xl font-semibold text-slate-800 tracking-tight">Gestión de Insumos</h1>
+            <p className="text-xs font-medium text-slate-400 mt-1">Hola, {currentUser?.nombre || 'Equipo'}</p>
           </div>
         </div>
 
@@ -92,6 +92,11 @@ const VistaGestion = ({
             <div className="flex flex-col lg:flex-row items-stretch justify-end gap-4 flex-1 w-full xl:w-auto">
               
               {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO */}
+              {isOwner && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
+             
+                </div>
+              )}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
                 {/* Cabecera de la Tarjeta */}
                 <div className="flex justify-between items-center mb-3">
@@ -208,12 +213,7 @@ const VistaGestion = ({
                     >
                       <ArrowLeft size={14} /> Volver
                     </button>
-                    <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight flex items-center gap-3">
-                      {tituloAlerta}
-                      <span className="bg-slate-100 border border-slate-200 text-slate-500 text-[14px] font-black px-2.5 py-0.5 rounded-lg shadow-inner">
-                        {datosFiltradosAlerta.length}
-                      </span>
-                    </h2>
+                    <h2 className="text-lg font-medium text-slate-700 tracking-tight">{tituloAlerta}</h2>
                   </div>
                   
                   <div className="flex items-center gap-4">
