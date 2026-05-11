@@ -28,6 +28,8 @@ const VistaGestion = ({
   toggleVisibilidadPlanta,
   obtenerColorOwner,
   renderRadarDinamico
+  setSimulatedId,
+  perfilesSimulables
 }) => {
   return (
     <div className="p-4 md:p-6 h-full max-w-full">
@@ -317,12 +319,21 @@ const VistaGestion = ({
               return (
                 <div className="mb-10">
                   <h3 className="text-[10px] font-black uppercase tracking-widest mb-3 text-slate-400">Radiografía Táctica del Equipo</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 w-full">
+<div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[repeat(7,minmax(0,1fr))] gap-3 w-full">
                     {operariosStats.map(op => {
                       const cStyle = obtenerColorOwner(op.nombre);
                       let opColorBar = "bg-emerald-500";
                       if (op.score < 100 && op.score >= 80) opColorBar = "bg-amber-500";
                       else if (op.score < 80) opColorBar = "bg-red-500";
+                      
+                      const perfilDestino = perfilesSimulables?.find(p => p.aliasMatch === op.nombre);
+
+                      return (
+                        <div 
+                          key={op.nombre} 
+                          onClick={() => { if (perfilDestino) setSimulatedId(perfilDestino.id); }}
+                          className={`bg-white rounded-xl p-3 border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-all ${perfilDestino ? 'cursor-pointer hover:-translate-y-1 hover:border-orange-300 ring-2 ring-transparent hover:ring-orange-100' : ''}`}
+                        >
 
                       return (
                         <div key={op.nombre} className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-shadow">
