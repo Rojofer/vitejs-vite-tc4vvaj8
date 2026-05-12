@@ -151,6 +151,25 @@ const PanelDetalle = ({
                     <span className="text-sm font-black tabular-nums text-slate-600 mt-1 leading-none">{formatoNum(consumoDiario)}</span>
                   </div>
                 </div>
+                
+                {/* NOTAS INTERNAS */}
+                <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3 shadow-sm mt-4 mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-[9px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5">
+                      <MessageSquare size={12}/> Notas Internas
+                    </label>
+                  </div>
+                  <textarea
+                    defaultValue={activeInsumo.notasInternas || ''}
+                    onBlur={(e) => {
+                      if (e.target.value !== activeInsumo.notasInternas) {
+                        guardarNotaInterna(activeInsumo.id, e.target.value);
+                      }
+                    }}
+                    placeholder="Anotaciones cualitativas (ej. Proveedor con demoras...)"
+                    className="w-full bg-white border border-amber-200 text-slate-700 text-xs font-medium rounded-lg px-3 py-2 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all resize-none min-h-[60px] placeholder:text-slate-300"
+                  />
+                </div>
 
                 {/* TABLAS 50/50 ALTA DENSIDAD */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
