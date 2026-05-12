@@ -547,6 +547,7 @@ const App = () => {
               renderRadarDinamico={renderRadarDinamico}
               setSimulatedId={setSimulatedId}
               perfilesSimulables={perfilesSimulables}
+              archivarInsumo={archivarInsumo}
             />
           )}
         </main>
