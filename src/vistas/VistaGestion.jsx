@@ -29,7 +29,7 @@ const VistaGestion = ({
   obtenerColorOwner,
   renderRadarDinamico,
   setSimulatedId,
-  perfilesSimulables,
+  perfilesSimulables
 }) => {
   return (
     <div className="p-4 md:p-6 h-full max-w-full">
@@ -89,7 +89,7 @@ const VistaGestion = ({
           return (
             <div className="flex flex-col lg:flex-row items-stretch justify-end gap-4 flex-1 w-full xl:w-auto">
               
-              {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO (SÓLO OWNER - Cuadro Fantasma Solucionado) */}
+              {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO (SÓLO OWNER) */}
               {currentUser?.rol === 'owner' && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
                   <div className="flex justify-between items-center mb-3">
@@ -319,7 +319,7 @@ const VistaGestion = ({
               return (
                 <div className="mb-10">
                   <h3 className="text-[10px] font-black uppercase tracking-widest mb-3 text-slate-400">Radiografía Táctica del Equipo</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[repeat(7,minmax(0,1fr))] gap-3 w-full">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 w-full">
                     {operariosStats.map(op => {
                       const cStyle = obtenerColorOwner(op.nombre);
                       let opColorBar = "bg-emerald-500";
@@ -331,12 +331,14 @@ const VistaGestion = ({
                       return (
                         <div 
                           key={op.nombre} 
-                          onClick={() => { if (perfilDestino) setSimulatedId(perfilDestino.id); }}
+                          onClick={() => {
+                            // Validamos que exista la función antes de llamarla para no romper la app
+                            if (perfilDestino && typeof setSimulatedId === 'function') {
+                              setSimulatedId(perfilDestino.id);
+                            }
+                          }}
                           className={`bg-white rounded-xl p-3 border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-all ${perfilDestino ? 'cursor-pointer hover:-translate-y-1 hover:border-orange-300 ring-2 ring-transparent hover:ring-orange-100' : ''}`}
                         >
-
-                      return (
-                        <div key={op.nombre} className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-shadow">
                           <div className="flex justify-between items-center">
                             <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${cStyle.bg} ${cStyle.text} ${cStyle.border} truncate max-w-[65%]`}>
                               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cStyle.dot}`}></span>
@@ -379,7 +381,7 @@ const VistaGestion = ({
               {renderRadarDinamico(insumos)}
             </div>
             
-            {/* DIRECTORIO DE GRUPOS - EFECTO SEMÁFORO ELIMINADO */}
+            {/* DIRECTORIO DE GRUPOS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
               {(() => {
                 let gruposAMostrar = grupos;
