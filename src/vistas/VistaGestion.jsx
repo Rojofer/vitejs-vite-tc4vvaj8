@@ -29,7 +29,8 @@ const VistaGestion = ({
   obtenerColorOwner,
   renderRadarDinamico,
   setSimulatedId,
-  perfilesSimulables
+  perfilesSimulables,
+  archivarInsumo
 }) => {
   return (
     <div className="p-4 md:p-6 h-full max-w-full">
@@ -180,6 +181,7 @@ const VistaGestion = ({
               isOwner={currentUser.rol === 'owner'} 
               canEditFav={currentUser.rol === 'owner' || currentUser.editorFavoritos} 
               obtenerColorOwner={obtenerColorOwner} 
+              archivarInsumo={archivarInsumo}
             />
           </motion.div>
 
@@ -221,6 +223,7 @@ const VistaGestion = ({
                   isOwner={currentUser.rol === 'owner'} 
                   canEditFav={currentUser.rol === 'owner' || currentUser.editorFavoritos} 
                   obtenerColorOwner={obtenerColorOwner} 
+                  archivarInsumo={archivarInsumo}
                 />
               </motion.div>
             );
@@ -512,6 +515,7 @@ const VistaGestion = ({
                   isOwner={currentUser.rol === 'owner'} 
                   canEditFav={currentUser.rol === 'owner' || currentUser.editorFavoritos} 
                   obtenerColorOwner={obtenerColorOwner} 
+                  archivarInsumo={archivarInsumo}
                 />
               </motion.div>
             );
