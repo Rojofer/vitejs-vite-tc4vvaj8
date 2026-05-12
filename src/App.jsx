@@ -11,10 +11,7 @@ import VistaLogin from './vistas/VistaLogin';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { 
-  LayoutDashboard, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, 
-  History, Bell, Package 
-} from 'lucide-react';
+import { MessageSquare,LayoutDashboard, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, History, Bell, Package} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const formatearFecha = (fecha) => {
