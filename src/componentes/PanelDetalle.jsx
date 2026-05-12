@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Star, Copy, Send, Package, FileText, History, BarChart2, AlertTriangle } from 'lucide-react';
+import { X, Star, Copy, Send, Package, FileText, History, BarChart2, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const formatoNum = (num) => Number(num).toLocaleString('es-AR');
