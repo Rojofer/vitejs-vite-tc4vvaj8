@@ -118,7 +118,17 @@ const App = () => {
       </div>
     );
   };
+  
+  const archivarInsumo = async (id) => {
+    if (window.confirm("¿Seguro que querés archivar este insumo? Desaparecerá del tablero pero quedará en el historial.")) {
+      await updateDoc(doc(db, "insumos", id), { discontinuado: true });
+      setActiveInsumo(null);
+    }
+  };
 
+  const guardarNotaInterna = async (id, nota) => {
+    await updateDoc(doc(db, "insumos", id), { notasInternas: nota });
+  };
   const [config, setConfig] = useState({ contactos: [], feriados: [], asuntos: { comprasLeve: "SEGUIMIENTO: {nombre}", comprasGrave: "URGENTE: {nombre}" }, plantillas: { comprasLeve: "", comprasGrave: "" } });
 
   const realUser = useMemo(() => {
@@ -554,6 +564,8 @@ const App = () => {
             reclamosActivos={reclamosActivos}
             abrirRedactorReclamo={abrirRedactorReclamo}
             obtenerColorOwner={obtenerColorOwner}
+            archivarInsumo={archivarInsumo}
+            guardarNotaInterna={guardarNotaInterna}
           />
         )}
       </AnimatePresence>
