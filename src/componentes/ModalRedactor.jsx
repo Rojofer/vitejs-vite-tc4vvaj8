@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Send } from 'lucide-react';
+import { X, Send, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const ModalRedactor = ({
@@ -154,19 +154,29 @@ const ModalRedactor = ({
         </div>
 
         {/* PIE DEL MODAL */}
-        <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-3 shrink-0">
+        <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
           <button 
             onClick={() => setReclamoDraft(null)} 
             className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
           >
             Cancelar
           </button>
-          <button 
-            onClick={() => confirmarYGuardarReclamo('NUEVO')} 
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-orange-500 text-white hover:bg-orange-600 shadow-md transition-all active:scale-95"
-          >
-            <Send size={14} /> Abrir Gmail y Registrar
-          </button>
+          
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => confirmarYGuardarReclamo('HILO')} 
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white border-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-400 shadow-sm transition-all active:scale-95"
+            >
+              <Search size={14} /> Continuar Hilo
+            </button>
+
+            <button 
+              onClick={() => confirmarYGuardarReclamo('NUEVO')} 
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-orange-500 text-white hover:bg-orange-600 shadow-md transition-all active:scale-95"
+            >
+              <Send size={14} /> Abrir Gmail
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
