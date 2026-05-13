@@ -13,7 +13,8 @@ const PanelDetalle = ({
   formatearFecha,
   reclamosActivos,
   abrirRedactorReclamo,
-  obtenerColorOwner
+  obtenerColorOwner,
+  guardarNotaInterna
 }) => {
   const [copiado, setCopiado] = useState(false);
   const [tabActiva, setTabActiva] = useState('datos');
