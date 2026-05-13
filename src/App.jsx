@@ -343,7 +343,7 @@ const App = () => {
     await updateDoc(doc(db, "insumos", draft.insumo.id), updates);
   };
 
-  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
+ const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
     const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
     const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     const correosFinales = [...correosDirectorio];
@@ -356,21 +356,31 @@ const App = () => {
       return;
     }
 
-    if (modoAccion === 'HILO') {
-      navigator.clipboard.writeText(reclamoDraft.cuerpo);
-      setAlertaHilo({
-        url: `https://mail.google.com/mail/u/0/#search/to:${correosStr}+"${reclamoDraft.ticketBorrador}"`,
-        reclamoData: reclamoDraft 
-      });
-      return; 
-    } 
-    
     try {
+      if (modoAccion === 'HILO') {
+        // 1. Copiamos el cuerpo al portapapeles para que lo pegues rápido
+        navigator.clipboard.writeText(reclamoDraft.cuerpo);
+        
+        // 2. Guardamos el registro en Firebase
+        await procesarGuardadoBD(reclamoDraft);
+        
+        // 3. Abrimos Gmail buscando el número de ticket exacto
+        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
+        
+        // 4. Cerramos la ventana y avisamos
+        setReclamoDraft(null);
+        setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
+        setTimeout(() => setToastMsg(null), 5000);
+        return; 
+      } 
+      
+      // --- FLUJO ORIGINAL PARA BOTÓN "NUEVO" ---
       await procesarGuardadoBD(reclamoDraft);
       window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
       setReclamoDraft(null);
       setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
       setTimeout(() => setToastMsg(null), 4000);
+
     } catch (error) {
       console.error("Error guardando reclamo:", error);
     }
