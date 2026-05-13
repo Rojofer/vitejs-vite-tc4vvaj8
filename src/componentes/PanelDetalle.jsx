@@ -33,7 +33,7 @@ const PanelDetalle = ({
   const consumoMensual = Number(activeInsumo.consumo || activeInsumo.consumoPromedio || 0);
   const consumoDiario = consumoMensual > 0 ? Math.round(consumoMensual / 26) : 0;
 
-  const solpedsOrdenadas = [...(activeInsumo.detalleSolpeds || [])].sort((a, b) => {
+  const ocsOrdenadas = [...(activeInsumo.detalleOCs || [])].sort((a, b) => {
     const fA = a.fecha?.seconds ? a.fecha.seconds * 1000 : new Date(a.fecha).getTime();
     const fB = b.fecha?.seconds ? b.fecha.seconds * 1000 : new Date(b.fecha).getTime();
     if (isNaN(fA)) return 1; if (isNaN(fB)) return -1;
@@ -209,7 +209,7 @@ const PanelDetalle = ({
                     <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 flex justify-between items-center">
                       <h4 className="text-[9px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5"><Package size={12} className="text-sky-500" /> Órdenes de Compra</h4>
                     </div>
-                    {activeInsumo.detalleOCs && activeInsumo.detalleOCs.length > 0 ? (
+                    {ocsOrdenadas.length > 0 ? (
                       <table className="w-full text-left border-collapse">
                         <thead className="bg-white border-b border-slate-100">
                           <tr>
@@ -220,7 +220,7 @@ const PanelDetalle = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                          {activeInsumo.detalleOCs.map((oc, idx) => {
+                          {ocsOrdenadas.map((oc, idx) => {
                             const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha);
                             const hoyCheck = new Date(); hoyCheck.setHours(0,0,0,0);
                             const isDemorada = f < hoyCheck;
