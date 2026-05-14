@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from './firebase';
 import TablaInsumos from './componentes/TablaInsumos';
 import VistaAuditoria from './vistas/VistaAuditoria';
+import VistaArchivados from './vistas/VistaArchivados';
 import VistaNotificaciones from './vistas/VistaNotificaciones';
 import PanelAjustes from './componentes/PanelAjustes';
 import PanelDetalle from './componentes/PanelDetalle';
@@ -11,7 +12,7 @@ import VistaLogin from './vistas/VistaLogin';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { MessageSquare,LayoutDashboard, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, History, Bell, Package} from 'lucide-react';
+import { MessageSquare,LayoutDashboard, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, History, Bell, Package,Archive} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const formatearFecha = (fecha) => {
@@ -450,6 +451,10 @@ const App = () => {
         <nav className="flex flex-col gap-6 w-full px-3">
           <div onClick={() => setVistaActiva('gestion')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'gestion' ? 'bg-slate-800 text-orange-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-orange-400 hover:bg-slate-800'}`}><LayoutDashboard size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Gestión ERP</span></div>
           <div onClick={() => setVistaActiva('auditoria')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'auditoria' ? 'bg-slate-800 text-sky-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-sky-400 hover:bg-slate-800'}`}><History size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Auditoría</span></div>
+          <div onClick={() => setVistaActiva('archivados')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'archivados' ? 'bg-slate-800 text-purple-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-purple-400 hover:bg-slate-800'}`}>
+            <Archive size={22} />
+            <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Insumos Ocultos</span>
+          </div>
           <div onClick={() => setVistaActiva('notificaciones')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'notificaciones' ? 'bg-slate-800 text-yellow-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-yellow-400 hover:bg-slate-800'}`}>
           <div className="relative">
             <Bell size={22} />
@@ -529,6 +534,15 @@ const App = () => {
               setActiveInsumo={setActiveInsumo}
             />
           )}
+
+          {vistaActiva === 'archivados' && (
+            <VistaArchivados 
+              insumos={insumos}
+              currentUser={currentUser}
+              setToastMsg={setToastMsg}
+            />
+          )}
+          
            {vistaActiva === 'gestion' && (
             <VistaGestion 
               currentUser={currentUser}
