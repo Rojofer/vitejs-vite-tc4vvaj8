@@ -261,30 +261,48 @@ const PanelDetalle = ({
               </motion.div>
             )}
 
-            {/* VISTA 2: HISTORIAL */}
             {tabActiva === 'historial' && (
               <motion.div key="historial" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}>
-                {reclamosActivos.length > 0 ? (
-                  <div className="space-y-2">
-                    {reclamosActivos.map((r, idx) => (
-                      <div key={idx} className={`p-3 rounded-lg border transition-all bg-white ${r.estado === 'CERRADO' ? 'border-slate-200 opacity-60' : 'border-orange-200 shadow-sm'}`}>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${r.estado === 'CERRADO' ? 'bg-slate-100 text-slate-500' : 'bg-orange-100 text-orange-600'}`}>
-                            {r.estado}
-                          </span>
-                          <span className="text-[9px] tabular-nums font-bold text-slate-400">{formatearFecha(r.fecha)}</span>
+                {(() => {
+                  // Ordenamos de más nuevo a más viejo y cortamos en 5
+                  const ultimosReclamos = [...reclamosActivos].sort((a, b) => {
+                    const fA = a.fecha?.seconds ? a.fecha.seconds * 1000 : new Date(a.fecha).getTime();
+                    const fB = b.fecha?.seconds ? b.fecha.seconds * 1000 : new Date(b.fecha).getTime();
+                    return fB - fA; 
+                  }).slice(0, 5);
+                  
+                  const ocultos = reclamosActivos.length - 5;
+
+                  return reclamosActivos.length > 0 ? (
+                    <div className="space-y-2">
+                      {ultimosReclamos.map((r, idx) => (
+                        <div key={idx} className={`p-3 rounded-lg border transition-all bg-white ${r.estado === 'CERRADO' ? 'border-slate-200 opacity-60' : 'border-orange-200 shadow-sm'}`}>
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${r.estado === 'CERRADO' ? 'bg-slate-100 text-slate-500' : 'bg-orange-100 text-orange-600'}`}>
+                              {r.estado}
+                            </span>
+                            <span className="text-[9px] tabular-nums font-bold text-slate-400">{formatearFecha(r.fecha)}</span>
+                          </div>
+                          <p className="text-[11px] font-bold text-slate-700 leading-tight mb-1">{r.mensaje}</p>
+                          <p className="text-[10px] text-slate-500 leading-relaxed italic border-l-2 border-slate-100 pl-2">{r.cuerpoOriginal}</p>
                         </div>
-                        <p className="text-[11px] font-bold text-slate-700 leading-tight mb-1">{r.mensaje}</p>
-                        <p className="text-[10px] text-slate-500 leading-relaxed italic border-l-2 border-slate-100 pl-2">{r.cuerpoOriginal}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-10 text-center border border-dashed border-slate-200 rounded-xl bg-white">
-                    <History size={20} className="mx-auto text-slate-300 mb-2" />
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin registro de auditoría</p>
-                  </div>
-                )}
+                      ))}
+                      
+                      {ocultos > 0 && (
+                        <div className="text-center pt-3 pb-1">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200 shadow-inner">
+                            + {ocultos} registros antiguos en auditoría
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="py-10 text-center border border-dashed border-slate-200 rounded-xl bg-white">
+                      <History size={20} className="mx-auto text-slate-300 mb-2" />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin registro de auditoría</p>
+                    </div>
+                  );
+                })()}
               </motion.div>
             )}
             
