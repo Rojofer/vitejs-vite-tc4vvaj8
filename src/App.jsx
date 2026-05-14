@@ -118,9 +118,14 @@ const App = () => {
   };
   
   const archivarInsumo = async (id) => {
-    if (window.confirm("¿Seguro que querés archivar este insumo? Desaparecerá del tablero pero quedará en el historial.")) {
-      await updateDoc(doc(db, "insumos", id), { discontinuado: true });
+    if (window.confirm("¿Seguro que querés archivar este insumo? Desaparecerá del tablero principal.")) {
+      await updateDoc(doc(db, "insumos", id), { 
+        discontinuado: true,
+        fechaArchivado: serverTimestamp() 
+      });
       setActiveInsumo(null);
+      setToastMsg("📦 Insumo enviado al sótano correctamente.");
+      setTimeout(() => setToastMsg(null), 4000);
     }
   };
 
@@ -424,17 +429,21 @@ const App = () => {
     reader.readAsText(file);
   };
 
-  const resultadosBusqueda = insumos.filter(i => i.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) || i.codigo?.toLowerCase().includes(searchTerm.toLowerCase()));
-  const grupos = [...new Set(insumos.map(item => item.grupo || 'SIN CLASIFICAR'))].sort((a, b) => a.localeCompare(b));
+  // ESCUDO ANTI-ZOMBIES: Separamos los vivos de los archivados
+  const insumosVivos = insumos.filter(i => !i.discontinuado);
+
+  const resultadosBusqueda = insumosVivos.filter(i => i.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) || i.codigo?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const grupos = [...new Set(insumosVivos.map(item => item.grupo || 'SIN CLASIFICAR'))].sort((a, b) => a.localeCompare(b));
   const reclamosActivos = activeInsumo ? reclamos.filter(r => r.insumoId === activeInsumo.id) : [];
 
   let datosAlerta = []; let tituloAlerta = "";
   const uCriticoApp = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
   const uUrgenciaApp = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
-  if (filtroAlerta === 'quiebres') { datosAlerta = insumos.filter(i => i.stock <= 0); tituloAlerta = "Quiebres Confirmados"; } 
-  else if (filtroAlerta === 'favoritos') { datosAlerta = insumos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp && i.supervivencia > uCriticoApp); tituloAlerta = "Favoritos en Riesgo"; } 
-  else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
-  else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
+
+  if (filtroAlerta === 'quiebres') { datosAlerta = insumosVivos.filter(i => i.stock <= 0); tituloAlerta = "Quiebres Confirmados"; } 
+  else if (filtroAlerta === 'favoritos') { datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp && i.supervivencia > uCriticoApp); tituloAlerta = "Favoritos en Riesgo"; } 
+  else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
+  else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumosVivos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
   
   if (currentUser.rol !== 'owner') {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
@@ -546,7 +555,7 @@ const App = () => {
            {vistaActiva === 'gestion' && (
             <VistaGestion 
               currentUser={currentUser}
-              insumos={insumos}
+              insumos={insumosVivos}
               config={config}
               searchTerm={searchTerm}
               resultadosBusqueda={resultadosBusqueda}
