@@ -33,6 +33,13 @@ const PanelDetalle = ({
   const consumoMensual = Number(activeInsumo.consumo || activeInsumo.consumoPromedio || 0);
   const consumoDiario = consumoMensual > 0 ? Math.round(consumoMensual / 26) : 0;
 
+  const solpedsOrdenadas = [...(activeInsumo.detalleSolpeds || [])].sort((a, b) => {
+    const fA = a.fecha?.seconds ? a.fecha.seconds * 1000 : new Date(a.fecha).getTime();
+    const fB = b.fecha?.seconds ? b.fecha.seconds * 1000 : new Date(b.fecha).getTime();
+    if (isNaN(fA)) return 1; if (isNaN(fB)) return -1;
+    return fA - fB;
+  });
+
   const ocsOrdenadas = [...(activeInsumo.detalleOCs || [])].sort((a, b) => {
     const fA = a.fecha?.seconds ? a.fecha.seconds * 1000 : new Date(a.fecha).getTime();
     const fB = b.fecha?.seconds ? b.fecha.seconds * 1000 : new Date(b.fecha).getTime();
