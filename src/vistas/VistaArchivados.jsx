@@ -3,7 +3,7 @@ import { ArchiveRestore, AlertCircle, Calendar } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase'; 
 
-const VistaArchivados = ({ insumos, currentUser, setToastMsg }) => {
+const VistaArchivados = ({ insumos, currentUser, setToastMsg, setDialogoConfirmacion }) => {
   // Filtramos y ordenamos para que el último archivado aparezca primero
   const archivados = insumos.filter(i => i.discontinuado === true).sort((a, b) => {
     const fA = a.fechaArchivado?.seconds || 0;
@@ -11,18 +11,25 @@ const VistaArchivados = ({ insumos, currentUser, setToastMsg }) => {
     return fB - fA; 
   });
 
-  const restaurar = async (id, nombre) => {
-    if (!window.confirm(`¿Restaurar ${nombre} al tablero principal?`)) return;
-    try {
-      // Al restaurar, limpiamos la etiqueta y la fecha
-      await updateDoc(doc(db, "insumos", id), { 
-        discontinuado: false,
-        fechaArchivado: null 
-      });
-      if(setToastMsg) setToastMsg(`✅ ${nombre} rescatado del sótano.`);
-    } catch (error) {
-      console.error("Error al restaurar:", error);
-    }
+  const restaurar = (id, nombre) => {
+    // Usamos el nuevo modal SaaS en lugar del navegador
+    setDialogoConfirmacion({
+      titulo: "Restaurar Insumo",
+      mensaje: `¿Seguro que querés restaurar "${nombre}" al tablero principal?`,
+      textoConfirmar: "Restaurar",
+      colorBoton: "bg-emerald-500 hover:bg-emerald-600",
+      onConfirm: async () => {
+        try {
+          await updateDoc(doc(db, "insumos", id), { 
+            discontinuado: false,
+            fechaArchivado: null 
+          });
+          if(setToastMsg) setToastMsg(`✅ ${nombre} rescatado del sótano.`);
+        } catch (error) {
+          console.error("Error al restaurar:", error);
+        }
+      }
+    });
   };
 
   const formatFecha = (fechaObj) => {
@@ -74,8 +81,9 @@ const VistaArchivados = ({ insumos, currentUser, setToastMsg }) => {
             <tbody className="divide-y divide-slate-50">
               {archivados.map(i => (
                 <tr key={i.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4 text-xs font-mono text-slate-400 w-32">{i.codigo}</td>
-                  <td className="px-6 py-4 text-xs font-bold text-slate-700">{i.nombre}</td>
+                  {/* AQUÍ SE CORRIGIÓ LA TIPOGRAFÍA DEL CÓDIGO */}
+                  <td className="px-6 py-4 text-xs font-bold text-slate-600 w-32">{i.codigo}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-slate-800">{i.nombre}</td>
                   <td className="px-6 py-4 text-[11px] font-semibold text-slate-500 w-48">{formatFecha(i.fechaArchivado)}</td>
                   <td className="px-6 py-4 text-center w-40">
                     <button 
