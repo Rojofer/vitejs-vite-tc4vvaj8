@@ -309,7 +309,10 @@ const App = () => {
     return { asunto: procesar(template.asunto || "⚠️ Asunto vacío"), cuerpo: procesar(template.cuerpo || "⚠️ Cuerpo vacío"), destino: template.destino || "compras" };
   };
 
-  const abrirRedactorReclamo = (insumo) => {
+  const abrirRedactorReclamo = (insumoPulsado) => {
+    // ESCUDO ANTI-AMNESIA: Buscamos la versión más fresca del insumo en la memoria principal
+    const insumo = insumos.find(i => i.id === insumoPulsado.id) || insumoPulsado;
+
     const umbral = config?.umbralUrgencia || 15;
     const isGrave = Math.round(insumo.supervivencia) <= umbral;
     const hasSolpeds = insumo.sp > 0; 
@@ -317,12 +320,13 @@ const App = () => {
     
     let tInicial = null;
     if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped);
-    if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente); 
+    if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente);
     if (!tInicial) tInicial = plantillas.find(p => p.isNormal);
-    if (!tInicial) tInicial = plantillas[0]; 
-
+    if (!tInicial) tInicial = plantillas[0];
+    
     const { asunto, cuerpo, destino } = aplicarPlantilla(insumo, tInicial.id);
     
+    // ACÁ ESTÁ LA MAGIA: Al estar fresco, si ya hay ticket guardado lo recicla
     const ticketActual = insumo.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
