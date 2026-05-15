@@ -214,6 +214,33 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                   <input type="range" min="1" max="24" value={localConfig.tiempoDelayAlerta !== undefined ? localConfig.tiempoDelayAlerta : 2} onChange={(e) => { setLocalConfig({ ...localConfig, tiempoDelayAlerta: Number(e.target.value) }); }} className="w-full accent-blue-500 cursor-pointer h-2 bg-blue-200 rounded-lg appearance-none" />
                 </div>
 
+                {/* NUEVO MÓDULO: MODO DE CIERRE DE RECLAMOS */}
+                <div className="bg-purple-50 border border-purple-200 p-6 rounded-2xl shadow-sm md:col-span-2 mt-2">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h5 className="font-black text-purple-800 text-sm uppercase">Modo de Cierre de Reclamos</h5>
+                      <p className="text-[9px] font-bold text-purple-500 uppercase mt-1">¿Cómo finalizan los reclamos a proveedores?</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => setLocalConfig({ ...localConfig, modoCierreReclamos: 'manual' })}
+                      className={`flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${(!localConfig.modoCierreReclamos || localConfig.modoCierreReclamos === 'manual') ? 'bg-white border-purple-500 shadow-md text-purple-700' : 'bg-purple-100/50 border-transparent text-purple-400 hover:bg-white'}`}
+                    >
+                      <span className="font-black uppercase text-xs tracking-widest">Cierre Manual (Preventivo)</span>
+                      <span className="text-[9px] font-bold text-center px-4">El operario debe cerrarlo a mano confirmando el ingreso físico o estratégico.</span>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setLocalConfig({ ...localConfig, modoCierreReclamos: 'auto' })}
+                      className={`flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${localConfig.modoCierreReclamos === 'auto' ? 'bg-white border-purple-500 shadow-md text-purple-700' : 'bg-purple-100/50 border-transparent text-purple-400 hover:bg-white'}`}
+                    >
+                      <span className="font-black uppercase text-xs tracking-widest">Cierre Automático</span>
+                      <span className="text-[9px] font-bold text-center px-4">El sistema lo cierra solo al detectar un salto de stock (cobertura segura).</span>
+                    </button>
+                  </div>
+                </div>
+                
               </div>
             </motion.div>
           )}
