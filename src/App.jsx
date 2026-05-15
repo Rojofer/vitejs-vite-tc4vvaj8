@@ -66,6 +66,7 @@ const App = () => {
 
   const [reclamoDraft, setReclamoDraft] = useState(null); 
   const [toastMsg, setToastMsg] = useState(null);
+  const [dialogoConfirmacion, setDialogoConfirmacion] = useState(null);
   const [alertaHilo, setAlertaHilo] = useState(null);
   const [filtroResponsable, setFiltroResponsable] = useState("TODOS");
   const [filtroRiesgoGrupo, setFiltroRiesgoGrupo] = useState(false);
@@ -118,15 +119,21 @@ const App = () => {
   };
   
   const archivarInsumo = async (id) => {
-    if (window.confirm("¿Seguro que querés archivar este insumo? Desaparecerá del tablero principal.")) {
-      await updateDoc(doc(db, "insumos", id), { 
-        discontinuado: true,
-        fechaArchivado: serverTimestamp() 
-      });
-      setActiveInsumo(null);
-      setToastMsg("📦 Insumo enviado al sótano correctamente.");
-      setTimeout(() => setToastMsg(null), 4000);
-    }
+    setDialogoConfirmacion({
+      titulo: "Archivar Insumo",
+      mensaje: "¿Seguro que querés archivar este insumo? Desaparecerá del tablero principal.",
+      textoConfirmar: "Sí, Archivar",
+      colorBoton: "bg-red-500 hover:bg-red-600",
+      onConfirm: async () => {
+        await updateDoc(doc(db, "insumos", id), { 
+          discontinuado: true,
+          fechaArchivado: serverTimestamp() 
+        });
+        setActiveInsumo(null);
+        setToastMsg("📦 Insumo enviado al sótano correctamente.");
+        setTimeout(() => setToastMsg(null), 4000);
+      }
+    });
   };
 
   const guardarNotaInterna = async (id, nota) => {
@@ -549,6 +556,7 @@ const App = () => {
               insumos={insumos}
               currentUser={currentUser}
               setToastMsg={setToastMsg}
+              setDialogoConfirmacion={setDialogoConfirmacion}
             />
           )}
           
@@ -699,24 +707,20 @@ const App = () => {
       </AnimatePresence>
       
       <AnimatePresence>
-        {toastMsg && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: 50 }} 
-            className="fixed bottom-10 right-10 z-[9999] bg-slate-900 border border-slate-700 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4"
-          >
-            <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
-              <CheckCircle size={16} className="text-emerald-400" />
-            </div>
-            <div>
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Operación Exitosa</h4>
-              <p className="text-xs font-bold text-slate-300 mt-0.5">{toastMsg}</p>
-            </div>
-            <button onClick={() => setToastMsg(null)} className="ml-4 text-slate-500 hover:text-white transition-colors shrink-0">
-              <X size={16}/>
-            </button>
-          </motion.div>
+        {dialogoConfirmacion && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 p-6 text-center">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                <AlertTriangle size={32} className="text-slate-400" />
+              </div>
+              <h3 className="text-slate-800 font-black text-lg mb-2 uppercase tracking-widest">{dialogoConfirmacion.titulo}</h3>
+              <p className="text-slate-500 text-xs font-bold mb-8 px-2">{dialogoConfirmacion.mensaje}</p>
+              <div className="flex gap-3">
+                <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
+                <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>{dialogoConfirmacion.textoConfirmar || 'Aceptar'}</button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
       
