@@ -136,20 +136,6 @@ const App = () => {
     });
   };
 
-  const cerrarReclamoManual = async (reclamoId) => {
-    try {
-      await updateDoc(doc(db, "reclamos", reclamoId), {
-        estado: 'CERRADO',
-        fechaCierre: serverTimestamp(),
-        motivoCierre: 'Cierre manual por operario (Ingreso/Resolución)'
-      });
-      setToastMsg("✅ Reclamo marcado como cumplido.");
-      setTimeout(() => setToastMsg(null), 4000);
-    } catch (e) {
-      console.error("Error al cerrar reclamo:", e);
-    }
-  };
-  
   const guardarNotaInterna = async (id, nota) => {
     await updateDoc(doc(db, "insumos", id), { notasInternas: nota });
   };
@@ -236,46 +222,6 @@ const App = () => {
   useEffect(() => {
     if (activeInsumo) { const insumoActualizado = insumos.find(i => i.id === activeInsumo.id); if (insumoActualizado && (insumoActualizado.stock !== activeInsumo.stock || insumoActualizado.ocDemorada !== activeInsumo.ocDemorada)) { setActiveInsumo(insumoActualizado); } }
   }, [insumos]);
-
-  useEffect(() => {
-    if (insumos.length === 0 || reclamos.length === 0) return;
-    const ejecutarAutoLimpieza = async () => {
-      const reclamosAbiertos = reclamos.filter(r => r.estado === 'ABIERTO' && r.insumoId !== 'BROADCAST');
-      let alertasSugeridas = [];
-      const umbral = config?.umbralUrgencia || 20; 
-
-      for (const r of reclamosAbiertos) { 
-        const insumo = insumos.find(i => i.id === r.insumoId); 
-        if (insumo) {
-          const tiempoReclamo = r.fecha?.seconds ? r.fecha.seconds * 1000 : new Date(r.fecha).getTime();
-          const horasAntiguedad = (new Date().getTime() - tiempoReclamo) / (1000 * 60 * 60);
-          const tieneEscudo = horasAntiguedad < 48; 
-
-          if (insumo.supervivencia >= umbral) { 
-            if (insumo.ocDemorada === 0) {
-              if (!tieneEscudo) {
-                const reclamoRef = doc(db, "reclamos", r.id);
-                await updateDoc(reclamoRef, { estado: "CERRADO", motivoCierre: "Stock Recuperado (Automático)" });
-              }
-            } else if (!r.alertaCierreMostrada) {
-              alertasSugeridas.push(insumo.nombre);
-              const reclamoRef = doc(db, "reclamos", r.id);
-              await updateDoc(reclamoRef, { alertaCierreMostrada: true });
-            }
-          } else if (insumo.supervivencia < umbral && r.alertaCierreMostrada) {
-            const reclamoRef = doc(db, "reclamos", r.id);
-            await updateDoc(reclamoRef, { alertaCierreMostrada: false });
-          }
-        }
-      }
-
-      if (alertasSugeridas.length > 0) {
-        setToastMsg(`Sugerencia de Auditoría: ${alertasSugeridas.join(', ')} superó los ${umbral} días de stock, pero mantiene OC demoradas.`);
-        setTimeout(() => setToastMsg(null), 8000); 
-      }
-    }; 
-    ejecutarAutoLimpieza();
-  }, [insumos, reclamos, config?.umbralUrgencia]);
 
   const guardarConfigEnFirebase = async (nuevaConfig) => { setConfig(nuevaConfig); await setDoc(doc(db, "config", "general"), nuevaConfig); };
   const toggleFavorito = async (insumo) => { await updateDoc(doc(db, "insumos", insumo.id), { esFavorito: !insumo.favorito }); };
@@ -421,7 +367,15 @@ const App = () => {
     if (e) e.stopPropagation();
     try {
       const reclamoObj = reclamos.find(r => r.id === reclamoId);
-      await updateDoc(doc(db, "reclamos", reclamoId), { estado: 'CERRADO' });
+      
+      // 1. Cerramos el reclamo y le ponemos el sello de tiempo
+      await updateDoc(doc(db, "reclamos", reclamoId), { 
+        estado: 'CERRADO',
+        fechaCierre: serverTimestamp(),
+        motivoCierre: 'Cierre manual por operario'
+      });
+      
+      // 2. Limpiamos la memoria del ticket en el insumo para futuros reclamos
       if (reclamoObj && reclamoObj.insumoId) {
          await updateDoc(doc(db, "insumos", reclamoObj.insumoId), { ticketReclamo: null });
       }
