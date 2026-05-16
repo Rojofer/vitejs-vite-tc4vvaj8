@@ -473,6 +473,36 @@ const App = () => {
   if (currentUser.rol !== 'owner') {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
   }
+
+    // --- ROBOT: LIMPIEZA AUTOMÁTICA DE RECLAMOS ---
+  useEffect(() => {
+    // Solo el Owner corre el robot. Revisamos en qué modo está el sistema.
+    const modoCierre = config?.modoCierreReclamos || 'manual';
+    if (currentUser?.rol !== 'owner' || insumos.length === 0 || reclamos.length === 0) return;
+
+    const procesarLimpieza = async () => {
+      const reclamosAbiertos = reclamos.filter(r => r.estado === 'ABIERTO');
+      const umbral = config?.umbralUrgencia || 15;
+
+      for (const reclamo of reclamosAbiertos) {
+        const insumo = insumos.find(i => i.id === reclamo.insumoId);
+        
+        // REGLA TÁCTICA: Cerramos SOLO si fue al sótano, 
+        // O si está en modo Automático y recuperó el stock.
+        if (!insumo || insumo.discontinuado || (modoCierre === 'auto' && insumo.supervivencia > umbral)) {
+          try {
+            await updateDoc(doc(db, "reclamos", reclamo.id), { 
+              estado: 'CERRADO',
+              fechaCierre: serverTimestamp(),
+              motivoCierre: insumo?.discontinuado ? 'Auto-cierre: Insumo al sótano' : 'Auto-cierre: Stock regularizado'
+            });
+          } catch (e) { console.error("Error en auto-cierre:", e); }
+        }
+      }
+    };
+
+    procesarLimpieza();
+  }, [insumos, reclamos, currentUser, config]);
   
   if (cargandoAuth) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-500">Verificando credenciales...</div>;
   if (!usuarioLogueado) return <VistaLogin />;
