@@ -136,6 +136,20 @@ const App = () => {
     });
   };
 
+  const cerrarReclamoManual = async (reclamoId) => {
+    try {
+      await updateDoc(doc(db, "reclamos", reclamoId), {
+        estado: 'CERRADO',
+        fechaCierre: serverTimestamp(),
+        motivoCierre: 'Cierre manual por operario (Ingreso/Resolución)'
+      });
+      setToastMsg("✅ Reclamo marcado como cumplido.");
+      setTimeout(() => setToastMsg(null), 4000);
+    } catch (e) {
+      console.error("Error al cerrar reclamo:", e);
+    }
+  };
+  
   const guardarNotaInterna = async (id, nota) => {
     await updateDoc(doc(db, "insumos", id), { notasInternas: nota });
   };
@@ -590,6 +604,8 @@ const App = () => {
               setSimulatedId={setSimulatedId}
               perfilesSimulables={perfilesSimulables}
               archivarInsumo={archivarInsumo}
+              cerrarReclamoManual={cerrarReclamoManual}
+              setDialogoConfirmacion={setDialogoConfirmacion}
             />
           )}
         </main>
