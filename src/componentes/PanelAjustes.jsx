@@ -199,21 +199,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                   </div>
                   <input type="range" min="1" max="60" value={localConfig.umbralUrgencia !== undefined ? localConfig.umbralUrgencia : 20} onChange={(e) => { setLocalConfig({ ...localConfig, umbralUrgencia: Number(e.target.value) }); }} className="w-full accent-orange-500 cursor-pointer h-2 bg-orange-200 rounded-lg appearance-none" />
                 </div>
-
-                <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl shadow-sm md:col-span-2">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h5 className="font-black text-blue-800 text-sm uppercase">Reloj de Arena (Delay de Alertas)</h5>
-                      <p className="text-[9px] font-bold text-blue-500 uppercase mt-1">Tiempo límite de envío</p>
-                    </div>
-                    <div className="bg-blue-100 text-blue-600 px-3 py-1.5 rounded-xl font-black text-2xl border border-blue-200 flex items-center gap-2 shadow-sm">
-                      <Clock size={20} className="text-blue-500" />
-                      {localConfig.tiempoDelayAlerta !== undefined ? localConfig.tiempoDelayAlerta : 2} <span className="text-sm">hs</span>
-                    </div>
-                  </div>
-                  <input type="range" min="1" max="24" value={localConfig.tiempoDelayAlerta !== undefined ? localConfig.tiempoDelayAlerta : 2} onChange={(e) => { setLocalConfig({ ...localConfig, tiempoDelayAlerta: Number(e.target.value) }); }} className="w-full accent-blue-500 cursor-pointer h-2 bg-blue-200 rounded-lg appearance-none" />
-                </div>
-
+               
                 {/* NUEVO MÓDULO: MODO DE CIERRE DE RECLAMOS */}
                 <div className="bg-purple-50 border border-purple-200 p-6 rounded-2xl shadow-sm md:col-span-2 mt-2">
                   <div className="flex justify-between items-center mb-6">
