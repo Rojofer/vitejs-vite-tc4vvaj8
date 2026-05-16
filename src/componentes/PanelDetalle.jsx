@@ -14,7 +14,9 @@ const PanelDetalle = ({
   reclamosActivos,
   abrirRedactorReclamo,
   obtenerColorOwner,
-  guardarNotaInterna
+  guardarNotaInterna,
+  setDialogoConfirmacion,  // <--- NUEVO
+  cerrarReclamoManual      // <--- NUEVO
 }) => {
   const [copiado, setCopiado] = useState(false);
   const [tabActiva, setTabActiva] = useState('datos');
@@ -285,6 +287,27 @@ const PanelDetalle = ({
                           </div>
                           <p className="text-[11px] font-bold text-slate-700 leading-tight mb-1">{r.mensaje}</p>
                           <p className="text-[10px] text-slate-500 leading-relaxed italic border-l-2 border-slate-100 pl-2">{r.cuerpoOriginal}</p>
+                          {/* BOTÓN DE CIERRE MANUAL */}
+                      {r.estado === 'ABIERTO' && (
+                        <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end">
+                          <button
+                            onClick={() => {
+                              if(setDialogoConfirmacion && cerrarReclamoManual) {
+                                setDialogoConfirmacion({
+                                  titulo: "Finalizar Reclamo",
+                                  mensaje: "¿Confirmás que el material ingresó a planta o que la situación preventiva se resolvió?",
+                                  textoConfirmar: "Sí, Finalizar",
+                                  colorBoton: "bg-emerald-500 hover:bg-emerald-600",
+                                  onConfirm: () => cerrarReclamoManual(r.id)
+                                });
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-sm"
+                          >
+                            Dar por Cumplido
+                          </button>
+                        </div>
+                      )}
                         </div>
                       ))}
                       
