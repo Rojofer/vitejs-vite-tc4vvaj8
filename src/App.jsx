@@ -145,13 +145,29 @@ const App = () => {
     if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
     const emailLogueado = usuarioLogueado.email.toLowerCase();
 
-    if (emailLogueado === 'fachaval@devesa.com' || emailLogueado === 'fernandocomex1@gmail.com') {
-      return { id: 'owner_real', email: emailLogueado, nombre: emailLogueado === 'fachaval@devesa.com' ? "Fernando (Dueño)" : "Fer (Tester)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
+    // 1. EL ÚNICO OWNER VIP: Fernando
+    if (emailLogueado === 'fernandocomex1@gmail.com') {
+      return { id: 'owner_real', email: emailLogueado, nombre: "Fernando (Owner)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
     }
     
+    // 2. OPERARIOS DEL EQUIPO (Los que tengas cargados en Ajustes > Equipo)
     const operarioMatch = (config?.contactos || []).filter(c => c.tipo === 'equipo').find(c => c.email && c.email.toLowerCase() === emailLogueado);
-    if (operarioMatch) return { id: operarioMatch.id, email: emailLogueado, nombre: operarioMatch.label || operarioMatch.email, rol: "operario", inicial: (operarioMatch.label || operarioMatch.email || "O").charAt(0).toUpperCase(), aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), editorFavoritos: operarioMatch.editorFavoritos === true };
-    return { id: usuarioLogueado.uid, email: emailLogueado, nombre: "Sin Permisos", rol: "espectador", inicial: "X", aliasMatch: "NINGUNO", editorFavoritos: false };
+    
+    if (operarioMatch) {
+      return { 
+        id: operarioMatch.id, 
+        email: emailLogueado, 
+        nombre: operarioMatch.label || emailLogueado.split('@')[0], 
+        rol: "operario", 
+        inicial: (operarioMatch.label || emailLogueado.split('@')[0]).charAt(0).toUpperCase(), 
+        aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), 
+        editorFavoritos: operarioMatch.editorFavoritos === true 
+      };
+    }
+
+    // 3. VISITAS NO AUTORIZADAS (Cualquier otro mail que intente entrar)
+    const nombreVisita = emailLogueado.split('@')[0];
+    return { id: usuarioLogueado.uid, email: emailLogueado, nombre: nombreVisita, rol: "espectador", inicial: nombreVisita.charAt(0).toUpperCase(), aliasMatch: "NINGUNO", editorFavoritos: false };
   }, [usuarioLogueado, config]);
 
   const perfilesSimulables = useMemo(() => {
