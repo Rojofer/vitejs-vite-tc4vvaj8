@@ -501,10 +501,12 @@ const App = () => {
         <nav className="flex flex-col gap-6 w-full px-3">
           <div onClick={() => setVistaActiva('gestion')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'gestion' ? 'bg-slate-800 text-orange-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-orange-400 hover:bg-slate-800'}`}><LayoutDashboard size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Gestión ERP</span></div>
           <div onClick={() => setVistaActiva('auditoria')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'auditoria' ? 'bg-slate-800 text-sky-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-sky-400 hover:bg-slate-800'}`}><History size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Auditoría</span></div>
-          <div onClick={() => setVistaActiva('archivados')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'archivados' ? 'bg-slate-800 text-purple-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-purple-400 hover:bg-slate-800'}`}>
-            <Archive size={22} />
-            <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Insumos Ocultos</span>
-          </div>
+          {currentUser.rol === 'owner' && (
+            <div onClick={() => setVistaActiva('archivados')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'archivados' ? 'bg-slate-800 text-purple-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-purple-400 hover:bg-slate-800'}`}>
+              <Archive size={22} />
+              <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Insumos Ocultos</span>
+            </div>
+          )}
           <div onClick={() => setVistaActiva('notificaciones')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'notificaciones' ? 'bg-slate-800 text-yellow-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-yellow-400 hover:bg-slate-800'}`}>
           <div className="relative">
             <Bell size={22} />
