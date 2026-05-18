@@ -342,30 +342,58 @@ const App = () => {
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
-    
+
     if (correosStr.length === 0 && modoAccion !== 'HILO') {
       setToastMsg("⚠️ Error: Seleccioná un destinatario antes de continuar.");
       setTimeout(() => setToastMsg(null), 4000);
       return;
     }
 
-    try {
-      if (modoAccion === 'HILO') {
-        // 1. Copiamos el cuerpo al portapapeles para que lo pegues rápido
+    // Encapsulamos la lógica de enviar un correo nuevo
+    const ejecutarFlujoNuevo = async () => {
+      try {
+        await procesarGuardadoBD(reclamoDraft);
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
+        setReclamoDraft(null);
+        setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
+        setTimeout(() => setToastMsg(null), 4000);
+      } catch (error) {
+        console.error("Error guardando reclamo:", error);
+      }
+    };
+
+    if (modoAccion === 'HILO') {
+      try {
+        // 1. Copiamos el cuerpo al portapapeles
         navigator.clipboard.writeText(reclamoDraft.cuerpo);
-        
         // 2. Guardamos el registro en Firebase
         await procesarGuardadoBD(reclamoDraft);
-        
         // 3. Abrimos Gmail buscando el número de ticket exacto
         window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
-        
         // 4. Cerramos la ventana y avisamos
         setReclamoDraft(null);
         setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
         setTimeout(() => setToastMsg(null), 5000);
-        return; 
-      } 
+      } catch (error) {
+        console.error("Error en Hilo:", error);
+      }
+    } else {
+      // --- ESCUDO ANTI-CORREOS DUPLICADOS ---
+      // Si el usuario aprieta "NUEVO" pero el insumo ya tiene un ticket activo, frenamos la máquina.
+      if (reclamoDraft.insumo.ticketReclamo) {
+        setDialogoConfirmacion({
+          titulo: "⚠️ Atención: Hilo ya iniciado",
+          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón azul "Sumar al Hilo Actual".`,
+          textoConfirmar: "Forzar envío nuevo",
+          colorBoton: "bg-red-500 hover:bg-red-600",
+          onConfirm: ejecutarFlujoNuevo
+        });
+      } else {
+        // Si es un material virgen (sin reclamos previos), mandamos el nuevo de una.
+        ejecutarFlujoNuevo();
+      }
+    }
+  };
       
       // --- FLUJO ORIGINAL PARA BOTÓN "NUEVO" ---
       await procesarGuardadoBD(reclamoDraft);
