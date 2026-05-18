@@ -539,6 +539,7 @@ const App = () => {
               auditoriaFiltroInsumo={auditoriaFiltroInsumo}
               setAuditoriaFiltroInsumo={setAuditoriaFiltroInsumo}
               setActiveInsumo={setActiveInsumo} 
+              setDialogoConfirmacion={setDialogoConfirmacion}
             />
           )}
           {vistaActiva === 'notificaciones' && (
