@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, AlertTriangle, Star, Clock, ArrowLeft, Package, Activity } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, Star, Clock, ArrowLeft, Package, Activity,MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TablaInsumos from '../componentes/TablaInsumos';
 
@@ -8,6 +8,7 @@ const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 const VistaGestion = ({
   currentUser,
   insumos,
+  reclamos,
   config,
   searchTerm,
   resultadosBusqueda,
@@ -232,8 +233,8 @@ const VistaGestion = ({
         ) : !selectedGroup ? (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             
-            {/* GRILLA DE KPIS - 4 COLUMNAS SIMÉTRICAS SIN RUIDO VISUAL */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            {/* GRILLA DE KPIS - 5 COLUMNAS SIMÉTRICAS */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
               {(() => {
                 const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
                 
@@ -244,6 +245,14 @@ const VistaGestion = ({
                 const kpiFavRiesgo = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia && i.supervivencia > uCritico);
                 const kpiDemoras = misInsumosDashboard.filter(i => i.ocDemorada > 0);
                 const kpiMisFavoritos = misInsumosDashboard.filter(i => i.favorito);
+                
+                // NUEVO KPI: Calculamos los reclamos ABIERTOS que corresponden a los insumos de este usuario
+                const misInsumosIds = misInsumosDashboard.map(i => i.id);
+                const kpiReclamosAbiertos = (reclamos || []).filter(r => 
+                  r.estado === 'ABIERTO' && 
+                  r.tipo !== 'AVISO GERENCIA' && 
+                  misInsumosIds.includes(r.insumoId)
+                );
                 
                 const total = misInsumosDashboard.length || 1;
 
@@ -292,6 +301,19 @@ const VistaGestion = ({
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
                       </div>
                     </div>
+
+                    {/* NUEVA TARJETA: TICKETS ABIERTOS */}
+                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] sm:text-[11px] font-black text-blue-500 uppercase tracking-widest leading-tight">Tickets Abiertos</span>
+                        <div className="p-2 bg-blue-50 rounded-xl"><MessageSquare size={16} className="text-blue-500"/></div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiReclamosAbiertos.length}</p>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Activos</span>
+                      </div>
+                    </div>
+                    
                   </>
                 );
               })()}
