@@ -585,6 +585,8 @@ const App = () => {
               setNotiTabActiva={setNotiTabActiva}
               formatearFecha={formatearFecha}
               setActiveInsumo={setActiveInsumo}
+              contactos={config?.contactos || []} // ENCHUFE 1
+              setToastMsg={setToastMsg} // ENCHUFE 2
             />
           )}
 
