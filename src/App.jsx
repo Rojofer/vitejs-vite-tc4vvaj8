@@ -12,7 +12,7 @@ import VistaLogin from './vistas/VistaLogin';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { Brain, MessageSquare, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, History, Bell, Package,Archive} from 'lucide-react';
+import { Brain, MessageSquare, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, History, Bell, Package, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const formatearFecha = (fecha) => {
@@ -58,12 +58,10 @@ const App = () => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [activeInsumo, setActiveInsumo] = useState(null);
   const [filtroAlerta, setFiltroAlerta] = useState(null);
-
   const [showSettings, setShowSettings] = useState(false);
   const [vistaActiva, setVistaActiva] = useState('gestion'); 
   const [notiTabActiva, setNotiTabActiva] = useState('avisos');
   const [auditoriaFiltroInsumo, setAuditoriaFiltroInsumo] = useState(null);
-
   const [reclamoDraft, setReclamoDraft] = useState(null); 
   const [toastMsg, setToastMsg] = useState(null);
   const [dialogoConfirmacion, setDialogoConfirmacion] = useState(null);
@@ -117,7 +115,7 @@ const App = () => {
       </div>
     );
   };
-  
+
   const archivarInsumo = async (id) => {
     setDialogoConfirmacion({
       titulo: "Archivar Insumo",
@@ -139,6 +137,7 @@ const App = () => {
   const guardarNotaInterna = async (id, nota) => {
     await updateDoc(doc(db, "insumos", id), { notasInternas: nota });
   };
+
   const [config, setConfig] = useState({ contactos: [], feriados: [], asuntos: { comprasLeve: "SEGUIMIENTO: {nombre}", comprasGrave: "URGENTE: {nombre}" }, plantillas: { comprasLeve: "", comprasGrave: "" } });
 
   const realUser = useMemo(() => {
@@ -150,7 +149,7 @@ const App = () => {
       return { id: 'owner_real', email: emailLogueado, nombre: "Fernando (Owner)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
     }
     
-    // 2. OPERARIOS DEL EQUIPO (Los que tengas cargados en Ajustes > Equipo)
+    // 2. OPERARIOS DEL EQUIPO
     const operarioMatch = (config?.contactos || []).filter(c => c.tipo === 'equipo').find(c => c.email && c.email.toLowerCase() === emailLogueado);
     
     if (operarioMatch) {
@@ -165,7 +164,7 @@ const App = () => {
       };
     }
 
-    // 3. VISITAS NO AUTORIZADAS (Cualquier otro mail que intente entrar)
+    // 3. VISITAS NO AUTORIZADAS
     const nombreVisita = emailLogueado.split('@')[0];
     return { id: usuarioLogueado.uid, email: emailLogueado, nombre: nombreVisita, rol: "espectador", inicial: nombreVisita.charAt(0).toUpperCase(), aliasMatch: "NINGUNO", editorFavoritos: false };
   }, [usuarioLogueado, config]);
@@ -202,17 +201,25 @@ const App = () => {
       const data = snapshot.docs.map(doc => {
         const d = doc.data(); const up = d.fecha_actualizacion || d.timestamp || d.updatedAt;
         if (up) { const t = up.seconds ? up.seconds * 1000 : new Date(up).getTime(); if (t > maxTime && !isNaN(t)) maxTime = t; }
+        
         const stock = Number(d.stockActual) || 0; const consumoMes = Number(d.consumoPromedio) || 0; const consumoDiario = consumoMes > 0 ? (consumoMes / 26) : 0; const sp = Number(d.solpeds) || 0;
         let ocFuturaTotal = 0; let ocDemoradaTotal = 0;
+        
         d.detalleOCs?.forEach(oc => { 
           const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha); 
           const fCheck = new Date(f); fCheck.setHours(0,0,0,0); const hoyCheck = new Date(); hoyCheck.setHours(0,0,0,0);
           if (fCheck < hoyCheck) ocDemoradaTotal += Number(oc.cantidad) || 0;
           else ocFuturaTotal += Number(oc.cantidad) || 0; 
         });
+        
         const supervivencia = consumoDiario > 0 ? (stock / consumoDiario) : 999;
         const coberturaReal = consumoDiario > 0 ? ((stock + ocFuturaTotal + sp) / consumoDiario) : 999;
-        return { id: doc.id, ...d, stock, ocDemorada: ocDemoradaTotal, ocFutura: ocFuturaTotal, sp, consumo: consumoMes, supervivencia: supervivencia > 998 ? 999 : supervivencia, cobertura: coberturaReal > 998 ? 999 : coberturaReal, favorito: d.esFavorito || false, owner: d.owner || "Sin asignar" };
+        
+        return { 
+          id: doc.id, ...d, stock, ocDemorada: ocDemoradaTotal, ocFutura: ocFuturaTotal, sp, consumo: consumoMes, 
+          supervivencia: supervivencia > 998 ? 999 : supervivencia, cobertura: coberturaReal > 998 ? 999 : coberturaReal, 
+          favorito: d.esFavorito || false, owner: d.owner || "Sin asignar" 
+        };
       });
       setInsumosRaw(data); if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
     });
@@ -240,13 +247,17 @@ const App = () => {
   }, [insumos]);
 
   const guardarConfigEnFirebase = async (nuevaConfig) => { setConfig(nuevaConfig); await setDoc(doc(db, "config", "general"), nuevaConfig); };
+
   const toggleFavorito = async (insumo) => { await updateDoc(doc(db, "insumos", insumo.id), { esFavorito: !insumo.favorito }); };
 
   const calcularFechaQuiebre = (dias) => {
     if (dias >= 999) return "Nunca";
-    let fecha = new Date(); let agregados = 0;
-    while (agregados < Math.round(dias)) { fecha.setDate(fecha.getDate() + 1);
-    const esDom = fecha.getDay() === 0; const str = fecha.toISOString().split('T')[0]; const esFer = config.feriados?.includes(str); if (!esDom && !esFer) agregados++;
+    let fecha = new Date();
+    let agregados = 0;
+    while (agregados < Math.round(dias)) { 
+      fecha.setDate(fecha.getDate() + 1);
+      const esDom = fecha.getDay() === 0;
+      const str = fecha.toISOString().split('T')[0]; const esFer = config.feriados?.includes(str); if (!esDom && !esFer) agregados++;
     }
     return fecha.toLocaleDateString('es-AR');
   };
@@ -286,12 +297,10 @@ const App = () => {
   };
 
   const abrirRedactorReclamo = (insumoPulsado) => {
-    // ESCUDO ANTI-AMNESIA: Buscamos la versión más fresca del insumo en la memoria principal
     const insumo = insumos.find(i => i.id === insumoPulsado.id) || insumoPulsado;
-
     const umbral = config?.umbralUrgencia || 15;
     const isGrave = Math.round(insumo.supervivencia) <= umbral;
-    const hasSolpeds = insumo.sp > 0; 
+    const hasSolpeds = insumo.sp > 0;
     const plantillas = getPlantillasDinamicas();
     
     let tInicial = null;
@@ -301,8 +310,6 @@ const App = () => {
     if (!tInicial) tInicial = plantillas[0];
     
     const { asunto, cuerpo, destino } = aplicarPlantilla(insumo, tInicial.id);
-    
-    // ACÁ ESTÁ LA MAGIA: Al estar fresco, si ya hay ticket guardado lo recicla
     const ticketActual = insumo.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
@@ -330,26 +337,24 @@ const App = () => {
       insumoId: draft.insumo.id, operario: currentUser.nombre, mensaje: draft.asunto, 
       cuerpoOriginal: draft.cuerpo, fecha: serverTimestamp(), estado: "ABIERTO", tipo: draft.tipoDestino 
     });
-    
     let updates = {};
     updates.ticketReclamo = draft.ticketBorrador;
     await updateDoc(doc(db, "insumos", draft.insumo.id), updates);
   };
 
- const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
+  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
     const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
     const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
-
+    
     if (correosStr.length === 0 && modoAccion !== 'HILO') {
       setToastMsg("⚠️ Error: Seleccioná un destinatario antes de continuar.");
       setTimeout(() => setToastMsg(null), 4000);
       return;
     }
 
-    // Encapsulamos la lógica de enviar un correo nuevo
     const ejecutarFlujoNuevo = async () => {
       try {
         await procesarGuardadoBD(reclamoDraft);
@@ -361,16 +366,12 @@ const App = () => {
         console.error("Error guardando reclamo:", error);
       }
     };
-
+    
     if (modoAccion === 'HILO') {
       try {
-        // 1. Copiamos el cuerpo al portapapeles
         navigator.clipboard.writeText(reclamoDraft.cuerpo);
-        // 2. Guardamos el registro en Firebase
         await procesarGuardadoBD(reclamoDraft);
-        // 3. Abrimos Gmail buscando el número de ticket exacto
         window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
-        // 4. Cerramos la ventana y avisamos
         setReclamoDraft(null);
         setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
         setTimeout(() => setToastMsg(null), 5000);
@@ -378,8 +379,6 @@ const App = () => {
         console.error("Error en Hilo:", error);
       }
     } else {
-      // --- ESCUDO ANTI-CORREOS DUPLICADOS ---
-      // Si el usuario aprieta "NUEVO" pero el insumo ya tiene un ticket activo, frenamos la máquina.
       if (reclamoDraft.insumo.ticketReclamo) {
         setDialogoConfirmacion({
           titulo: "⚠️ Atención: Reclamo ya iniciado",
@@ -389,7 +388,6 @@ const App = () => {
           onConfirm: ejecutarFlujoNuevo
         });
       } else {
-        // Si es un material virgen (sin reclamos previos), mandamos el nuevo de una.
         ejecutarFlujoNuevo();
       }
     }
@@ -399,19 +397,14 @@ const App = () => {
     if (e) e.stopPropagation();
     try {
       const reclamoObj = reclamos.find(r => r.id === reclamoId);
-      
-      // 1. Cerramos el reclamo y le ponemos el sello de tiempo
       await updateDoc(doc(db, "reclamos", reclamoId), { 
         estado: 'CERRADO',
         fechaCierre: serverTimestamp(),
         motivoCierre: 'Cierre manual por operario'
       });
-      
-      // 2. Limpiamos la memoria del ticket en el insumo para futuros reclamos
       if (reclamoObj && reclamoObj.insumoId) {
          await updateDoc(doc(db, "insumos", reclamoObj.insumoId), { ticketReclamo: null });
       }
-      
       setToastMsg("✅ Reclamo cerrado y pizarra limpia para futuros avisos.");
       setTimeout(() => setToastMsg(null), 4000);
     } catch (error) {
@@ -432,17 +425,17 @@ const App = () => {
       try {
         const data = JSON.parse(event.target.result);
         if (data.config) await guardarConfigEnFirebase(data.config);
-        if (data.reclamos) for (const r of data.reclamos) { const { id, ...rest } = r; await setDoc(doc(db, "reclamos", id), rest); }
-        if (data.insumos) for (const i of data.insumos) { const { id, ...rest } = i; await setDoc(doc(db, "insumos", id), rest); }
+        if (data.reclamos) for (const r of data.reclamos) { const { id, ...rest } = r;
+          await setDoc(doc(db, "reclamos", id), rest); }
+        if (data.insumos) for (const i of data.insumos) { const { id, ...rest } = i;
+          await setDoc(doc(db, "insumos", id), rest); }
         alert("¡Base de datos restaurada con éxito!");
       } catch (err) { alert("Error al leer el archivo JSON: Archivo corrupto o formato inválido."); }
     };
     reader.readAsText(file);
   };
 
-  // ESCUDO ANTI-ZOMBIES: Separamos los vivos de los archivados
   const insumosVivos = insumos.filter(i => !i.discontinuado);
-
   const resultadosBusqueda = insumosVivos.filter(i => i.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) || i.codigo?.toLowerCase().includes(searchTerm.toLowerCase()));
   const grupos = [...new Set(insumosVivos.map(item => item.grupo || 'SIN CLASIFICAR'))].sort((a, b) => a.localeCompare(b));
   const reclamosActivos = activeInsumo ? reclamos.filter(r => r.insumoId === activeInsumo.id) : [];
@@ -450,7 +443,7 @@ const App = () => {
   let datosAlerta = []; let tituloAlerta = "";
   const uCriticoApp = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
   const uUrgenciaApp = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
-
+  
   if (filtroAlerta === 'quiebres') { datosAlerta = insumosVivos.filter(i => i.stock <= 0); tituloAlerta = "Quiebres Confirmados"; } 
   else if (filtroAlerta === 'favoritos') { datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp && i.supervivencia > uCriticoApp); tituloAlerta = "Favoritos en Riesgo"; } 
   else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
@@ -460,9 +453,7 @@ const App = () => {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
   }
 
-    // --- ROBOT: LIMPIEZA AUTOMÁTICA DE RECLAMOS ---
   useEffect(() => {
-    // Solo el Owner corre el robot. Revisamos en qué modo está el sistema.
     const modoCierre = config?.modoCierreReclamos || 'manual';
     if (currentUser?.rol !== 'owner' || insumos.length === 0 || reclamos.length === 0) return;
 
@@ -472,9 +463,6 @@ const App = () => {
 
       for (const reclamo of reclamosAbiertos) {
         const insumo = insumos.find(i => i.id === reclamo.insumoId);
-        
-        // REGLA TÁCTICA: Cerramos SOLO si fue al sótano, 
-        // O si está en modo Automático y recuperó el stock.
         if (!insumo || insumo.discontinuado || (modoCierre === 'auto' && insumo.supervivencia > umbral)) {
           try {
             await updateDoc(doc(db, "reclamos", reclamo.id), { 
@@ -486,7 +474,6 @@ const App = () => {
         }
       }
     };
-
     procesarLimpieza();
   }, [insumos, reclamos, currentUser, config]);
   
@@ -525,17 +512,45 @@ const App = () => {
       <div className="flex-1 flex flex-col h-full min-w-0 relative">
         <header className="h-20 flex items-center justify-between px-8 shrink-0 z-10 bg-white border-b border-slate-200 shadow-sm w-full">
           
-          {/* POLO IZQUIERDO: TÍTULOS DINÁMICOS UNIFICADOS */}
-          <div className="flex items-center gap-3">
-            {vistaActiva === 'gestion' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Brain size={20} className="text-orange-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Gestión de Insumos</h1></>}
-            {vistaActiva === 'auditoria' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><History size={20} className="text-sky-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Auditoría de Reclamos</h1></>}
-            {vistaActiva === 'archivados' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Archive size={20} className="text-purple-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Sótano de Insumos</h1></>}
-            {vistaActiva === 'notificaciones' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Bell size={20} className="text-yellow-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Notificaciones</h1></>}
+          {/* POLO IZQUIERDO: TÍTULOS DINÁMICOS */}
+          <div className="flex items-center gap-3 shrink-0 min-w-[200px]">
+            {vistaActiva === 'gestion' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Brain size={20} className="text-orange-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden lg:block">Gestión de Insumos</h1></>}
+            {vistaActiva === 'auditoria' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><History size={20} className="text-sky-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden lg:block">Auditoría de Reclamos</h1></>}
+            {vistaActiva === 'archivados' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Archive size={20} className="text-purple-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden lg:block">Sótano de Insumos</h1></>}
+            {vistaActiva === 'notificaciones' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Bell size={20} className="text-yellow-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden lg:block">Notificaciones</h1></>}
+          </div>
+
+          {/* CENTRO: BUSCADOR GLOBAL MÁGICO */}
+          <div className="flex-1 max-w-xl mx-6 hidden md:block">
+            <div className="relative group">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
+              <input
+                type="text"
+                placeholder="Buscar por código o material..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  // Magia UX: Si empieza a escribir estando en otra pestaña, lo llevamos a Gestión
+                  if (e.target.value !== "" && vistaActiva !== 'gestion') {
+                    setVistaActiva('gestion');
+                  }
+                }}
+                className="w-full pl-12 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-50 transition-all placeholder:text-slate-400 uppercase shadow-inner"
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm("")} 
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 bg-slate-200/50 hover:bg-slate-200 p-1.5 rounded-lg transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* POLO DERECHO: RELOJ Y PERFIL DE USUARIO */}
-          <div className="flex items-center gap-4 pl-8 border-l border-slate-200">
-            <div className="mr-4 text-right hidden md:block">
+          <div className="flex items-center justify-end gap-4 pl-6 border-l border-slate-200 shrink-0">
+            <div className="mr-4 text-right hidden lg:block">
               <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> ACTUALIZADO </p>
               <p className="text-xs font-bold text-slate-600">{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
@@ -588,7 +603,7 @@ const App = () => {
             />
           )}
           {vistaActiva === 'notificaciones' && (
-            <VistaNotificaciones 
+             <VistaNotificaciones 
               currentUser={currentUser}
               insumos={insumos}
               reclamos={reclamos}
@@ -596,8 +611,8 @@ const App = () => {
               setNotiTabActiva={setNotiTabActiva}
               formatearFecha={formatearFecha}
               setActiveInsumo={setActiveInsumo}
-              contactos={config?.contactos || []} // ENCHUFE 1
-              setToastMsg={setToastMsg} // ENCHUFE 2
+              contactos={config?.contactos || []}
+              setToastMsg={setToastMsg}
             />
           )}
 
@@ -667,7 +682,6 @@ const App = () => {
         {alertaHilo && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
             <motion.div initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 flex flex-col">
-              
               <div className="bg-slate-900 p-6 text-center relative">
                 <div className="w-16 h-16 bg-sky-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                   <Mail size={32} className="text-sky-400" />
@@ -701,7 +715,7 @@ const App = () => {
               <div className="p-5 bg-white border-t border-slate-100 flex gap-3">
                 <button 
                   onClick={() => { 
-                    setAlertaHilo(null); 
+                    setAlertaHilo(null);
                     setToastMsg("Envío pausado. Podés enviarlo manualmente luego."); 
                     setTimeout(()=>setToastMsg(null),4000);
                   }} 
@@ -722,7 +736,7 @@ const App = () => {
                 >
                   Entendido, Abrir Gmail <ChevronRight size={14}/>
                 </button>
-              </div>
+               </div>
             </motion.div>
           </motion.div>
         )}
@@ -766,12 +780,13 @@ const App = () => {
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 p-6 text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                 <AlertTriangle size={32} className="text-slate-400" />
-              </div>
+               </div>
               <h3 className="text-slate-800 font-black text-lg mb-2 uppercase tracking-widest">{dialogoConfirmacion.titulo}</h3>
               <p className="text-slate-500 text-xs font-bold mb-8 px-2">{dialogoConfirmacion.mensaje}</p>
               <div className="flex gap-3">
                 <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
-                <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>{dialogoConfirmacion.textoConfirmar || 'Aceptar'}</button>
+                 <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null);
+                }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>{dialogoConfirmacion.textoConfirmar || 'Aceptar'}</button>
               </div>
             </motion.div>
           </div>
