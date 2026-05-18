@@ -382,8 +382,8 @@ const App = () => {
       // Si el usuario aprieta "NUEVO" pero el insumo ya tiene un ticket activo, frenamos la máquina.
       if (reclamoDraft.insumo.ticketReclamo) {
         setDialogoConfirmacion({
-          titulo: "⚠️ Atención: Hilo ya iniciado",
-          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón azul "Sumar al Hilo Actual".`,
+          titulo: "⚠️ Atención: Reclamo ya iniciado",
+          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón "CONTINUAR HILO".`,
           textoConfirmar: "Forzar envío nuevo",
           colorBoton: "bg-red-500 hover:bg-red-600",
           onConfirm: ejecutarFlujoNuevo
