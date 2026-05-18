@@ -526,7 +526,7 @@ const App = () => {
         <header className="h-20 flex items-center px-8 gap-8 shrink-0 z-10 bg-white border-b border-slate-200 shadow-sm">
 <div className="flex items-center gap-4 ml-auto border-l pl-8 border-slate-200">
             <div className="mr-4 text-right hidden md:block">
-              <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> Última Actualización Sheets</p>
+              <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> ACTUALIZADO </p>
               <p className="text-xs font-bold text-slate-600">{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
             
@@ -535,7 +535,7 @@ const App = () => {
                 onClick={() => setSimulatedId('owner_real')}
                 className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all animate-pulse"
               >
-                Salir del Modo Espía
+                CONTROLANDO
               </button>
             ) : (
               <div className="flex items-center group p-2 rounded-xl border relative transition-all bg-slate-50 border-slate-200">
