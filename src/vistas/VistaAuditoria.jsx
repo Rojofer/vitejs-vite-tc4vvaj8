@@ -269,8 +269,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      {/* BOTÓN DE CIERRE CON ESCUDO SAAS */}
-                      {h.estado === 'ABIERTO' && h.tipo !== "APROBACION GERENCIA" && currentUser.rol === 'owner' && (
+                      {/* BOTÓN DE CIERRE CON ESCUDO SAAS - CONTROL DELEGADO LIMPIO */}
+                      {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -284,7 +284,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                 onConfirm: () => cerrarReclamoManual(h.id)
                               });
                             } else {
-                              cerrarReclamoManual(h.id, e); // Respaldo por si falla el modal
+                              cerrarReclamoManual(h.id, e);
                             }
                           }} 
                           className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1"
