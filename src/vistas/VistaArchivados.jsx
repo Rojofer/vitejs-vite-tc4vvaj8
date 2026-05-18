@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArchiveRestore, AlertCircle, Calendar } from 'lucide-react';
+import { AlertCircle, Calendar } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase'; 
 
@@ -49,14 +49,8 @@ const VistaArchivados = ({ insumos, currentUser, setToastMsg, setDialogoConfirma
 
   return (
     <div className="p-8 h-full flex flex-col bg-[#F8FAFC]">
-      <div className="mb-6 flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <ArchiveRestore className="text-purple-500" size={28} /> SÓTANO DE INSUMOS
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Materiales ocultados del tablero principal (Solo lectura y restauración).</p>
-        </div>
-        <div className="bg-purple-50 text-purple-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-purple-100 flex items-center gap-2">
+      <div className="mb-6 flex justify-end items-center">
+        <div className="bg-purple-50 text-purple-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-purple-100 flex items-center gap-2 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-purple-500"></span>
           {archivados.length} Registros Ocultos
         </div>
@@ -81,7 +75,6 @@ const VistaArchivados = ({ insumos, currentUser, setToastMsg, setDialogoConfirma
             <tbody className="divide-y divide-slate-50">
               {archivados.map(i => (
                 <tr key={i.id} className="hover:bg-slate-50/50 transition-colors group">
-                  {/* AQUÍ SE CORRIGIÓ LA TIPOGRAFÍA DEL CÓDIGO */}
                   <td className="px-6 py-4 text-xs font-bold text-slate-600 w-32">{i.codigo}</td>
                   <td className="px-6 py-4 text-xs font-bold text-slate-800">{i.nombre}</td>
                   <td className="px-6 py-4 text-[11px] font-semibold text-slate-500 w-48">{formatFecha(i.fechaArchivado)}</td>
