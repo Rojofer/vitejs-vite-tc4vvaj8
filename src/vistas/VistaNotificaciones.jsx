@@ -83,21 +83,8 @@ const VistaNotificaciones = ({
     // Quitamos el max-w-4xl para que ocupe el ancho sin margen excesivo
     <div className="p-4 md:p-6 h-full w-full mx-auto">
       
-      {/* CABECERA */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
-            <Bell size={24} className="text-yellow-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-800 tracking-tight">Notificaciones</h1>
-            <p className="text-xs font-medium text-slate-400 mt-1">
-              {currentUser.rol === 'owner' ? 'Centro de Emisiones & Bandeja' : 'Bandeja de entrada general'}
-            </p>
-          </div>
-        </div>
-
-        {/* BOTÓN MEGÁFONO SÓLO PARA OWNER */}
+      {/* BOTÓN MEGÁFONO SÓLO PARA OWNER (CABECERA) */}
+      <div className="flex justify-end mb-6 min-h-[40px]">
         {currentUser.rol === 'owner' && !modoRedaccion && (
           <button 
             onClick={() => setModoRedaccion(true)}
