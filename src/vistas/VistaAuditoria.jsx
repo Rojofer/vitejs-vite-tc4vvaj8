@@ -4,7 +4,7 @@ import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail } from 'lucide-react';
 
-const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo }) => {
+const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo,setDialogoConfirmacion}) => {
     const [filtroMes, setFiltroMes] = useState("TODOS"); 
     const [filtroTipo, setFiltroTipo] = useState("TODOS"); 
     const [filtroOperario, setFiltroOperario] = useState("TODOS"); // <-- NUEVO ESTADO PARA EL FILTRO
@@ -269,11 +269,23 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end gap-3">
+                      {/* BOTÓN DE CIERRE CON ESCUDO SAAS */}
                       {h.estado === 'ABIERTO' && h.tipo !== "APROBACION GERENCIA" && currentUser.rol === 'owner' && (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            cerrarReclamoManual(h.id, e);
+                            if(setDialogoConfirmacion) {
+                              const insumoAsociado = insumos.find(i => i.id === h.insumoId);
+                              setDialogoConfirmacion({
+                                titulo: "Cerrar Reclamo",
+                                mensaje: `¿Confirmás que querés dar por cumplido y cerrar el reclamo de "${insumoAsociado?.nombre || 'este material'}"?`,
+                                textoConfirmar: "Sí, Cerrar Reclamo",
+                                colorBoton: "bg-emerald-500 hover:bg-emerald-600",
+                                onConfirm: () => cerrarReclamoManual(h.id)
+                              });
+                            } else {
+                              cerrarReclamoManual(h.id, e); // Respaldo por si falla el modal
+                            }
                           }} 
                           className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1"
                         >
