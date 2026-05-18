@@ -12,7 +12,7 @@ import VistaLogin from './vistas/VistaLogin';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { collection, onSnapshot, query, addDoc, serverTimestamp, orderBy, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { Brain, MessageSquare,LayoutDashboard, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, History, Bell, Package,Archive} from 'lucide-react';
+import { Brain, MessageSquare, Mail, Settings, Search, AlertTriangle, X, ChevronRight, CheckCircle, Clock, History, Bell, Package,Archive} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const formatearFecha = (fecha) => {
@@ -499,7 +499,7 @@ const App = () => {
       <aside className="w-20 bg-slate-900 flex flex-col items-center py-6 border-r border-slate-800 z-[60] shadow-2xl shrink-0 h-full relative">
         <div onClick={() => setShowWelcome(true)} className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg mb-10 font-black italic text-xl cursor-pointer hover:scale-105 transition-all">K</div>
         <nav className="flex flex-col gap-6 w-full px-3">
-          <div onClick={() => setVistaActiva('gestion')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'gestion' ? 'bg-slate-800 text-orange-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-orange-400 hover:bg-slate-800'}`}><LayoutDashboard size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Gestión ERP</span></div>
+          <div onClick={() => setVistaActiva('gestion')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'gestion' ? 'bg-slate-800 text-orange-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-orange-400 hover:bg-slate-800'}`}><Brain size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Gestión ERP</span></div>
           <div onClick={() => setVistaActiva('auditoria')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'auditoria' ? 'bg-slate-800 text-sky-500 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-sky-400 hover:bg-slate-800'}`}><History size={22} /><span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Auditoría</span></div>
           {currentUser.rol === 'owner' && (
             <div onClick={() => setVistaActiva('archivados')} className={`p-3 rounded-xl flex justify-center cursor-pointer transition-all relative group ${vistaActiva === 'archivados' ? 'bg-slate-800 text-purple-400 shadow-inner border border-slate-700' : 'text-slate-500 hover:text-purple-400 hover:bg-slate-800'}`}>
@@ -523,8 +523,18 @@ const App = () => {
       </aside>
 
       <div className="flex-1 flex flex-col h-full min-w-0 relative">
-        <header className="h-20 flex items-center px-8 gap-8 shrink-0 z-10 bg-white border-b border-slate-200 shadow-sm">
-<div className="flex items-center gap-4 ml-auto border-l pl-8 border-slate-200">
+        <header className="h-20 flex items-center justify-between px-8 shrink-0 z-10 bg-white border-b border-slate-200 shadow-sm w-full">
+          
+          {/* POLO IZQUIERDO: TÍTULOS DINÁMICOS UNIFICADOS */}
+          <div className="flex items-center gap-3">
+            {vistaActiva === 'gestion' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Brain size={20} className="text-orange-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Gestión de Insumos</h1></>}
+            {vistaActiva === 'auditoria' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><History size={20} className="text-sky-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Auditoría de Reclamos</h1></>}
+            {vistaActiva === 'archivados' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Archive size={20} className="text-purple-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Sótano de Insumos</h1></>}
+            {vistaActiva === 'notificaciones' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Bell size={20} className="text-yellow-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden sm:block">Notificaciones</h1></>}
+          </div>
+
+          {/* POLO DERECHO: RELOJ Y PERFIL DE USUARIO */}
+          <div className="flex items-center gap-4 pl-8 border-l border-slate-200">
             <div className="mr-4 text-right hidden md:block">
               <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> ACTUALIZADO </p>
               <p className="text-xs font-bold text-slate-600">{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
@@ -558,6 +568,7 @@ const App = () => {
               Salir
             </button>
           </div>
+
         </header>
 
         <main className="flex-1 overflow-auto relative bg-[#F8FAFC]">
