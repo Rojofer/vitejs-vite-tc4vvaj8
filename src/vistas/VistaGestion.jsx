@@ -31,6 +31,7 @@ const VistaGestion = ({
   renderRadarDinamico,
   setSimulatedId,
   perfilesSimulables,
+  setVistaActiva,
   archivarInsumo
 }) => {
   return (
@@ -38,16 +39,7 @@ const VistaGestion = ({
       
       {/* CABECERA PRINCIPAL GESTIÓN ERP Y BARRA DE SALUD */}
       <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mb-8 gap-6">
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center shadow-lg">
-            <LayoutDashboard size={24} className="text-orange-500" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-800 tracking-tight">Gestión de Insumos</h1>
-            <p className="text-xs font-medium text-slate-400 mt-1">Hola, {currentUser?.nombre || 'Equipo'}</p>
-          </div>
-        </div>
-
+        
         {/* BARRA DE SALUD OPERATIVA (HEADER) CON MINI-KPIS */}
         {(() => {
           const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
