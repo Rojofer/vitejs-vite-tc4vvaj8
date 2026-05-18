@@ -394,19 +394,7 @@ const App = () => {
       }
     }
   };
-      
-      // --- FLUJO ORIGINAL PARA BOTÓN "NUEVO" ---
-      await procesarGuardadoBD(reclamoDraft);
-      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
-      setReclamoDraft(null);
-      setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
-      setTimeout(() => setToastMsg(null), 4000);
-
-    } catch (error) {
-      console.error("Error guardando reclamo:", error);
-    }
-  };
-
+  
   const cerrarReclamoManual = async (reclamoId, e) => {
     if (e) e.stopPropagation();
     try {
