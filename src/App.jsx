@@ -603,6 +603,7 @@ const App = () => {
             <VistaGestion 
               currentUser={currentUser}
               insumos={insumosVivos}
+              reclamos={reclamos}
               config={config}
               searchTerm={searchTerm}
               resultadosBusqueda={resultadosBusqueda}
