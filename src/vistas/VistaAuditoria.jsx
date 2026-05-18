@@ -269,8 +269,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      {/* BOTÓN DE CIERRE CON ESCUDO SAAS - CONTROL DELEGADO LIMPIO */}
-                      {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
+                      {/* BOTÓN DE CIERRE CON ESCUDO SAAS - CONTROL DELEGADO FLEXIBLE */}
+                      {h.estado === 'ABIERTO' && (
+                        currentUser.rol === 'owner' || 
+                        h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || 
+                        h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()
+                      ) && (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
