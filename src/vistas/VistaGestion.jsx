@@ -84,7 +84,7 @@ const VistaGestion = ({
               
               {/* TARJETA UNIFICADA: RESUMEN DE INVENTARIO (SÓLO OWNER) */}
               {currentUser?.rol === 'owner' && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0">
+                <div onClick={() => setFiltroAlerta('todos')} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0 cursor-pointer group">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumen de Inventario</h3>
                     <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${tieneFantasmas ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-100 shadow-sm'}`}>
