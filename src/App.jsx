@@ -448,6 +448,7 @@ const App = () => {
   else if (filtroAlerta === 'favoritos') { datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp && i.supervivencia > uCriticoApp); tituloAlerta = "Favoritos en Riesgo"; } 
   else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
   else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumosVivos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
+  else if (filtroAlerta === 'todos') { datosAlerta = insumosVivos; tituloAlerta = "Inventario Completo"; }
   
   if (currentUser.rol !== 'owner') {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
@@ -530,7 +531,6 @@ const App = () => {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  // Magia UX: Si empieza a escribir estando en otra pestaña, lo llevamos a Gestión
                   if (e.target.value !== "" && vistaActiva !== 'gestion') {
                     setVistaActiva('gestion');
                   }
