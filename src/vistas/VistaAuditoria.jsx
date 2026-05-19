@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, TrendingUp, Target, Zap, BarChart2, ShieldCheck, Timer } from 'lucide-react';
 
 const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo, setDialogoConfirmacion}) => {
     const [filtroMes, setFiltroMes] = useState("TODOS");
@@ -12,7 +12,62 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [auditoriaTab, setAuditoriaTab] = useState('abiertos');
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null); 
-    const [expandedThreads, setExpandedThreads] = useState({});
+
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
+    const kpiData = useMemo(() => {
+      // Filtramos la basura y nos quedamos solo con reclamos operativos reales a compras
+      const validos = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
+
+      // 1. Tasa de Resolución Mensual
+      const hoy = new Date();
+      const mesActual = hoy.getMonth();
+      const anioActual = hoy.getFullYear();
+      const reclamosMes = validos.filter(r => {
+        const f = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
+        return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
+      });
+      const cerradosMes = reclamosMes.filter(r => r.estado === 'CERRADO');
+      const tasaResolucion = reclamosMes.length > 0 ? Math.round((cerradosMes.length / reclamosMes.length) * 100) : 100;
+
+      // 2. Lead Time Promedio (Apertura a Cierre)
+      const resueltos = validos.filter(r => r.estado === 'CERRADO' && r.fecha && r.fechaCierre);
+      let totalDias = 0;
+      resueltos.forEach(r => {
+        const fInicio = r.fecha.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
+        const fFin = r.fechaCierre.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
+        totalDias += Math.max(0, (fFin - fInicio) / 86400); // Diferencia en días
+      });
+      const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
+
+      // 3. Top Ofensores (Pareto)
+      const conteoPorInsumo = {};
+      validos.forEach(r => {
+         conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1;
+      });
+      const topOfensores = Object.keys(conteoPorInsumo)
+        .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
+        .filter(obj => obj.insumo) // descartar si el insumo ya no existe
+        .sort((a,b) => b.cantidad - a.cantidad)
+        .slice(0, 5); // Los 5 peores
+
+      // 4. Efectividad del Primer Contacto (Insistencia)
+      let hilosUnicos = 0;
+      let hilosMultiples = 0;
+      Object.values(conteoPorInsumo).forEach(cant => {
+        if (cant === 1) hilosUnicos++;
+        else if (cant > 1) hilosMultiples++;
+      });
+      const totalHilos = hilosUnicos + hilosMultiples;
+      const efectividadPrimerContacto = totalHilos > 0 ? Math.round((hilosUnicos / totalHilos) * 100) : 100;
+
+      return {
+        tasaResolucion, reclamosMes: reclamosMes.length, cerradosMes: cerradosMes.length,
+        leadTime,
+        topOfensores,
+        efectividadPrimerContacto,
+        totalGestionados: validos.length
+      };
+    }, [reclamos, insumos]);
 
     // --- FUNCIÓN: GENERADOR DE DOSSIER PDF ---
     const exportarDossierPDF = (hiloActivo) => {
@@ -61,12 +116,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         theme: 'grid',
         headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 3 },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 'auto' }
-        }
+        columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 25 }, 2: { cellWidth: 25 }, 3: { cellWidth: 'auto' } }
       });
       doc.save(`Trazabilidad_${insumo.nombre || 'Auditoria'}.pdf`);
       setToastMsg("Dossier PDF generado y descargado con éxito.");
@@ -82,21 +132,19 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       link.download = `Auditoria_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
     };
 
-    // --- OBTENER LISTA DE OPERARIOS ÚNICOS PARA EL MENÚ ---
-    const operariosUnicos = useMemo(() => {
-      const ops = reclamos.filter(r => r.insumoId !== "BROADCAST").map(r => r.operario).filter(Boolean);
-      return [...new Set(ops)].sort();
-    }, [reclamos]);
+    // --- FILTROS Y TABLA ---
+    // Ocultamos INICIALIZADO y BROADCAST de la tabla
+    let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO");
 
-    let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST");
+    const operariosUnicos = useMemo(() => {
+      const ops = filtrados.map(r => r.operario).filter(Boolean);
+      return [...new Set(ops)].sort();
+    }, [filtrados]);
     
     if (currentUser.rol !== 'owner') {
       filtrados = filtrados.filter(r => r.operario === currentUser.nombre || (r.operario && r.operario.includes(currentUser.nombre)));
     } else {
-      // Aplicar filtro de operario solo si el usuario es Owner y seleccionó un operario
-      if (filtroOperario !== "TODOS") {
-        filtrados = filtrados.filter(r => r.operario === filtroOperario);
-      }
+      if (filtroOperario !== "TODOS") filtrados = filtrados.filter(r => r.operario === filtroOperario);
     }
 
     const mesesDisponibles = useMemo(() => { 
@@ -150,7 +198,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           <div className="flex gap-6 border-b border-slate-200 mb-6">
             <button onClick={() => setAuditoriaTab('abiertos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'abiertos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>En Curso</button>
             <button onClick={() => setAuditoriaTab('resueltos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'resueltos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Resueltos</button>
-            {currentUser.rol === 'owner' && <button onClick={() => setAuditoriaTab('kpis')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'kpis' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Tablero KPIs</button>}
+            {currentUser.rol === 'owner' && <button onClick={() => setAuditoriaTab('kpis')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'kpis' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Tablero KPIs</button>}
           </div>
 
           {(auditoriaTab === 'abiertos' || auditoriaTab === 'resueltos') && (
@@ -162,13 +210,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <input type="text" placeholder="Buscar código, insumo o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
                 </div>
                 
-                {/* NUEVO FILTRO DESPLEGABLE DE OPERADORES (SOLO PARA ADMINS) */}
                 {currentUser.rol === 'owner' && (
                   <select value={filtroOperario} onChange={e => setFiltroOperario(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
                     <option value="TODOS">Todos los Operarios</option>
-                    {operariosUnicos.map(op => (
-                      <option key={op} value={op}>{op}</option>
-                    ))}
+                    {operariosUnicos.map(op => <option key={op} value={op}>{op}</option>)}
                   </select>
                 )}
 
@@ -207,177 +252,226 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                       <th className="py-4 px-4 text-center bg-white border-b border-slate-200">Estado</th>
                       <th className="py-4 px-4 text-center bg-white border-b border-slate-200">Tipo</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Asunto (Clic para leer)</th>
-                      {currentUser.rol === 'owner' && (
-                        <th className="py-4 px-4 bg-white border-b border-slate-200">Operario</th>
-                      )}
+                      {currentUser.rol === 'owner' && <th className="py-4 px-4 bg-white border-b border-slate-200">Operario</th>}
                       <th className="py-4 px-4 text-right bg-white rounded-tr-3xl border-b border-slate-200">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {hilos.map((h, idx) => {
-                      const threadItems = h.subReclamos ? [...h.subReclamos].sort((a,b) => (b.fecha?.seconds||0) - (a.fecha?.seconds||0)) : [];
-                      const isExpanded = expandedRow === h.insumoId;
-                      const insumoAsociado = insumos.find(i => i.id === h.insumoId) || {};
+                    {hilos.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="py-10 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">No hay registros en la auditoría.</td>
+                      </tr>
+                    ) : (
+                      hilos.map((h, idx) => {
+                        const threadItems = h.subReclamos ? [...h.subReclamos].sort((a,b) => (b.fecha?.seconds||0) - (a.fecha?.seconds||0)) : [];
+                        const isExpanded = expandedRow === h.insumoId;
+                        const insumoAsociado = insumos.find(i => i.id === h.insumoId) || {};
 
-                      return (
-                        <React.Fragment key={h.insumoId || idx}>
-                          <tr 
-                            onClick={() => setActiveInsumo(insumoAsociado)}
-                            className="hover:bg-slate-50/80 transition-colors group align-middle cursor-pointer"
-                          >
-                            <td className="py-4 px-4 text-center">
-                              {h.totalReclamos > 1 ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedRow(isExpanded ? null : h.insumoId);
-                                  }}
-                                  className="p-1 rounded bg-white border border-slate-200 text-slate-500 hover:border-slate-400 transition-colors shadow-sm"
-                                >
-                                  <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}/>
+                        return (
+                          <React.Fragment key={h.insumoId || idx}>
+                            <tr onClick={() => setActiveInsumo(insumoAsociado)} className="hover:bg-slate-50/80 transition-colors group align-middle cursor-pointer">
+                              <td className="py-4 px-4 text-center">
+                                {h.totalReclamos > 1 ? (
+                                  <button onClick={(e) => { e.stopPropagation(); setExpandedRow(isExpanded ? null : h.insumoId); }} className="p-1 rounded bg-white border border-slate-200 text-slate-500 hover:border-slate-400 transition-colors shadow-sm">
+                                    <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}/>
+                                  </button>
+                                ) : ( <span className="w-6 inline-block"></span> )}
+                              </td>
+
+                              <td className="py-4 px-4">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] font-mono text-slate-400">CÓD: {insumoAsociado.codigo || 'S/C'}</span>
+                                  <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
+                                    {insumoAsociado.nombre || 'GENERAL'}
+                                    {h.totalReclamos > 1 && <span className="bg-slate-200 text-slate-600 text-[8px] px-1.5 py-0.5 rounded-full">{h.totalReclamos} MSJS</span>}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-4 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</td>
+
+                              <td className="py-4 px-4">
+                                {h.estado === 'ABIERTO' && h.tipo !== "APROBACION GERENCIA" ? (
+                                  <span className="px-2 py-1 rounded bg-orange-100 text-orange-700 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-orange-500"></span> Abierto</span>
+                                ) : h.tipo === "APROBACION GERENCIA" ? (
+                                  <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><Clock size={10}/> Esperando Envío</span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-slate-400"></span> Resuelto</span>
+                                )}
+                              </td>
+
+                              <td className="py-4 px-4">
+                                {h.tipo === 'equipo' || h.tipo === 'ALERTA PLANTA' ? (
+                                  <span className="text-[9px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded shadow-sm">ALERTA PLANTA</span>
+                                ) : h.tipo === "APROBACION GERENCIA" ? (
+                                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded shadow-sm flex items-center gap-1 w-max"><CheckSquare size={10}/> APROBACIÓN</span>
+                                ) : h.tipo === "RECHAZO GERENCIA" ? (
+                                  <span className="text-[9px] font-black text-slate-600 bg-slate-100 border border-slate-300 px-2 py-1 rounded shadow-sm flex items-center gap-1 w-max"><X size={10}/> RECHAZO</span>
+                                ) : (
+                                  <span className="text-[9px] font-black text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded flex items-center gap-1 w-max shadow-sm"><AlertCircle size={10}/> RECLAMO COMPRAS</span>
+                                )}
+                              </td>
+
+                              <td className="py-4 px-4">
+                                <button onClick={(e) => { e.stopPropagation(); setModalMensaje(h); }} className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 transition-colors text-left">
+                                  <Info size={12} className="shrink-0" /> {h.mensaje}
                                 </button>
-                              ) : ( <span className="w-6 inline-block"></span> )}
-                            </td>
+                              </td>
 
-                            <td className="py-4 px-4">
-                              <div className="flex flex-col">
-                                <span className="text-[9px] font-mono text-slate-400">CÓD: {insumoAsociado.codigo || 'S/C'}</span>
-                                <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
-                                  {insumoAsociado.nombre || 'GENERAL'}
-                                  {h.totalReclamos > 1 && <span className="bg-slate-200 text-slate-600 text-[8px] px-1.5 py-0.5 rounded-full">{h.totalReclamos} MSJS</span>}
-                                </span>
-                              </div>
-                            </td>
+                              {currentUser.rol === 'owner' && <td className="py-4 px-4 text-[9px] font-black text-slate-700 uppercase tracking-wide">{h.operario}</td>}
 
-                            <td className="py-4 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</td>
+                              <td className="py-4 px-4 text-right">
+                                <div className="flex items-center justify-end gap-3">
+                                  {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
+                                    <button onClick={(e) => { e.stopPropagation(); if(setDialogoConfirmacion) { const insumoAsociado = insumos.find(i => i.id === h.insumoId); setDialogoConfirmacion({ titulo: "Cerrar Reclamo", mensaje: `¿Confirmás que querés dar por cumplido y cerrar el reclamo de "${insumoAsociado?.nombre || 'este material'}"?`, textoConfirmar: "Sí, Cerrar Reclamo", colorBoton: "bg-emerald-500 hover:bg-emerald-600", onConfirm: () => cerrarReclamoManual(h.id) }); } else { cerrarReclamoManual(h.id, e); } }} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1">
+                                      <X size={10} /> Cerrar
+                                    </button>
+                                  )}
+                                  {currentUser.rol === 'owner' && (
+                                    <button onClick={(e) => { e.stopPropagation(); exportarDossierPDF(h); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-all" title="Exportar Dossier PDF">
+                                      <FileText size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
 
-                            <td className="py-4 px-4">
-                              {h.estado === 'ABIERTO' && h.tipo !== "APROBACION GERENCIA" ? (
-                                <span className="px-2 py-1 rounded bg-orange-100 text-orange-700 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-orange-500"></span> Abierto</span>
-                              ) : h.tipo === "APROBACION GERENCIA" ? (
-                                <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><Clock size={10}/> Esperando Envío</span>
-                              ) : (
-                                <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-slate-400"></span> Resuelto</span>
-                              )}
-                            </td>
-
-                            <td className="py-4 px-4">
-                              {h.tipo === 'equipo' || h.tipo === 'ALERTA PLANTA' ? (
-                                <span className="text-[9px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded shadow-sm">ALERTA PLANTA</span>
-                              ) : h.tipo === "APROBACION GERENCIA" ? (
-                                <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded shadow-sm flex items-center gap-1 w-max"><CheckSquare size={10}/> APROBACIÓN</span>
-                              ) : h.tipo === "RECHAZO GERENCIA" ? (
-                                <span className="text-[9px] font-black text-slate-600 bg-slate-100 border border-slate-300 px-2 py-1 rounded shadow-sm flex items-center gap-1 w-max"><X size={10}/> RECHAZO</span>
-                              ) : (
-                                <span className="text-[9px] font-black text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded flex items-center gap-1 w-max shadow-sm"><AlertCircle size={10}/> RECLAMO COMPRAS</span>
-                              )}
-                            </td>
-
-                            <td className="py-4 px-4">
-                              <button 
-                                onClick={(e) => { 
-                                  e.stopPropagation();
-                                  setModalMensaje(h); 
-                                }} 
-                                className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 transition-colors text-left"
-                              >
-                                <Info size={12} className="shrink-0" /> {h.mensaje}
-                              </button>
-                            </td>
-
-                            {currentUser.rol === 'owner' && (
-                              <td className="py-4 px-4 text-[9px] font-black text-slate-700 uppercase tracking-wide">{h.operario}</td>
-                            )}
-
-                            <td className="py-4 px-4 text-right">
-                              <div className="flex items-center justify-end gap-3">
-                                {/* BOTÓN DE CIERRE CON ESCUDO SAAS - CONTROL DELEGADO FLEXIBLE */}
-                                {h.estado === 'ABIERTO' && (
-                                  currentUser.rol === 'owner' || 
-                                  h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || 
-                                  h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()
-                                ) && (
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if(setDialogoConfirmacion) {
-                                        const insumoAsociado = insumos.find(i => i.id === h.insumoId);
-                                        setDialogoConfirmacion({
-                                          titulo: "Cerrar Reclamo",
-                                          mensaje: `¿Confirmás que querés dar por cumplido y cerrar el reclamo de "${insumoAsociado?.nombre || 'este material'}"?`,
-                                          textoConfirmar: "Sí, Cerrar Reclamo",
-                                          colorBoton: "bg-emerald-500 hover:bg-emerald-600",
-                                          onConfirm: () => cerrarReclamoManual(h.id)
-                                        });
-                                      } else {
-                                        cerrarReclamoManual(h.id, e);
-                                      }
-                                    }} 
-                                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1"
-                                  >
-                                    <X size={10} /> Cerrar
-                                  </button>
-                                )}
-                                {currentUser.rol === 'owner' && (
-                                  <button 
-                                    onClick={(e) => { 
-                                      e.stopPropagation();
-                                      exportarDossierPDF(h); 
-                                    }} 
-                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-all" 
-                                    title="Exportar Dossier PDF"
-                                  >
-                                    <FileText size={16} />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-
-                          <AnimatePresence>
-                            {isExpanded && threadItems.slice(1).map((item, iIdx) => (
-                              <motion.tr 
-                                key={item.id || iIdx} 
-                                onClick={() => setActiveInsumo(insumoAsociado)}
-                                initial={{ opacity: 0, backgroundColor: "#f8fafc" }} 
-                                animate={{ opacity: 1, backgroundColor: "#f8fafc" }} 
-                                exit={{ opacity: 0 }} 
-                                className="border-b border-slate-100/50 align-middle cursor-pointer"
-                              >
-                                <td className="py-3 px-4"></td>
-                                <td colSpan="2" className="py-3 px-4 text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
-                                  <CornerDownRight size={12}/> ITERACIÓN #{threadItems.length - iIdx - 1}
-                                </td>
-                                <td className="py-3 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
-                                <td colSpan="2" className="py-3 px-4">
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setModalMensaje(item);
-                                    }} 
-                                    className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 text-left"
-                                  >
-                                    <Info size={12} className="shrink-0" /> {item.mensaje}
-                                  </button>
-                                </td>
-                                <td className="py-3 px-4 text-[9px] font-black text-slate-500 uppercase">{item.operario}</td>
-                                <td className="py-3 px-4"></td>
-                              </motion.tr>
-                            ))}
-                          </AnimatePresence>
-                        </React.Fragment>
-                      );
-                    })}
+                            <AnimatePresence>
+                              {isExpanded && threadItems.slice(1).map((item, iIdx) => (
+                                <motion.tr key={item.id || iIdx} onClick={() => setActiveInsumo(insumoAsociado)} initial={{ opacity: 0, backgroundColor: "#f8fafc" }} animate={{ opacity: 1, backgroundColor: "#f8fafc" }} exit={{ opacity: 0 }} className="border-b border-slate-100/50 align-middle cursor-pointer">
+                                  <td className="py-3 px-4"></td>
+                                  <td colSpan="2" className="py-3 px-4 text-[9px] font-black text-slate-400 uppercase flex items-center gap-2"><CornerDownRight size={12}/> ITERACIÓN #{threadItems.length - iIdx - 1}</td>
+                                  <td className="py-3 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
+                                  <td colSpan="2" className="py-3 px-4"><button onClick={(e) => { e.stopPropagation(); setModalMensaje(item); }} className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 text-left"><Info size={12} className="shrink-0" /> {item.mensaje}</button></td>
+                                  <td className="py-3 px-4 text-[9px] font-black text-slate-500 uppercase">{item.operario}</td>
+                                  <td className="py-3 px-4"></td>
+                                </motion.tr>
+                              ))}
+                            </AnimatePresence>
+                          </React.Fragment>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
             </motion.div>
           )}
 
+          {/* NUEVO MÓDULO DE TABLERO DE KPIs GERENCIALES */}
           {auditoriaTab === 'kpis' && (
-            <div className="flex h-64 items-center justify-center border-2 border-dashed border-slate-200 rounded-3xl">
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Módulo en Desarrollo</p>
-            </div>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* TARJETA 1: Tasa Resolucion */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tasa de Resolución</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Mes Actual</p>
+                    </div>
+                    <div className="p-2 bg-emerald-50 rounded-xl"><Target size={16} className="text-emerald-500"/></div>
+                  </div>
+                  <div>
+                    <div className="flex items-end gap-2 mb-2">
+                      <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.tasaResolucion}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500" style={{width: `${kpiData.tasaResolucion}%`}}></div>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{kpiData.cerradosMes} CERRADOS DE {kpiData.reclamosMes} ABIERTOS</p>
+                  </div>
+                </div>
+
+                {/* TARJETA 2: Lead Time */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lead Time Promedio</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Apertura a Cierre</p>
+                    </div>
+                    <div className="p-2 bg-blue-50 rounded-xl"><Timer size={16} className="text-blue-500"/></div>
+                  </div>
+                  <div>
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.leadTime}</span>
+                      <span className="text-sm font-bold text-slate-400 uppercase">Días</span>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">TIEMPO HISTÓRICO DE RESPUESTA</p>
+                  </div>
+                </div>
+
+                {/* TARJETA 3: Efectividad 1er Contacto */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Eficiencia de Contacto</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Sin Hilos de Insistencia</p>
+                    </div>
+                    <div className="p-2 bg-purple-50 rounded-xl"><Zap size={16} className="text-purple-500"/></div>
+                  </div>
+                  <div>
+                    <div className="flex items-end gap-2 mb-2">
+                      <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.efectividadPrimerContacto}%</span>
+                    </div>
+                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-purple-500" style={{width: `${kpiData.efectividadPrimerContacto}%`}}></div>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">RESUELTOS CON 1 SOLO AVISO</p>
+                  </div>
+                </div>
+
+                 {/* TARJETA 4: Tickets Totales */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Volumen Histórico</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Total de gestiones</p>
+                    </div>
+                    <div className="p-2 bg-orange-50 rounded-xl"><ShieldCheck size={16} className="text-orange-500"/></div>
+                  </div>
+                  <div>
+                    <div className="flex items-end gap-2 mb-2">
+                      <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.totalGestionados}</span>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">TICKETS OPERADOS</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* PARETO TOP OFENSORES */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-6">
+                  <BarChart2 size={20} className="text-slate-800"/>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-slate-800">Top Ofensores (Pareto de Reclamos)</h3>
+                </div>
+                
+                {kpiData.topOfensores.length === 0 ? (
+                  <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">No hay datos suficientes para el Pareto</div>
+                ) : (
+                  <div className="space-y-4">
+                    {kpiData.topOfensores.map((item, idx) => {
+                      const maximo = kpiData.topOfensores[0].cantidad;
+                      const porcentaje = Math.round((item.cantidad / maximo) * 100);
+                      return (
+                        <div key={item.id} className="flex items-center gap-4">
+                          <div className="w-6 text-center font-black text-slate-300 text-lg">#{idx + 1}</div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-end mb-1">
+                              <span className="text-xs font-bold text-slate-700 uppercase truncate max-w-[200px] sm:max-w-md">{item.insumo.nombre}</span>
+                              <span className="text-xs font-black text-rose-500">{item.cantidad} Reclamos</span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-rose-400 rounded-full transition-all duration-1000" style={{width: `${porcentaje}%`}}></div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
           )}
           
           <AnimatePresence>
