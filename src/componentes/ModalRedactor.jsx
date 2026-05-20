@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Send, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Send, Search, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const ModalRedactor = ({
@@ -11,22 +11,152 @@ const ModalRedactor = ({
   aplicarPlantilla,
   confirmarYGuardarReclamo
 }) => {
+  const [procesadoInicial, setProcesadoInicial] = useState(false);
+
   if (!reclamoDraft) return null;
 
   const plantillas = getPlantillasDinamicas();
   const contactos = config?.contactos || [];
 
-  // Función táctica: Cambia la plantilla y recalcula el texto sin romper nada
+  // --- MOTOR 1: PROCESADOR MATEMÁTICO DE ETIQUETAS MÁGICAS ---
+  const procesarTextoAvanzado = (txtOriginal, insumo) => {
+    let txt = txtOriginal || "";
+    const hoy = new Date();
+    const hace10Dias = new Date();
+    hace10Dias.setDate(hoy.getDate() - 10);
+    const fmt = (n) => Number(n).toLocaleString('es-AR');
+
+    const parsearFecha = (fRaw) => {
+      if (!fRaw) return new Date(2100, 1, 1); 
+      if (fRaw.seconds) return new Date(fRaw.seconds * 1000);
+      if (typeof fRaw === 'string' && fRaw.includes('/')) {
+        const p = fRaw.split('/');
+        if (p.length === 3) return new Date(p[2], p[1]-1, p[0]);
+      }
+      return new Date(fRaw);
+    };
+
+    const isAprobada = (estado) => {
+      const e = (estado || "").toUpperCase();
+      return e.includes('APROBADO') || e.includes('APROBADA') || e.includes('DOCUM.SUBSIGUIENTES');
+    };
+
+    // 1. OCs Aprobadas
+    if (txt.includes('{ocs_aprobadas}')) {
+      const ocsAprob = (insumo.detalleOCs || []).filter(oc => isAprobada(oc.estado));
+      const str = ocsAprob.length > 0 
+        ? ocsAprob.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Resp: ${oc.comprador}`).join('\n')
+        : "Sin Órdenes de Compra aprobadas/demoradas registradas.";
+      txt = txt.replace(/{ocs_aprobadas}/g, str);
+    }
+
+    // 2. OCs Pendientes
+    if (txt.includes('{ocs_pendientes}')) {
+      const ocsPend = (insumo.detalleOCs || []).filter(oc => !isAprobada(oc.estado));
+      const str = ocsPend.length > 0 
+        ? ocsPend.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Resp: ${oc.comprador}`).join('\n')
+        : "Sin Órdenes de Compra pendientes de aprobación.";
+      txt = txt.replace(/{ocs_pendientes}/g, str);
+    }
+
+    // 3. Todas Etiquetadas (URGENCIAS)
+    if (txt.includes('{ocs_todas_etiquetadas}')) {
+      const str = (insumo.detalleOCs || []).length > 0
+        ? (insumo.detalleOCs || []).map(oc => `- OC ${oc.numero} [${isAprobada(oc.estado) ? '✅ APROBADA' : '⏳ PENDIENTE'}] (${fmt(oc.cantidad)} un.) | Resp: ${oc.comprador}`).join('\n')
+        : "Sin Órdenes de Compra registradas.";
+      txt = txt.replace(/{ocs_todas_etiquetadas}/g, str);
+    }
+
+    // 4. Solpeds Viejas (7/10 Días)
+    if (txt.includes('{solpeds_viejas}')) {
+      const solpedsViejas = (insumo.detalleSolpeds || []).filter(sp => parsearFecha(sp.fecha) < hace10Dias);
+      const str = solpedsViejas.length > 0
+        ? solpedsViejas.map(sp => `- S/P ${sp.numero} (${fmt(sp.cantidad)} un.) | Resp: ${sp.comprador}`).join('\n')
+        : "No hay Solicitudes de Pedido con más de 10 días de antigüedad.";
+      txt = txt.replace(/{solpeds_viejas}/g, str);
+    }
+
+    return txt;
+  };
+
+  // --- MOTOR 2: MATCH AUTOMÁTICO DE COMPRADORES (FRANCOTIRADOR) ---
+  const autoSeleccionarDestinatarios = (textoTemplateCrudo, insumo) => {
+    let matchNames = [];
+    let sendToAllCompras = false;
+
+    const originalText = textoTemplateCrudo || ""; 
+
+    if (originalText.includes('{solpeds_viejas}')) {
+      (insumo.detalleSolpeds || []).forEach(sp => matchNames.push(sp.comprador));
+    } 
+    if (originalText.includes('{ocs_aprobadas}') || originalText.includes('{ocs_todas_etiquetadas}') || originalText.includes('{ocs_pendientes}')) {
+      (insumo.detalleOCs || []).forEach(oc => matchNames.push(oc.comprador));
+    }
+
+    // Fallback: Si no hay etiquetas mágicas, probamos con el owner general
+    if (matchNames.length === 0 && insumo.owner) {
+      matchNames.push(insumo.owner);
+    }
+
+    let matchedIds = [];
+    matchNames.forEach(rawName => {
+      if (!rawName) return;
+      const cleanName = String(rawName).trim().toLowerCase();
+      
+      if (cleanName === "sin asignar" || cleanName === "no_asignada") {
+        sendToAllCompras = true;
+      } else {
+        // MATCH TÁCTICO: Busca si el texto contiene el alias o el label
+        const contactoEncontrado = contactos.find(c => {
+          const aliasC = String(c.alias || "").trim().toLowerCase();
+          const labelC = String(c.label || "").trim().toLowerCase();
+          if (aliasC && cleanName.includes(aliasC)) return true;
+          if (labelC && cleanName.includes(labelC)) return true;
+          return false;
+        });
+        if (contactoEncontrado) {
+          matchedIds.push(contactoEncontrado.id);
+        }
+      }
+    });
+
+    if (sendToAllCompras) {
+      contactos.filter(c => c.tipo === 'compras').forEach(c => matchedIds.push(c.id));
+    }
+
+    return [...new Set(matchedIds)]; // Elimina duplicados
+  };
+
+  // --- AUTO-EVALUACIÓN AL ABRIR EL MODAL ---
+  useEffect(() => {
+    if (reclamoDraft && !procesadoInicial) {
+      const template = plantillas.find(p => p.id === reclamoDraft.tipoPlantilla) || plantillas[0];
+      const cuerpoCrudoTemplate = template.cuerpo || "";
+
+      const nuevoCuerpo = procesarTextoAvanzado(reclamoDraft.cuerpo, reclamoDraft.insumo);
+      const nuevosDestinos = autoSeleccionarDestinatarios(cuerpoCrudoTemplate, reclamoDraft.insumo);
+
+      setReclamoDraft(prev => ({
+        ...prev,
+        cuerpo: nuevoCuerpo,
+        destinatarios: nuevosDestinos.length > 0 ? nuevosDestinos : prev.destinatarios
+      }));
+      setProcesadoInicial(true);
+    }
+  }, [reclamoDraft, procesadoInicial, plantillas]);
+
+  // --- AL CAMBIAR DE PLANTILLA EN EL DESPLEGABLE ---
   const handlePlantillaChange = (e) => {
     const newTemplateId = e.target.value;
+    // 1. Aplicamos las reglas estándar (App.jsx)
     const { asunto, cuerpo, destino } = aplicarPlantilla(reclamoDraft.insumo, newTemplateId);
     
-    let destinatariosMatch = [];
-    if (reclamoDraft.insumo.owner && reclamoDraft.insumo.owner !== "Sin asignar") {
-        const txtOwner = String(reclamoDraft.insumo.owner).trim().toLowerCase();
-        const contacto = contactos.find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner));
-        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
-    }
+    // 2. Extraemos el template crudo para saber qué magia requiere
+    const templateObj = plantillas.find(p => p.id === newTemplateId) || plantillas[0];
+    
+    // 3. Pasamos por nuestros motores
+    const cuerpoAvanzado = procesarTextoAvanzado(cuerpo, reclamoDraft.insumo);
+    const destinosInteligentes = autoSeleccionarDestinatarios(templateObj.cuerpo, reclamoDraft.insumo);
 
     const ticketActual = reclamoDraft.ticketBorrador;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
@@ -36,12 +166,12 @@ const ModalRedactor = ({
       tipoPlantilla: newTemplateId,
       tipoDestino: destino,
       asunto: asuntoConTicket,
-      cuerpo: cuerpo,
-      destinatarios: destinatariosMatch
+      cuerpo: cuerpoAvanzado,
+      destinatarios: destinosInteligentes.length > 0 ? destinosInteligentes : []
     });
   };
 
-  // Función táctica: Seleccionar/Deseleccionar destinatarios
+  // Función manual para tildar/destildar
   const toggleDestinatario = (id) => {
     const actuales = reclamoDraft.destinatarios || [];
     if (actuales.includes(id)) {
@@ -67,7 +197,7 @@ const ModalRedactor = ({
         {/* CABECERA INVISIBLE Y MINIMALISTA */}
         <div className="flex justify-between items-center px-8 pt-6 pb-2 border-b border-transparent">
           <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <Send size={18} className="text-orange-500" /> Nuevo Reclamo a Compras
+            <Send size={18} className="text-orange-500" /> Emisión de Reclamo
           </h2>
           <button 
             onClick={() => setReclamoDraft(null)} 
@@ -75,6 +205,14 @@ const ModalRedactor = ({
           >
             <X size={20} />
           </button>
+        </div>
+
+        {/* INFOBOX DE ETIQUETAS DETECTADAS */}
+        <div className="px-8 mt-2">
+          <div className="bg-sky-50 text-sky-700 text-[10px] font-bold px-4 py-2 rounded-lg flex items-center gap-2 border border-sky-100">
+            <Info size={14} className="shrink-0"/>
+            El sistema seleccionará automáticamente a los destinatarios según la plantilla que elijas. Verificá los tildes antes de disparar.
+          </div>
         </div>
 
         {/* CUERPO DEL MODAL (Prioridad al área de texto) */}
