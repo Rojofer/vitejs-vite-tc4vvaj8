@@ -141,41 +141,78 @@ const App = () => {
   const [config, setConfig] = useState({ contactos: [], feriados: [], asuntos: { comprasLeve: "SEGUIMIENTO: {nombre}", comprasGrave: "URGENTE: {nombre}" }, plantillas: { comprasLeve: "", comprasGrave: "" } });
 
   const realUser = useMemo(() => {
-    if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
+    if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", etiquetaRol: "ESPECTADOR", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
     const emailLogueado = usuarioLogueado.email.toLowerCase();
 
-    // 1. EL ÚNICO OWNER VIP: Fernando
+    // 1. EL ÚNICO OWNER VIP: Fernando (Acceso total + Ajustes)
     if (emailLogueado === 'fernandocomex1@gmail.com') {
-      return { id: 'owner_real', email: emailLogueado, nombre: "Fernando (Owner)", rol: "owner", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true };
-    }
-    
-    // 2. OPERARIOS DEL EQUIPO
-    const operarioMatch = (config?.contactos || []).filter(c => c.tipo === 'equipo').find(c => c.email && c.email.toLowerCase() === emailLogueado);
-    
-    if (operarioMatch) {
-      return { 
-        id: operarioMatch.id, 
-        email: emailLogueado, 
-        nombre: operarioMatch.label || emailLogueado.split('@')[0], 
-        rol: "operario", 
-        inicial: (operarioMatch.label || emailLogueado.split('@')[0]).charAt(0).toUpperCase(), 
-        aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(), 
-        editorFavoritos: operarioMatch.editorFavoritos === true 
-      };
+      return { id: 'owner_real', email: emailLogueado, nombre: "Fernando", rol: "owner", etiquetaRol: "OWNER VIP", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true, accesoAjustes: true };
     }
 
-    // 3. VISITAS NO AUTORIZADAS
+    // 2. BUSCAMOS EN EL DIRECTORIO
+    const operarioMatch = (config?.contactos || []).find(c => c.email && c.email.toLowerCase() === emailLogueado);
+
+    if (operarioMatch) {
+      if (operarioMatch.visionGlobal) {
+        // PERFIL SUPERVISOR (Tiene el Ojo activado)
+        return {
+          id: operarioMatch.id,
+          email: emailLogueado,
+          nombre: operarioMatch.label || emailLogueado.split('@')[0],
+          rol: "owner", // Le damos poderes de owner
+          etiquetaRol: "SUPERVISOR", // Pero le ponemos su propia etiqueta
+          inicial: (operarioMatch.label || emailLogueado.split('@')[0]).charAt(0).toUpperCase(),
+          aliasMatch: "TODOS",
+          editorFavoritos: true,
+          accesoAjustes: false // CANDADO AL PANEL DE AJUSTES
+        };
+      } else {
+        // PERFIL OPERARIO ESTÁNDAR
+        return {
+          id: operarioMatch.id,
+          email: emailLogueado,
+          nombre: operarioMatch.label || emailLogueado.split('@')[0],
+          rol: "operario",
+          etiquetaRol: "OPERARIO",
+          inicial: (operarioMatch.label || emailLogueado.split('@')[0]).charAt(0).toUpperCase(),
+          aliasMatch: (operarioMatch.alias || "").trim().toUpperCase(),
+          editorFavoritos: operarioMatch.editorFavoritos === true
+        };
+      }
+    }
+
+    // 3. VISITAS
     const nombreVisita = emailLogueado.split('@')[0];
-    return { id: usuarioLogueado.uid, email: emailLogueado, nombre: nombreVisita, rol: "espectador", inicial: nombreVisita.charAt(0).toUpperCase(), aliasMatch: "NINGUNO", editorFavoritos: false };
+    return { id: usuarioLogueado.uid, email: emailLogueado, nombre: nombreVisita, rol: "espectador", etiquetaRol: "VISITA", inicial: nombreVisita.charAt(0).toUpperCase(), aliasMatch: "NINGUNO", editorFavoritos: false };
   }, [usuarioLogueado, config]);
 
   const perfilesSimulables = useMemo(() => {
     const base = [
-      { id: 'owner_real', nombre: "Dueño VIP", rol: "owner", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true }
+      { id: 'owner_real', nombre: "Dueño VIP", rol: "owner", etiquetaRol: "OWNER VIP", inicial: "👑", aliasMatch: "TODOS", editorFavoritos: true, accesoAjustes: true }
     ];
-    const extras = (config?.contactos || []).filter(c => c.tipo === 'equipo').map((c) => ({
-      id: c.id, nombre: (c.alias || c.label || 'Operario').toUpperCase(), rol: "operario", inicial: "👁️", aliasMatch: (c.alias || "").trim().toUpperCase(), editorFavoritos: c.editorFavoritos === true
-    }));
+    const extras = (config?.contactos || []).filter(c => c.tipo === 'equipo').map((c) => {
+      if (c.visionGlobal) {
+         return {
+           id: c.id,
+           nombre: (c.alias || c.label || 'Supervisor').toUpperCase(),
+           rol: "owner",
+           etiquetaRol: "SUPERVISOR",
+           inicial: "👁️",
+           aliasMatch: "TODOS",
+           editorFavoritos: true,
+           accesoAjustes: false
+         };
+      }
+      return {
+        id: c.id,
+        nombre: (c.alias || c.label || 'Operario').toUpperCase(),
+        rol: "operario",
+        etiquetaRol: "OPERARIO",
+        inicial: "👤",
+        aliasMatch: (c.alias || "").trim().toUpperCase(),
+        editorFavoritos: c.editorFavoritos === true
+      };
+    });
     return [...base, ...extras];
   }, [config]);
 
@@ -507,7 +544,14 @@ const App = () => {
           <span className="absolute left-16 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Notificaciones</span>
         </div>
         </nav>
-        {currentUser.rol === 'owner' && (<div className="mt-auto w-full px-3 relative group"><div onClick={() => setShowSettings(true)} className="p-3 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex justify-center cursor-pointer rounded-xl w-full"><Settings size={22} /><span className="absolute left-16 top-2 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Ajustes Generales</span></div></div>)}
+        {currentUser.rol === 'owner' && currentUser.accesoAjustes !== false && (
+          <div className="mt-auto w-full px-3 relative group">
+            <div onClick={() => setShowSettings(true)} className="p-3 text-slate-500 hover:text-white hover:bg-slate-800 transition-all flex justify-center cursor-pointer rounded-xl w-full">
+              <Settings size={22} />
+              <span className="absolute left-16 top-2 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity uppercase tracking-widest whitespace-nowrap z-50">Ajustes Generales</span>
+            </div>
+          </div>
+        )}
       </aside>
 
       <div className="flex-1 flex flex-col h-full min-w-0 relative">
@@ -565,14 +609,14 @@ const App = () => {
             ) : (
               <div className="flex items-center group p-2 rounded-xl border relative transition-all bg-slate-50 border-slate-200">
                 <div className="text-right mr-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    {currentUser.rol}
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${currentUser.etiquetaRol === 'SUPERVISOR' ? 'text-sky-500' : 'text-slate-400'}`}>
+                    {currentUser.etiquetaRol || currentUser.rol}
                   </p>
                   <p className="text-xs font-black text-slate-800">
                     {currentUser.nombre}
                   </p>
                 </div>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md ${currentUser.rol === 'owner' ? 'bg-orange-500 text-white' : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md ${currentUser.rol === 'owner' ? (currentUser.accesoAjustes === false ? 'bg-sky-500 text-white' : 'bg-orange-500 text-white') : 'bg-slate-700 text-white'}`}>{currentUser.inicial}</div>
               </div>
             )}
             
