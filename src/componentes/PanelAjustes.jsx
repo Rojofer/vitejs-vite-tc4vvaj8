@@ -58,6 +58,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
               <input type="email" value={c.email} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].email = e.target.value; setLocalConfig({...localConfig, contactos: newC});}} className="flex-[1.5] px-4 py-3 border border-slate-200 rounded-xl text-xs text-slate-600 outline-none focus:ring-1 focus:ring-purple-500 transition-all bg-white" placeholder="Correo" />
             </div>
             <div className="flex items-center justify-between border-t border-slate-200 pt-3 mt-1">
+                <div className="flex items-center justify-between border-t border-slate-200 pt-3 mt-1">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Color:</span>
@@ -67,12 +68,24 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                       ))}
                     </div>
                   </div>
+                  
                   <div className="h-4 w-px bg-slate-200 mx-1"></div>
+   
                   <label className={`flex items-center gap-1.5 cursor-pointer transition-colors ${c.editorFavoritos ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'}`}>
                     <input type="checkbox" checked={c.editorFavoritos || false} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].editorFavoritos = e.target.checked; setLocalConfig({...localConfig, contactos: newC}); }} className="hidden" />
                     <Star size={14} fill={c.editorFavoritos ? "currentColor" : "none"} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Editor Favs</span>
                   </label>
+
+                  {/* NUEVO INTERRUPTOR: SUPERVISOR (VISIÓN GLOBAL) */}
+                  <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                  
+                  <label className={`flex items-center gap-1.5 cursor-pointer transition-colors ${c.visionGlobal ? 'text-sky-500' : 'text-slate-400 hover:text-slate-600'}`}>
+                    <input type="checkbox" checked={c.visionGlobal || false} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].visionGlobal = e.target.checked; setLocalConfig({...localConfig, contactos: newC}); }} className="hidden" />
+                    <Eye size={14} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Supervisor</span>
+                  </label>
+
                 </div>
                 <button onClick={() => {const nc = localConfig.contactos.filter(x=>x.id!==c.id); setLocalConfig({...localConfig, contactos: nc});}} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-all"><Trash2 size={14} /> Eliminar</button>
               </div>
