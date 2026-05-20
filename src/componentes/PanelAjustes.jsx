@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Users, Activity, Mail, TrendingUp, Calendar, Database, X, Plus, Trash2, Download, Upload, Save, Star, Clock, Factory } from 'lucide-react';
+import { Settings, Users, Activity, Mail, TrendingUp, Calendar, Database, X, Plus, Trash2, Download, Upload, Save, Star, Clock, Factory, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImportar }) => {
@@ -30,6 +30,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
         {/* MENÚ LATERAL */}
         <div className="w-64 bg-slate-50 border-r border-slate-200 p-6 flex flex-col gap-2 shrink-0 overflow-y-auto shadow-inner">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 mt-2">Directorios</p>
+  
           <button onClick={() => setSettingsTab('compras')} className={`w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${settingsTab === 'compras' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}><Users size={16} /> Compras</button>
           <button onClick={() => setSettingsTab('planta')} className={`w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${settingsTab === 'planta' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}><Factory size={16} /> Planta</button>
           <button onClick={() => setSettingsTab('equipo')} className={`w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${settingsTab === 'equipo' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}><Activity size={16} /> Equipo</button>
@@ -57,38 +58,39 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
               <input type="text" value={c.alias || ""} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].alias = e.target.value; setLocalConfig({...localConfig, contactos: newC});}} className="flex-[0.8] px-4 py-3 border border-slate-200 rounded-xl text-xs font-black text-purple-600 outline-none focus:ring-1 focus:ring-purple-500 transition-all bg-purple-50/50" placeholder="Match en Sheets" />
               <input type="email" value={c.email} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].email = e.target.value; setLocalConfig({...localConfig, contactos: newC});}} className="flex-[1.5] px-4 py-3 border border-slate-200 rounded-xl text-xs text-slate-600 outline-none focus:ring-1 focus:ring-purple-500 transition-all bg-white" placeholder="Correo" />
             </div>
+            
+            {/* NUEVO PANEL DE CONTROLES: COLOR + EDITOR FAVS + SUPERVISOR */}
             <div className="flex items-center justify-between border-t border-slate-200 pt-3 mt-1">
-                <div className="flex items-center justify-between border-t border-slate-200 pt-3 mt-1">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Color:</span>
-                    <div className="flex gap-1.5">
-                      {['emerald', 'purple', 'blue', 'pink', 'amber', 'indigo'].map(color => (
-                        <button key={color} onClick={() => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].color = color; setLocalConfig({...localConfig, contactos: newC}); }} className={`w-5 h-5 rounded-full transition-all border-2 ${c.color === color || (!c.color && color === 'emerald') ? 'border-slate-800 scale-125 shadow-md' : 'border-transparent hover:scale-110 opacity-50'} ${color==='emerald'?'bg-emerald-500':color==='purple'?'bg-purple-500':color==='blue'?'bg-blue-500':color==='pink'?'bg-pink-500':color==='amber'?'bg-amber-500':'bg-indigo-500'}`} title={`Color ${color}`}></button>
-                      ))}
-                    </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Color:</span>
+                  <div className="flex gap-1.5">
+                    {['emerald', 'purple', 'blue', 'pink', 'amber', 'indigo'].map(color => (
+                      <button key={color} onClick={() => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].color = color; setLocalConfig({...localConfig, contactos: newC}); }} className={`w-5 h-5 rounded-full transition-all border-2 ${c.color === color || (!c.color && color === 'emerald') ? 'border-slate-800 scale-125 shadow-md' : 'border-transparent hover:scale-110 opacity-50'} ${color==='emerald'?'bg-emerald-500':color==='purple'?'bg-purple-500':color==='blue'?'bg-blue-500':color==='pink'?'bg-pink-500':color==='amber'?'bg-amber-500':'bg-indigo-500'}`} title={`Color ${color}`}></button>
+                    ))}
                   </div>
-                  
-                  <div className="h-4 w-px bg-slate-200 mx-1"></div>
-   
-                  <label className={`flex items-center gap-1.5 cursor-pointer transition-colors ${c.editorFavoritos ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <input type="checkbox" checked={c.editorFavoritos || false} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].editorFavoritos = e.target.checked; setLocalConfig({...localConfig, contactos: newC}); }} className="hidden" />
-                    <Star size={14} fill={c.editorFavoritos ? "currentColor" : "none"} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Editor Favs</span>
-                  </label>
-
-                  {/* NUEVO INTERRUPTOR: SUPERVISOR (VISIÓN GLOBAL) */}
-                  <div className="h-4 w-px bg-slate-200 mx-1"></div>
-                  
-                  <label className={`flex items-center gap-1.5 cursor-pointer transition-colors ${c.visionGlobal ? 'text-sky-500' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <input type="checkbox" checked={c.visionGlobal || false} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].visionGlobal = e.target.checked; setLocalConfig({...localConfig, contactos: newC}); }} className="hidden" />
-                    <Eye size={14} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Supervisor</span>
-                  </label>
-
                 </div>
-                <button onClick={() => {const nc = localConfig.contactos.filter(x=>x.id!==c.id); setLocalConfig({...localConfig, contactos: nc});}} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-all"><Trash2 size={14} /> Eliminar</button>
+                
+                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+ 
+                <label className={`flex items-center gap-1.5 cursor-pointer transition-colors ${c.editorFavoritos ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'}`}>
+                  <input type="checkbox" checked={c.editorFavoritos || false} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].editorFavoritos = e.target.checked; setLocalConfig({...localConfig, contactos: newC}); }} className="hidden" />
+                  <Star size={14} fill={c.editorFavoritos ? "currentColor" : "none"} />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Editor Favs</span>
+                </label>
+
+                {/* NUEVO INTERRUPTOR: SUPERVISOR (VISIÓN GLOBAL) */}
+                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                
+                <label className={`flex items-center gap-1.5 cursor-pointer transition-colors ${c.visionGlobal ? 'text-sky-500' : 'text-slate-400 hover:text-slate-600'}`}>
+                  <input type="checkbox" checked={c.visionGlobal || false} onChange={(e) => { const newC = [...localConfig.contactos]; const i = newC.findIndex(x=>x.id===c.id); newC[i].visionGlobal = e.target.checked; setLocalConfig({...localConfig, contactos: newC}); }} className="hidden" />
+                  <Eye size={14} />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Supervisor</span>
+                </label>
+
               </div>
+              <button onClick={() => {const nc = localConfig.contactos.filter(x=>x.id!==c.id); setLocalConfig({...localConfig, contactos: nc});}} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-all"><Trash2 size={14} /> Eliminar</button>
+            </div>
           </div>))}</div><button onClick={() => {setLocalConfig({...localConfig, contactos: [...(localConfig.contactos||[]), {id: Date.now(), label:"", email:"", tipo:"equipo", alias:"", color:"emerald"}]});}} className="flex items-center gap-2 text-xs font-bold text-purple-600 uppercase hover:bg-purple-50 px-4 py-2.5 rounded-lg transition-all border border-transparent hover:border-purple-200"><Plus size={16}/> Agregar Miembro</button></motion.div>)}
           
           {/* PLANTILLAS DINÁMICAS */}
@@ -253,6 +255,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
       {/* FOOTER MAGICO: EL BOTON DE GUARDAR */}
       <div className="p-5 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
         <p className="text-[10px] text-slate-400 font-mono tracking-widest uppercase">* Los cambios locales no aplican hasta confirmar.</p>
+      
         <div className="flex gap-3">
           <button onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all">Cancelar</button>
           <button onClick={() => {
