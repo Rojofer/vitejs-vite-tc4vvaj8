@@ -82,12 +82,11 @@ const ModalRedactor = ({
 
     const isAprobada = (estado) => {
       const e = (estado || "").toUpperCase();
-      // Lógica blindada: Si el Excel acusa "PENDIENTE", "SIN ESTADO" o viene vacío, es falso (Pendiente).
-      // Cualquier otro valor (fechas, códigos, "Docum.subsiguientes") lo asume como Aprobada.
-      if (e.includes('PENDIENTE') || e === 'SIN ESTADO' || e.trim() === '') {
-        return false;
+      // Ahora sí atacamos el texto real de tu Sheets/SAP: "EN PROCESO DE AUTORIZACIÓN"
+      if (e.includes('PENDIENTE') || e.includes('PROCESO') || e.includes('AUTORIZAC') || e === 'SIN ESTADO' || e.trim() === '') {
+        return false; // Es una OC Pendiente
       }
-      return true;
+      return true; // Es una OC Aprobada (Docum.subsiguientes, etc.)
     };
 
     // 1. OCs Aprobadas (SÓLO DEMORADAS REALES > 0)
