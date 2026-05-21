@@ -82,7 +82,12 @@ const ModalRedactor = ({
 
     const isAprobada = (estado) => {
       const e = (estado || "").toUpperCase();
-      return e.includes('APROBADO') || e.includes('APROBADA') || e.includes('DOCUM.SUBSIGUIENTES');
+      // Lógica blindada: Si el Excel acusa "PENDIENTE", "SIN ESTADO" o viene vacío, es falso (Pendiente).
+      // Cualquier otro valor (fechas, códigos, "Docum.subsiguientes") lo asume como Aprobada.
+      if (e.includes('PENDIENTE') || e === 'SIN ESTADO' || e.trim() === '') {
+        return false;
+      }
+      return true;
     };
 
     // 1. OCs Aprobadas (SÓLO DEMORADAS REALES > 0)
