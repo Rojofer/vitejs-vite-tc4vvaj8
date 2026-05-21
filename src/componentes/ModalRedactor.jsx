@@ -93,7 +93,7 @@ const ModalRedactor = ({
     if (txt.includes('{ocs_aprobadas}')) {
       const ocsAprob = (insumo.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
       const str = ocsAprob.length > 0 
-        ? ocsAprob.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Días demorados: ${calcularDemora(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
+        ? ocsAprob.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Ingreso planificado: ${formatearFechaCorta(oc.fecha)} | Días demorados: ${calcularDemora(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
         : "Sin Órdenes de Compra aprobadas/demoradas registradas.";
       txt = txt.replace(/{ocs_aprobadas}/g, str);
     }
@@ -102,7 +102,7 @@ const ModalRedactor = ({
     if (txt.includes('{ocs_pendientes}')) {
       const ocsPend = (insumo.detalleOCs || []).filter(oc => !isAprobada(oc.estado));
       const str = ocsPend.length > 0 
-        ? ocsPend.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
+        ? ocsPend.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Ingreso planificado: ${formatearFechaCorta(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
         : "Sin Órdenes de Compra pendientes de aprobación.";
       txt = txt.replace(/{ocs_pendientes}/g, str);
     }
@@ -111,7 +111,7 @@ const ModalRedactor = ({
     if (txt.includes('{ocs_todas_etiquetadas}')) {
       const ocsDemoradasRE = (insumo.detalleOCs || []).filter(oc => calcularDemora(oc.fecha) > 0);
       const str = ocsDemoradasRE.length > 0
-        ? ocsDemoradasRE.map(oc => `- OC ${oc.numero} [${isAprobada(oc.estado) ? '✅ APROBADA' : '⏳ PENDIENTE'}] (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Días demorados: ${calcularDemora(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
+        ? ocsDemoradasRE.map(oc => `- OC ${oc.numero} [${isAprobada(oc.estado) ? '✅ APROBADA' : '⏳ PENDIENTE'}] (${fmt(oc.cantidad)} un.) | Ingreso planificado: ${formatearFechaCorta(oc.fecha)} | Días demorados: ${calcularDemora(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
         : "Sin Órdenes de Compra demoradas registradas.";
       txt = txt.replace(/{ocs_todas_etiquetadas}/g, str);
     }
