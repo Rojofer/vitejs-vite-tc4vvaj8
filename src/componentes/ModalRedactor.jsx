@@ -36,42 +36,71 @@ const ModalRedactor = ({
       return new Date(fRaw);
     };
 
+    const formatearFechaCorta = (fRaw) => {
+      if (!fRaw || fRaw === "-") return "Sin fecha";
+      try {
+        const f = parsearFecha(fRaw);
+        if (f.getFullYear() === 2100) return "Sin fecha";
+        const dia = String(f.getDate()).padStart(2, '0');
+        const mes = String(f.getMonth() + 1).padStart(2, '0');
+        const anio = String(f.getFullYear()).slice(-2);
+        return `${dia}/${mes}/${anio}`;
+      } catch(e) { return String(fRaw); }
+    };
+
+    // Función para estandarizar el nombre del comprador buscando en la agenda
+    const formatearComprador = (rawName) => {
+      if (!rawName || rawName === "SIN ASIGNAR" || rawName === "NO_ASIGNADA") return "Sin Asignar";
+      const cleanName = String(rawName).trim().toLowerCase();
+      
+      const contactoMatch = contactos.find(c => {
+        const aliasC = String(c.alias || "").trim().toLowerCase();
+        const labelC = String(c.label || "").trim().toLowerCase();
+        if (aliasC && cleanName.includes(aliasC)) return true;
+        if (labelC && cleanName.includes(labelC)) return true;
+        return false;
+      });
+
+      // Si encuentra el contacto en los Ajustes, usa su Nombre Oficial. Si no, usa el que vino de Excel.
+      return contactoMatch && contactoMatch.label ? contactoMatch.label : rawName;
+    };
+
     const isAprobada = (estado) => {
       const e = (estado || "").toUpperCase();
       return e.includes('APROBADO') || e.includes('APROBADA') || e.includes('DOCUM.SUBSIGUIENTES');
     };
 
-    // 1. OCs Aprobadas
+    // 1. OCs Aprobadas (AGREGADA FECHA DE INGRESO Y COMPRADOR ESTÁNDAR)
     if (txt.includes('{ocs_aprobadas}')) {
       const ocsAprob = (insumo.detalleOCs || []).filter(oc => isAprobada(oc.estado));
       const str = ocsAprob.length > 0 
-        ? ocsAprob.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Resp: ${oc.comprador}`).join('\n')
+        ? ocsAprob.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
         : "Sin Órdenes de Compra aprobadas/demoradas registradas.";
       txt = txt.replace(/{ocs_aprobadas}/g, str);
     }
 
-    // 2. OCs Pendientes
+    // 2. OCs Pendientes (AGREGADA FECHA DE INGRESO Y COMPRADOR ESTÁNDAR)
     if (txt.includes('{ocs_pendientes}')) {
       const ocsPend = (insumo.detalleOCs || []).filter(oc => !isAprobada(oc.estado));
       const str = ocsPend.length > 0 
-        ? ocsPend.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Resp: ${oc.comprador}`).join('\n')
+        ? ocsPend.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
         : "Sin Órdenes de Compra pendientes de aprobación.";
       txt = txt.replace(/{ocs_pendientes}/g, str);
     }
 
-    // 3. Todas Etiquetadas (URGENCIAS)
+    // 3. Todas Etiquetadas (URGENCIAS) (AGREGADA FECHA DE INGRESO Y COMPRADOR ESTÁNDAR)
     if (txt.includes('{ocs_todas_etiquetadas}')) {
       const str = (insumo.detalleOCs || []).length > 0
-        ? (insumo.detalleOCs || []).map(oc => `- OC ${oc.numero} [${isAprobada(oc.estado) ? '✅ APROBADA' : '⏳ PENDIENTE'}] (${fmt(oc.cantidad)} un.) | Resp: ${oc.comprador}`).join('\n')
+        ? (insumo.detalleOCs || []).map(oc => `- OC ${oc.numero} [${isAprobada(oc.estado) ? '✅ APROBADA' : '⏳ PENDIENTE'}] (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
         : "Sin Órdenes de Compra registradas.";
       txt = txt.replace(/{ocs_todas_etiquetadas}/g, str);
     }
 
-    // 4. Solpeds Viejas (7/10 Días)
+    // 4. Solpeds Viejas (7/10 Días) (AGREGADA FECHA DE SOLICITUD Y COMPRADOR ESTÁNDAR)
     if (txt.includes('{solpeds_viejas}')) {
       const solpedsViejas = (insumo.detalleSolpeds || []).filter(sp => parsearFecha(sp.fecha) < hace10Dias);
       const str = solpedsViejas.length > 0
-        ? solpedsViejas.map(sp => `- S/P ${sp.numero} (${fmt(sp.cantidad)} un.) | Resp: ${sp.comprador}`).join('\n')
+        ? solpedsViejas.map(sp => `- S/P ${sp.numero} (${fmt(sp.cantidad)} un.) | Solicitada: ${formatearFechaCorta(sp.fecha)} | Resp: ${formatearComprador(sp.comprador)}`).join('\n')
         : "No hay Solicitudes de Pedido con más de 10 días de antigüedad.";
       txt = txt.replace(/{solpeds_viejas}/g, str);
     }
