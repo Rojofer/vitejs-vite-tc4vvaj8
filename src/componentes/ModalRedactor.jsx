@@ -107,11 +107,12 @@ const ModalRedactor = ({
       txt = txt.replace(/{ocs_pendientes}/g, str);
     }
 
-    // 3. Todas Etiquetadas (URGENCIAS) (CON DÍAS DEMORADOS)
+    // 3. Todas Etiquetadas (URGENCIAS) (SÓLO DEMORADAS REALES > 0)
     if (txt.includes('{ocs_todas_etiquetadas}')) {
-      const str = (insumo.detalleOCs || []).length > 0
-        ? (insumo.detalleOCs || []).map(oc => `- OC ${oc.numero} [${isAprobada(oc.estado) ? 'APROBADA' : 'PENDIENTE'}] (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Días demorados: ${calcularDemora(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
-        : "Sin Órdenes de Compra registradas.";
+      const ocsDemoradasRE = (insumo.detalleOCs || []).filter(oc => calcularDemora(oc.fecha) > 0);
+      const str = ocsDemoradasRE.length > 0
+        ? ocsDemoradasRE.map(oc => `- OC ${oc.numero} [${isAprobada(oc.estado) ? '✅ APROBADA' : '⏳ PENDIENTE'}] (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Días demorados: ${calcularDemora(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
+        : "Sin Órdenes de Compra demoradas registradas.";
       txt = txt.replace(/{ocs_todas_etiquetadas}/g, str);
     }
 
