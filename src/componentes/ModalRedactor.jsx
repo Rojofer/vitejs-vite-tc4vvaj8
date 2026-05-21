@@ -85,9 +85,9 @@ const ModalRedactor = ({
       return e.includes('APROBADO') || e.includes('APROBADA') || e.includes('DOCUM.SUBSIGUIENTES');
     };
 
-    // 1. OCs Aprobadas (CON DÍAS DEMORADOS)
+    // 1. OCs Aprobadas (SÓLO DEMORADAS REALES > 0)
     if (txt.includes('{ocs_aprobadas}')) {
-      const ocsAprob = (insumo.detalleOCs || []).filter(oc => isAprobada(oc.estado));
+      const ocsAprob = (insumo.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
       const str = ocsAprob.length > 0 
         ? ocsAprob.map(oc => `- OC ${oc.numero} (${fmt(oc.cantidad)} un.) | Ingreso: ${formatearFechaCorta(oc.fecha)} | Días demorados: ${calcularDemora(oc.fecha)} | Resp: ${formatearComprador(oc.comprador)}`).join('\n')
         : "Sin Órdenes de Compra aprobadas/demoradas registradas.";
