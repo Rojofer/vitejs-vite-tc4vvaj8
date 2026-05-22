@@ -262,7 +262,7 @@ const ModalRedactor = ({
 
         <div className="px-8 mt-2">
           <div className="bg-purple-50 text-purple-700 text-[10px] font-bold px-4 py-1.5 rounded-lg flex items-center gap-2 border border-purple-100 uppercase tracking-wide">
-            <strong>Canal Activo:</strong> Dirección e Interacción con {tipoFiltroContacto === 'planta' ? '🏢 DIRECTORIO DE PLANTA' : '💼 SECTOR COMPRAS'}
+            <strong>Canal Activo:</strong> Dirección e Interacción con {tipoFiltroContacto === 'planta' ? '-->ADMINISTRACION' : '--> SECTOR COMPRAS'}
           </div>
         </div>
 
