@@ -12,11 +12,30 @@ const ModalRedactor = ({
   confirmarYGuardarReclamo
 }) => {
   const [procesadoInicial, setProcesadoInicial] = useState(false);
-
   if (!reclamoDraft) return null;
 
   const plantillas = getPlantillasDinamicas();
   const contactos = config?.contactos || [];
+
+  // --- MOTOR DE ORDENAMIENTO NUMÉRICO PARA LA LISTA DESPLEGABLE ---
+  const plantillasOrdenadas = React.useMemo(() => {
+    return [...plantillas].sort((a, b) => {
+      const nombreA = (a.nombre || "").trim();
+      const nombreB = (b.nombre || "").trim();
+      
+      // Extraemos el primer carácter numérico si existe
+      const numA = parseInt(nombreA.charAt(0), 10);
+      const numB = parseInt(nombreB.charAt(0), 10);
+      
+      // Si ambos tienen número al inicio, comparamos numéricamente
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      // Si solo uno tiene número, ese va primero
+      if (!isNaN(numA)) return -1;
+      if (!isNaN(numB)) return 1;
+      // Fallback: orden alfabético general
+      return nombreA.localeCompare(nombreB);
+    });
+  }, [plantillas]);
 
   // --- MOTOR 1: PROCESADOR MATEMÁTICO DE ETIQUETAS MÁGICAS ---
   const procesarTextoAvanzado = (txtOriginal, insumo) => {
@@ -27,7 +46,7 @@ const ModalRedactor = ({
     const fmt = (n) => Number(n).toLocaleString('es-AR');
 
     const parsearFecha = (fRaw) => {
-      if (!fRaw) return new Date(2100, 1, 1); 
+      if (!fRaw) return new Date(2100, 1, 1);
       if (fRaw.seconds) return new Date(fRaw.seconds * 1000);
       if (typeof fRaw === 'string' && fRaw.includes('/')) {
         const p = fRaw.split('/');
@@ -48,7 +67,6 @@ const ModalRedactor = ({
       } catch(e) { return String(fRaw); }
     };
 
-    // Calculadora de días de demora
     const calcularDemora = (fRaw) => {
       if (!fRaw || fRaw === "-") return "?";
       try {
@@ -63,7 +81,6 @@ const ModalRedactor = ({
       } catch(e) { return "?"; }
     };
 
-    // Función para estandarizar el nombre del comprador buscando en la agenda
     const formatearComprador = (rawName) => {
       if (!rawName || rawName === "SIN ASIGNAR" || rawName === "NO_ASIGNADA") return "Sin Asignar";
       const cleanName = String(rawName).trim().toLowerCase();
@@ -75,21 +92,17 @@ const ModalRedactor = ({
         if (labelC && cleanName.includes(labelC)) return true;
         return false;
       });
-
-      // Si encuentra el contacto en los Ajustes, usa su Nombre Oficial. Si no, usa el que vino de Excel.
       return contactoMatch && contactoMatch.label ? contactoMatch.label : rawName;
     };
 
     const isAprobada = (estado) => {
       const e = (estado || "").toUpperCase();
-      // Ahora sí atacamos el texto real de tu Sheets/SAP: "EN PROCESO DE AUTORIZACIÓN"
       if (e.includes('PENDIENTE') || e.includes('PROCESO') || e.includes('AUTORIZAC') || e === 'SIN ESTADO' || e.trim() === '') {
-        return false; // Es una OC Pendiente
+        return false;
       }
-      return true; // Es una OC Aprobada (Docum.subsiguientes, etc.)
+      return true;
     };
 
-    // 1. OCs Aprobadas (SÓLO DEMORADAS REALES > 0)
     if (txt.includes('{ocs_aprobadas}')) {
       const ocsAprob = (insumo.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
       const str = ocsAprob.length > 0 
@@ -98,7 +111,6 @@ const ModalRedactor = ({
       txt = txt.replace(/{ocs_aprobadas}/g, str);
     }
 
-    // 2. OCs Pendientes (SIN DÍAS DEMORADOS)
     if (txt.includes('{ocs_pendientes}')) {
       const ocsPend = (insumo.detalleOCs || []).filter(oc => !isAprobada(oc.estado));
       const str = ocsPend.length > 0 
@@ -107,7 +119,6 @@ const ModalRedactor = ({
       txt = txt.replace(/{ocs_pendientes}/g, str);
     }
 
-    // 3. Todas Etiquetadas (URGENCIAS) (SÓLO DEMORADAS REALES > 0)
     if (txt.includes('{ocs_todas_etiquetadas}')) {
       const ocsDemoradasRE = (insumo.detalleOCs || []).filter(oc => calcularDemora(oc.fecha) > 0);
       const str = ocsDemoradasRE.length > 0
@@ -116,7 +127,6 @@ const ModalRedactor = ({
       txt = txt.replace(/{ocs_todas_etiquetadas}/g, str);
     }
 
-    // 4. Solpeds Viejas (7/10 Días) 
     if (txt.includes('{solpeds_viejas}')) {
       const solpedsViejas = (insumo.detalleSolpeds || []).filter(sp => parsearFecha(sp.fecha) < hace10Dias);
       const str = solpedsViejas.length > 0
@@ -128,12 +138,15 @@ const ModalRedactor = ({
     return txt;
   };
 
-  // --- MOTOR 2: MATCH AUTOMÁTICO DE COMPRADORES (FRANCOTIRADOR) ---
-  const autoSeleccionarDestinatarios = (textoTemplateCrudo, insumo) => {
+  // --- MOTOR 2: MATCH AUTOMÁTICO DE CONTACTOS INTERNOS ---
+  const autoSeleccionarDestinatarios = (textoTemplateCrudo, insumo, plantillaId) => {
+    if (plantillaId === 'comprasGrave' || plantillaId === 'comprasLeve' ? false : (plantillaId === 'comprasGrave' || String(plantillaId).toUpperCase().includes('AUTORIZAR') || String(textoTemplateCrudo).toUpperCase().includes('AUTORIZAR'))) {
+      return contactos.filter(c => c.tipo === 'planta').map(c => c.id);
+    }
+
     let matchNames = [];
     let sendToAllCompras = false;
-
-    const originalText = textoTemplateCrudo || ""; 
+    const originalText = textoTemplateCrudo || "";
 
     if (originalText.includes('{solpeds_viejas}')) {
       (insumo.detalleSolpeds || []).forEach(sp => matchNames.push(sp.comprador));
@@ -142,7 +155,6 @@ const ModalRedactor = ({
       (insumo.detalleOCs || []).forEach(oc => matchNames.push(oc.comprador));
     }
 
-    // Fallback: Si no hay etiquetas mágicas, probamos con el owner general
     if (matchNames.length === 0 && insumo.owner) {
       matchNames.push(insumo.owner);
     }
@@ -155,7 +167,6 @@ const ModalRedactor = ({
       if (cleanName === "sin asignar" || cleanName === "no_asignada") {
         sendToAllCompras = true;
       } else {
-        // MATCH TÁCTICO: Busca si el texto contiene el alias o el label
         const contactoEncontrado = contactos.find(c => {
           const aliasC = String(c.alias || "").trim().toLowerCase();
           const labelC = String(c.label || "").trim().toLowerCase();
@@ -163,7 +174,7 @@ const ModalRedactor = ({
           if (labelC && cleanName.includes(labelC)) return true;
           return false;
         });
-        if (contactoEncontrado) {
+        if (contactoEncontrado && contactoEncontrado.tipo === 'compras') {
           matchedIds.push(contactoEncontrado.id);
         }
       }
@@ -173,17 +184,16 @@ const ModalRedactor = ({
       contactos.filter(c => c.tipo === 'compras').forEach(c => matchedIds.push(c.id));
     }
 
-    return [...new Set(matchedIds)]; // Elimina duplicados
+    return [...new Set(matchedIds)];
   };
 
-  // --- AUTO-EVALUACIÓN AL ABRIR EL MODAL ---
   useEffect(() => {
     if (reclamoDraft && !procesadoInicial) {
       const template = plantillas.find(p => p.id === reclamoDraft.tipoPlantilla) || plantillas[0];
       const cuerpoCrudoTemplate = template.cuerpo || "";
 
       const nuevoCuerpo = procesarTextoAvanzado(reclamoDraft.cuerpo, reclamoDraft.insumo);
-      const nuevosDestinos = autoSeleccionarDestinatarios(cuerpoCrudoTemplate, reclamoDraft.insumo);
+      const nuevosDestinos = autoSeleccionarDestinatarios(cuerpoCrudoTemplate, reclamoDraft.insumo, reclamoDraft.tipoPlantilla);
 
       setReclamoDraft(prev => ({
         ...prev,
@@ -194,33 +204,28 @@ const ModalRedactor = ({
     }
   }, [reclamoDraft, procesadoInicial, plantillas]);
 
-  // --- AL CAMBIAR DE PLANTILLA EN EL DESPLEGABLE ---
   const handlePlantillaChange = (e) => {
     const newTemplateId = e.target.value;
-    // 1. Aplicamos las reglas estándar (App.jsx)
     const { asunto, cuerpo, destino } = aplicarPlantilla(reclamoDraft.insumo, newTemplateId);
-    
-    // 2. Extraemos el template crudo para saber qué magia requiere
     const templateObj = plantillas.find(p => p.id === newTemplateId) || plantillas[0];
     
-    // 3. Pasamos por nuestros motores
     const cuerpoAvanzado = procesarTextoAvanzado(cuerpo, reclamoDraft.insumo);
-    const destinosInteligentes = autoSeleccionarDestinatarios(templateObj.cuerpo, reclamoDraft.insumo);
-
+    const destinosInteligentes = autoSeleccionarDestinatarios(templateObj.cuerpo, reclamoDraft.insumo, newTemplateId);
     const ticketActual = reclamoDraft.ticketBorrador;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
+
+    const destinoEfectivo = (newTemplateId.toUpperCase().includes('AUTORIZAR') || templateObj.nombre.toUpperCase().includes('AUTORIZAR')) ? 'planta' : destino;
 
     setReclamoDraft({
       ...reclamoDraft,
       tipoPlantilla: newTemplateId,
-      tipoDestino: destino,
+      tipoDestino: destinoEfectivo,
       asunto: asuntoConTicket,
       cuerpo: cuerpoAvanzado,
-      destinatarios: destinosInteligentes.length > 0 ? destinosInteligentes : []
+      destinatarios: destinosInteligentes
     });
   };
 
-  // Función manual para tildar/destildar
   const toggleDestinatario = (id) => {
     const actuales = reclamoDraft.destinatarios || [];
     if (actuales.includes(id)) {
@@ -229,6 +234,8 @@ const ModalRedactor = ({
       setReclamoDraft({ ...reclamoDraft, destinatarios: [...actuales, id] });
     }
   };
+
+  const tipoFiltroContacto = (reclamoDraft.tipoPlantilla?.toUpperCase().includes('AUTORIZAR') || reclamoDraft.tipoDestino === 'planta') ? 'planta' : 'compras';
 
   return (
     <motion.div 
@@ -243,7 +250,6 @@ const ModalRedactor = ({
         exit={{ scale: 0.95, opacity: 0 }} 
         className="bg-white rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl overflow-hidden max-h-[95vh]"
       >
-        {/* CABECERA INVISIBLE Y MINIMALISTA */}
         <div className="flex justify-between items-center px-8 pt-6 pb-2 border-b border-transparent">
           <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Send size={18} className="text-orange-500" /> Emisión de Reclamo
@@ -256,7 +262,6 @@ const ModalRedactor = ({
           </button>
         </div>
 
-        {/* INFOBOX DE ETIQUETAS DETECTADAS */}
         <div className="px-8 mt-2">
           <div className="bg-sky-50 text-sky-700 text-[10px] font-bold px-4 py-2 rounded-lg flex items-center gap-2 border border-sky-100">
             <Info size={14} className="shrink-0"/>
@@ -264,10 +269,13 @@ const ModalRedactor = ({
           </div>
         </div>
 
-        {/* CUERPO DEL MODAL (Prioridad al área de texto) */}
+        <div className="px-8 mt-2">
+          <div className="bg-purple-50 text-purple-700 text-[10px] font-bold px-4 py-1.5 rounded-lg flex items-center gap-2 border border-purple-100 uppercase tracking-wide">
+            <strong>Canal Activo:</strong> Dirección e Interacción con {tipoFiltroContacto === 'planta' ? '🏢 DIRECTORIO DE PLANTA' : '💼 SECTOR COMPRAS'}
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto px-8 py-4 flex flex-col gap-5">
-          
-          {/* SELECTORES EN UNA SOLA FILA */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 shrink-0">
             <div>
               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Plantilla Operativa</label>
@@ -276,7 +284,7 @@ const ModalRedactor = ({
                 onChange={handlePlantillaChange}
                 className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all cursor-pointer"
               >
-                {plantillas.map(p => (
+                {plantillasOrdenadas.map(p => (
                   <option key={p.id} value={p.id}>{p.nombre.toUpperCase()}</option>
                 ))}
               </select>
@@ -295,7 +303,7 @@ const ModalRedactor = ({
                 
                 {reclamoDraft.showDestinatarios && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto p-2">
-                    {contactos.filter(c => c.tipo === reclamoDraft.tipoDestino).map(c => (
+                    {contactos.filter(c => c.tipo === tipoFiltroContacto).map(c => (
                       <label key={c.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
                         <input 
                           type="checkbox" 
@@ -309,7 +317,7 @@ const ModalRedactor = ({
                         </div>
                       </label>
                     ))}
-                    {contactos.filter(c => c.tipo === reclamoDraft.tipoDestino).length === 0 && (
+                    {contactos.filter(c => c.tipo === tipoFiltroContacto).length === 0 && (
                       <div className="p-2 text-xs text-slate-500 text-center">No hay contactos configurados para este sector.</div>
                     )}
                   </div>
@@ -318,7 +326,6 @@ const ModalRedactor = ({
             </div>
           </div>
 
-          {/* ASUNTO */}
           <div className="shrink-0">
             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Asunto Oficial</label>
             <input 
@@ -329,7 +336,6 @@ const ModalRedactor = ({
             />
           </div>
 
-          {/* CUERPO DEL MENSAJE (Espacio Maximizado) */}
           <div className="flex flex-col flex-1 h-full min-h-[350px]">
             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Cuerpo del Mensaje</label>
             <textarea 
@@ -340,7 +346,6 @@ const ModalRedactor = ({
           </div>
         </div>
 
-        {/* PIE DEL MODAL */}
         <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
           <button 
             onClick={() => setReclamoDraft(null)} 
