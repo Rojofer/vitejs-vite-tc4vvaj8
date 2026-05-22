@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, TrendingUp, Target, Zap, BarChart2, ShieldCheck, Timer } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer } from 'lucide-react';
 
 const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo, setDialogoConfirmacion}) => {
     const [filtroMes, setFiltroMes] = useState("TODOS");
@@ -11,14 +11,22 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [busquedaAuditoria, setBusquedaAuditoria] = useState("");
     const [auditoriaTab, setAuditoriaTab] = useState('abiertos');
     const [expandedRow, setExpandedRow] = useState(null);
-    const [modalMensaje, setModalMensaje] = useState(null); 
+    const [modalMensaje, setModalMensaje] = useState(null);
+
+    // CEREBRO UNIFICADO: Lee el asunto y deduce la etiqueta visual con su número y color
+    const getTipoReclamo = (asunto) => {
+      const txt = (asunto || "").toUpperCase();
+      if (txt.includes("SOLPED")) return { num: "1", label: "SOLPEDS SIN O/C", style: "bg-sky-50 text-sky-700 border-sky-200" };
+      if (txt.includes("AUTORIZAR")) return { num: "2", label: "AUTORIZAR OC", style: "bg-purple-50 text-purple-700 border-purple-200" };
+      if (txt.includes("APROBADA DEMORADA")) return { num: "3", label: "O/C DEMORADAS", style: "bg-orange-50 text-orange-700 border-orange-200" };
+      if (txt.includes("QUIEBRE")) return { num: "4", label: "RIESGO DE QUIEBRE", style: "bg-red-50 text-red-700 border-red-200" };
+      return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
+    };
 
     // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
     const kpiData = useMemo(() => {
-      // Filtramos la basura y nos quedamos solo con reclamos operativos reales a compras
       const validos = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
 
-      // 1. Tasa de Resolución Mensual
       const hoy = new Date();
       const mesActual = hoy.getMonth();
       const anioActual = hoy.getFullYear();
@@ -29,28 +37,25 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const cerradosMes = reclamosMes.filter(r => r.estado === 'CERRADO');
       const tasaResolucion = reclamosMes.length > 0 ? Math.round((cerradosMes.length / reclamosMes.length) * 100) : 100;
 
-      // 2. Lead Time Promedio (Apertura a Cierre)
       const resueltos = validos.filter(r => r.estado === 'CERRADO' && r.fecha && r.fechaCierre);
       let totalDias = 0;
       resueltos.forEach(r => {
         const fInicio = r.fecha.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
         const fFin = r.fechaCierre.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
-        totalDias += Math.max(0, (fFin - fInicio) / 86400); // Diferencia en días
+        totalDias += Math.max(0, (fFin - fInicio) / 86400);
       });
       const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
 
-      // 3. Top Ofensores (Pareto)
       const conteoPorInsumo = {};
       validos.forEach(r => {
          conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1;
       });
       const topOfensores = Object.keys(conteoPorInsumo)
         .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
-        .filter(obj => obj.insumo) // descartar si el insumo ya no existe
+        .filter(obj => obj.insumo)
         .sort((a,b) => b.cantidad - a.cantidad)
-        .slice(0, 5); // Los 5 peores
+        .slice(0, 5);
 
-      // 4. Efectividad del Primer Contacto (Insistencia)
       let hilosUnicos = 0;
       let hilosMultiples = 0;
       Object.values(conteoPorInsumo).forEach(cant => {
@@ -93,8 +98,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       doc.setFont("helvetica", "bold");
       doc.text(`CÓDIGO: ${insumo.codigo || 'S/C'}`, 18, 49);
       doc.text(`MATERIAL: ${insumo.nombre || 'GENERAL'}`, 18, 55);
-      
-     const tableData = threadItems.map((item) => {
+
+      const tableData = threadItems.map((item) => {
         const tipoReclamoDef = getTipoReclamo(item.mensaje);
         let accion = `[${tipoReclamoDef.num}] ${tipoReclamoDef.label}`;
         let operarioLimpio = (item.operario || "").replace(/➡️/g, '->');
@@ -114,8 +119,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         theme: 'grid',
         headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 3 },
-        columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 25 }, 2: { cellWidth: 25 }, 3: { cellWidth: 'auto' } }
+        columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 25 }, 2: { cellWidth: 35 }, 3: { cellWidth: 'auto' } }
       });
+
       doc.save(`Trazabilidad_${insumo.nombre || 'Auditoria'}.pdf`);
       setToastMsg("Dossier PDF generado y descargado con éxito.");
       setTimeout(() => setToastMsg(null), 4000);
@@ -124,21 +130,23 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     // --- DESCARGAR EXCEL INTERNO ---
     const descargarExcelAuditoria = (filtrados) => {
       let csv = "Fecha,Estado,Tipo,Insumo,Mensaje,Operario\n";
-      filtrados.forEach(r => { const ins = insumos.find(i => i.id === r.insumoId)?.nombre || 'Eliminado'; csv += `"${formatearFecha(r.fecha)}","${r.estado}","${r.tipo === 'equipo'?'Alerta Interna':'Reclamo Compras'}","${ins}","${r.mensaje}","${r.operario}"\n`; });
+      filtrados.forEach(r => { 
+        const ins = insumos.find(i => i.id === r.insumoId)?.nombre || 'Eliminado'; 
+        const tipoDef = getTipoReclamo(r.mensaje);
+        csv += `"${formatearFecha(r.fecha)}","${r.estado}","[${tipoDef.num}] ${tipoDef.label}","${ins}","${r.mensaje}","${r.operario}"\n`; 
+      });
       const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
       link.download = `Auditoria_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
     };
 
     // --- FILTROS Y TABLA ---
-    // Ocultamos INICIALIZADO y BROADCAST de la tabla
     let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO");
-
     const operariosUnicos = useMemo(() => {
       const ops = filtrados.map(r => r.operario).filter(Boolean);
       return [...new Set(ops)].sort();
     }, [filtrados]);
-    
+
     if (currentUser.rol !== 'owner') {
       filtrados = filtrados.filter(r => r.operario === currentUser.nombre || (r.operario && r.operario.includes(currentUser.nombre)));
     } else {
@@ -157,7 +165,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     }, [filtrados]);
 
     if (filtroMes !== "TODOS") filtrados = filtrados.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
-    
+
     if (filtroTipo !== "TODOS") {
       if (filtroTipo === "TIPO_1") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("SOLPED"));
       if (filtroTipo === "TIPO_2") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("AUTORIZAR"));
@@ -185,18 +193,20 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     
     if (auditoriaFiltroInsumo) filtrados = filtrados.filter(r => r.insumoId === auditoriaFiltroInsumo);
 
-    const hilos = useMemo(() => { const h = []; const m = {}; filtrados.forEach(r => { if (!m[r.insumoId]) { m[r.insumoId] = { ...r, totalReclamos: 1, subReclamos: [r] }; h.push(m[r.insumoId]); } else { m[r.insumoId].totalReclamos += 1; m[r.insumoId].subReclamos.push(r); } }); return h; }, [filtrados]);
-    
-    // CEREBRO: Lee el asunto y deduce la etiqueta visual con su número y color
-    const getTipoReclamo = (asunto) => {
-      const txt = (asunto || "").toUpperCase();
-      if (txt.includes("SOLPED")) return { num: "1", label: "SOLPEDS SIN O/C", style: "bg-sky-50 text-sky-700 border-sky-200" };
-      if (txt.includes("AUTORIZAR")) return { num: "2", label: "AUTORIZAR OC", style: "bg-purple-50 text-purple-700 border-purple-200" };
-      if (txt.includes("APROBADA DEMORADA")) return { num: "3", label: "O/C DEMORADAS", style: "bg-orange-50 text-orange-700 border-orange-200" };
-      if (txt.includes("QUIEBRE")) return { num: "4", label: "RIESGO DE QUIEBRE", style: "bg-red-50 text-red-700 border-red-200" };
-      return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
-    };
-    
+    const hilos = useMemo(() => { 
+      const h = []; const m = {}; 
+      filtrados.forEach(r => { 
+        if (!m[r.insumoId]) { 
+          m[r.insumoId] = { ...r, totalReclamos: 1, subReclamos: [r] }; 
+          h.push(m[r.insumoId]); 
+        } else { 
+          m[r.insumoId].totalReclamos += 1; 
+          m[r.insumoId].subReclamos.push(r); 
+        } 
+      }); 
+      return h; 
+    }, [filtrados]);
+
     return (
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
@@ -221,7 +231,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input type="text" placeholder="Buscar código, insumo o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
                 </div>
-                
+       
                 {currentUser.rol === 'owner' && (
                   <select value={filtroOperario} onChange={e => setFiltroOperario(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
                     <option value="TODOS">Todos los Operarios</option>
@@ -303,21 +313,21 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
                               <td className="py-4 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</td>
 
-                              <td className="py-4 px-4">
+                              <td className="py-4 px-4 text-center">
                                 {h.estado === 'ABIERTO' && h.tipo !== "APROBACION GERENCIA" ? (
-                                  <span className="px-2 py-1 rounded bg-orange-100 text-orange-700 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-orange-500"></span> Abierto</span>
+                                  <span className="px-2 py-1 rounded bg-orange-100 text-orange-700 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-orange-500"></span> Abierto</span>
                                 ) : h.tipo === "APROBACION GERENCIA" ? (
-                                  <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><Clock size={10}/> Esperando Envío</span>
+                                  <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><Clock size={10}/> Esperando Envío</span>
                                 ) : (
-                                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-[9px] font-black uppercase flex items-center gap-1 w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-slate-400"></span> Resuelto</span>
+                                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-slate-400"></span> Resuelto</span>
                                 )}
                               </td>
 
-                              <td className="py-4 px-4">
+                              <td className="py-4 px-4 text-center">
                                 {(() => {
                                   const tipo = getTipoReclamo(h.mensaje);
                                   return (
-                                    <span className={`text-[9px] font-black border px-2 py-1 rounded flex items-center gap-1.5 w-max shadow-sm ${tipo.style}`}>
+                                    <span className={`text-[9px] font-black border px-2 py-1 rounded flex items-center gap-1.5 mx-auto w-max shadow-sm ${tipo.style}`}>
                                       <span className="bg-white text-current rounded-sm px-1.5 py-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">{tipo.num}</span> 
                                       {tipo.label}
                                     </span>
@@ -336,7 +346,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               <td className="py-4 px-4 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                   {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
-                                    <button onClick={(e) => { e.stopPropagation(); if(setDialogoConfirmacion) { const insumoAsociado = insumos.find(i => i.id === h.insumoId); setDialogoConfirmacion({ titulo: "Cerrar Reclamo", mensaje: `¿Confirmás que querés dar por cumplido y cerrar el reclamo de "${insumoAsociado?.nombre || 'este material'}"?`, textoConfirmar: "Sí, Cerrar Reclamo", colorBoton: "bg-emerald-500 hover:bg-emerald-600", onConfirm: () => cerrarReclamoManual(h.id) }); } else { cerrarReclamoManual(h.id, e); } }} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1">
+                                    <button onClick={(e) => { e.stopPropagation(); if(setDialogoConfirmacion) { const insumoAsociado = insumos.find(i => i.id === h.insumoId);
+                                      setDialogoConfirmacion({ titulo: "Cerrar Reclamo", mensaje: `¿Confirmás que querés dar por cumplido y cerrar el reclamo de "${insumoAsociado?.nombre || 'este material'}"?`, textoConfirmar: "Sí, Cerrar Reclamo", colorBoton: "bg-emerald-500 hover:bg-emerald-600", onConfirm: () => cerrarReclamoManual(h.id) });
+                                    } else { cerrarReclamoManual(h.id, e); } }} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1">
                                       <X size={10} /> Cerrar
                                     </button>
                                   )}
@@ -363,8 +375,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                     </td>
                                     <td className="py-3 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
                                     <td className="py-3 px-4"></td>
-                                    <td className="py-3 px-4">
-                                      <span className={`text-[8px] font-black border px-1.5 py-0.5 rounded flex items-center gap-1 w-max shadow-xs ${tipoSub.style}`}>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className={`text-[8px] font-black border px-1.5 py-0.5 rounded flex items-center gap-1 mx-auto w-max shadow-xs ${tipoSub.style}`}>
                                         <span className="bg-white text-current rounded-sm px-1 py-0.1 shadow-xs">{tipoSub.num}</span> 
                                         {tipoSub.label}
                                       </span>
@@ -374,7 +386,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                         <Info size={12} className="shrink-0" /> {item.mensaje}
                                       </button>
                                     </td>
-                                    <td className="py-3 px-4 text-[9px] font-black text-slate-500 uppercase">{item.operario}</td>
+                                    {currentUser.rol === 'owner' && <td className="py-3 px-4 text-[9px] font-black text-slate-500 uppercase">{item.operario}</td>}
                                     <td className="py-3 px-4"></td>
                                   </motion.tr>
                                 );
@@ -393,9 +405,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {/* NUEVO MÓDULO DE TABLERO DE KPIs GERENCIALES */}
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* TARJETA 1: Tasa Resolucion */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -415,7 +425,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   </div>
                 </div>
 
-                {/* TARJETA 2: Lead Time */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -433,7 +442,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   </div>
                 </div>
 
-                {/* TARJETA 3: Efectividad 1er Contacto */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -446,14 +454,13 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     <div className="flex items-end gap-2 mb-2">
                       <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.efectividadPrimerContacto}%</span>
                     </div>
-                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-purple-500" style={{width: `${kpiData.efectividadPrimerContacto}%`}}></div>
                     </div>
                     <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">RESUELTOS CON 1 SOLO AVISO</p>
                   </div>
                 </div>
 
-                 {/* TARJETA 4: Tickets Totales */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -471,7 +478,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
-              {/* PARETO TOP OFENSORES */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 mb-6">
                   <BarChart2 size={20} className="text-slate-800"/>
@@ -519,7 +525,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     </div>
                     <button onClick={() => setModalMensaje(null)} className="text-slate-400 hover:text-white transition-colors"><X/></button>
                   </div>
-                  
+        
                   <div className="p-8 space-y-4 max-h-[70vh] overflow-auto bg-slate-50">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -531,6 +537,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                         <p className="font-bold text-sm text-slate-800">{modalMensaje.operario}</p>
                       </div>
                     </div>
+        
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
                         {modalMensaje.tipo?.includes('GERENCIA') ? 'Detalle de la Operación' : 'Asunto Oficial'}
