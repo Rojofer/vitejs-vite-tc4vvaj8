@@ -324,12 +324,31 @@ const App = () => {
       return fCheck < hoyCheck; 
     }) || [];
     const listaOcs = ocsD.length > 0 ? ocsD.map(oc => `- OC ${oc.numero} (${formatoNum(oc.cantidad)} un.)`).join("\n") : "Sin OC Demoradas";
+    
+    // NUEVO MOTOR 5: OCs a Futuro para Adelantar
+    const ocsAdelantar = insumo.detalleOCs?.filter(oc => { 
+      if (ocsIgnoradas.includes(oc.numero)) return false;
+      const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha); 
+      const fCheck = new Date(f); fCheck.setHours(0,0,0,0); 
+      return fCheck >= hoyCheck; // Busca las que NO están demoradas
+    }).sort((a,b) => {
+      const fa = a.fecha?.seconds ? a.fecha.seconds : new Date(a.fecha).getTime()/1000;
+      const fb = b.fecha?.seconds ? b.fecha.seconds : new Date(b.fecha).getTime()/1000;
+      return fa - fb; // Ordena de la más próxima a la más lejana
+    }) || [];
+    
+    const listaOcsAdelantar = ocsAdelantar.length > 0 ? ocsAdelantar.map(oc => {
+      const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha);
+      return `- OC ${oc.numero} (${formatoNum(oc.cantidad)} un.) | Ingreso Pautado: ${f.toLocaleDateString('es-AR')} | Adelantar para: ${fechaQ}`;
+    }).join("\n") : "Sin OCs a futuro para adelantar";
+
     const solpedsD = insumo.detalleSolpeds || [];
     const listaSolpeds = solpedsD.length > 0 ? solpedsD.map(sp => `- S/P ${sp.numero} (${formatoNum(sp.cantidad)} un.)`).join("\n") : "Sin Solicitudes (S/P)";
     
     const procesar = (txt) => {
       if (!txt) return "";
-      return txt.replace(/{nombre}/g, insumo.nombre || "").replace(/{codigo}/g, insumo.codigo || "").replace(/{dias}/g, dias >= 999 ? 'Infinitos' : dias).replace(/{fechaQuiebre}/g, fechaQ).replace(/{ocs}/g, listaOcs).replace(/{solpeds}/g, listaSolpeds);
+      // Agregamos el replace de ocs_a_adelantar
+      return txt.replace(/{nombre}/g, insumo.nombre || "").replace(/{codigo}/g, insumo.codigo || "").replace(/{dias}/g, dias >= 999 ? 'Infinitos' : dias).replace(/{fechaQuiebre}/g, fechaQ).replace(/{ocs}/g, listaOcs).replace(/{solpeds}/g, listaSolpeds).replace(/{ocs_a_adelantar}/g, listaOcsAdelantar);
     };
     return { asunto: procesar(template.asunto || "⚠️ Asunto vacío"), cuerpo: procesar(template.cuerpo || "⚠️ Cuerpo vacío"), destino: template.destino || "compras" };
   };
