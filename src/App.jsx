@@ -825,20 +825,25 @@ const App = () => {
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 p-6 text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                 <AlertTriangle size={32} className="text-slate-400" />
-               </div>
+              </div>
               <h3 className="text-slate-800 font-black text-lg mb-2 uppercase tracking-widest">{dialogoConfirmacion.titulo}</h3>
               <p className="text-slate-500 text-xs font-bold mb-8 px-2">{dialogoConfirmacion.mensaje}</p>
-              <div className="flex flex-col gap-3">
-                {dialogoConfirmacion.textoAlternativo && (
-                  <button onClick={() => { dialogoConfirmacion.onAlternativo(); setDialogoConfirmacion(null); }} className="w-full py-3 rounded-xl font-black text-[11px] uppercase tracking-widest bg-sky-500 text-white hover:bg-sky-600 shadow-md transition-all flex items-center justify-center gap-2">
-                    <Search size={14} /> {dialogoConfirmacion.textoAlternativo}
-                  </button>
-                )}
-                <div className="flex gap-3">
-                <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
-                 <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null);
-                }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>{dialogoConfirmacion.textoConfirmar || 'Aceptar'}</button>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setDialogoConfirmacion(null)} 
+                  className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null); }} 
+                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}
+                >
+                  {dialogoConfirmacion.textoConfirmar || 'Aceptar'}
+                </button>
               </div>
+
             </motion.div>
           </div>
         )}
