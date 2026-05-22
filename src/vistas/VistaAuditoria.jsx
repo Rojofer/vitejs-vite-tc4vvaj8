@@ -3,10 +3,10 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users } from 'lucide-react';
-import { db } from '../firebase'; // Asegurar la importación para el cierre masivo
+import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
-const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo, setDialogoConfirmacion}) => {
+const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo, setDialogoConfirmacion }) => {
     const [filtroMes, setFiltroMes] = useState("TODOS");
     const [filtroTipo, setFiltroTipo] = useState("TODOS"); 
     const [filtroOperario, setFiltroOperario] = useState("TODOS");
@@ -15,13 +15,14 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null);
 
-    // CEREBRO UNIFICADO: Lee el asunto y deduce la etiqueta visual con su número y color
+    // CEREBRO CLASIFICADOR: Deduce la etiqueta visual con su número, texto y color
     const getTipoReclamo = (asunto) => {
       const txt = (asunto || "").toUpperCase();
       if (txt.includes("SOLPED")) return { num: "1", label: "SOLPEDS SIN O/C", style: "bg-sky-50 text-sky-700 border-sky-200" };
       if (txt.includes("AUTORIZAR")) return { num: "2", label: "AUTORIZAR OC", style: "bg-purple-50 text-purple-700 border-purple-200" };
       if (txt.includes("APROBADA DEMORADA")) return { num: "3", label: "O/C DEMORADAS", style: "bg-orange-50 text-orange-700 border-orange-200" };
       if (txt.includes("QUIEBRE")) return { num: "4", label: "RIESGO DE QUIEBRE", style: "bg-red-50 text-red-700 border-red-200" };
+      if (txt.includes("ADELANTAR")) return { num: "5", label: "ADELANTAR OC", style: "bg-teal-50 text-teal-700 border-teal-200" };
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
@@ -52,7 +53,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       validos.forEach(r => {
          conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1;
       });
-      const topOf异 = Object.keys(conteoPorInsumo)
+      const topOfensoresList = Object.keys(conteoPorInsumo)
         .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
         .filter(obj => obj.insumo)
         .sort((a,b) => b.cantidad - a.cantidad)
@@ -67,7 +68,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const totalHilos = hilosUnicos + hilosMultiples;
       const efectividadPrimerContacto = totalHilos > 0 ? Math.round((hilosUnicos / totalHilos) * 100) : 100;
 
-      // Cálculo de rendimiento por operario para la nueva tabla
+      // Rendimiento analítico por Operario Almacén
       const rankingOperarios = {};
       validos.forEach(r => {
         const op = r.operario || "Sin Nombre";
@@ -92,19 +93,18 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return {
         tasaResolucion, reclamosMes: reclamosMes.length, cerradosMes: cerradosMes.length,
         leadTime,
-        topOfensores: topOf异,
+        topOfensores: topOfensoresList,
         efectividadPrimerContacto,
         totalGestionados: validos.length,
         listaOperarios
       };
     }, [reclamos, insumos]);
 
-    // --- FUNCIÓN TÁCTICA: CIERRE MASIVO COMPLETO DE TICKET ---
+    // --- FUNCIÓN LOGÍSTICA: CIERRE MASIVO EN BLOQUE ---
     const ejecutarCierreMasivoEnBloque = async (insumoId) => {
       try {
         const batch = writeBatch(db);
         
-        // 1. Buscamos todas las iteraciones abiertas de este material en Firestore
         const qReclamos = query(
           collection(db, "reclamos"), 
           where("insumoId", "==", insumoId), 
@@ -120,7 +120,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           });
         });
 
-        // 2. Rompemos el candado de ticket en la grilla principal
         batch.update(doc(db, "insumos", insumoId), { ticketReclamo: null });
 
         await batch.commit();
@@ -134,30 +133,30 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
     };
 
-    // --- FUNCIÓN: GENERADOR DE DOSSIER PDF ---
+    // --- GENERADOR DE DOSSIER DE TRAZABILIDAD PDF ---
     const exportarDossierPDF = (hiloActivo) => {
-      const doc = new jsPDF();
+      const docPdf = new jsPDF();
       const insumo = insumos.find(i => i.id === hiloActivo.insumoId) || {};
       const threadItems = hiloActivo.subReclamos ?
         [...hiloActivo.subReclamos].sort((a,b) => (a.fecha?.seconds||0) - (b.fecha?.seconds||0)) : []; 
 
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.text("AUDITORÍA", 14, 20);
+      docPdf.setFontSize(16);
+      docPdf.setFont("helvetica", "bold");
+      docPdf.text("AUDITORÍA", 14, 20);
       
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100);
-      doc.text(`Fecha de emisión: ${new Date().toLocaleString('es-AR')}`, 14, 28); 
+      docPdf.setFontSize(9);
+      docPdf.setFont("helvetica", "normal");
+      docPdf.setTextColor(100);
+      docPdf.text(`Fecha de emisión: ${new Date().toLocaleString('es-AR')}`, 14, 28); 
 
-      doc.setDrawColor(200);
-      doc.setFillColor(248, 250, 252);
-      doc.rect(14, 35, 182, 25, 'FD'); 
+      docPdf.setDrawColor(200);
+      docPdf.setFillColor(248, 250, 252);
+      docPdf.rect(14, 35, 182, 25, 'FD'); 
             
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.text(`CÓDIGO: ${insumo.codigo || 'S/C'}`, 18, 49);
-      doc.text(`MATERIAL: ${insumo.nombre || 'GENERAL'}`, 18, 55);
+      docPdf.setFontSize(11);
+      docPdf.setFont("helvetica", "bold");
+      docPdf.text(`CÓDIGO: ${insumo.codigo || 'S/C'}`, 18, 49);
+      docPdf.text(`MATERIAL: ${insumo.nombre || 'GENERAL'}`, 18, 55);
 
       const tableData = threadItems.map((item) => {
         const tipoReclamoDef = getTipoReclamo(item.mensaje);
@@ -172,7 +171,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         ];
       });
 
-      autoTable(doc, {
+      autoTable(docPdf, {
         startY: 70, 
         head: [['Fecha / Hora', 'Responsable', 'Acción', 'Registro Oficial']],
         body: tableData,
@@ -182,12 +181,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 25 }, 2: { cellWidth: 35 }, 3: { cellWidth: 'auto' } }
       });
 
-      doc.save(`Trazabilidad_${insumo.nombre || 'Auditoria'}.pdf`);
+      docPdf.save(`Trazabilidad_${insumo.nombre || 'Auditoria'}.pdf`);
       setToastMsg("Dossier PDF generado y descargado con éxito.");
       setTimeout(() => setToastMsg(null), 4000);
     };
 
-    // --- DESCARGAR EXCEL INTERNO ---
+    // --- DESCARGAR EXCEL BRUTO ---
     const descargarExcelAuditoria = (filtrados) => {
       let csv = "Fecha,Estado,Tipo,Insumo,Mensaje,Operario\n";
       filtrados.forEach(r => { 
@@ -200,7 +199,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       link.download = `Auditoria_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
     };
 
-    // --- FILTROS Y TABLA ---
+    // --- LÓGICA DE FILTRADO DE LA TABLA PRINCIPAL ---
     let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO");
     const operariosUnicos = useMemo(() => {
       const ops = filtrados.map(r => r.operario).filter(Boolean);
@@ -215,7 +214,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
     const mesesDisponibles = useMemo(() => { 
       const unique = Array.from(new Set(filtrados.map(r => obtenerMesAnio(r.fecha)))); 
-      return unique.sort((a, b) => {
+      return unique.sort((a, b) => { 
         if (a === "Sin Fecha") return 1; if (b === "Sin Fecha") return -1; 
         const [mesA, anioA] = a.split(" "); const [mesB, anioB] = b.split(" "); 
         if (anioA !== anioB) return Number(anioB) - Number(anioA); 
@@ -231,9 +230,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       if (filtroTipo === "TIPO_2") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("AUTORIZAR"));
       if (filtroTipo === "TIPO_3") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("APROBADA DEMORADA"));
       if (filtroTipo === "TIPO_4") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("QUIEBRE"));
+      if (filtroTipo === "TIPO_5") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("ADELANTAR"));
       if (filtroTipo === "OTRO") filtrados = filtrados.filter(r => {
         const txt = (r.mensaje || "").toUpperCase();
-        return !txt.includes("SOLPED") && !txt.includes("AUTORIZAR") && !txt.includes("APROBADA DEMORADA") && !txt.includes("QUIEBRE");
+        return !txt.includes("SOLPED") && !txt.includes("AUTORIZAR") && !txt.includes("APROBADA DEMORADA") && !txt.includes("QUIEBRE") && !txt.includes("ADELANTAR");
       });
     }
 
@@ -305,6 +305,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <option value="TIPO_2">2 - AUTORIZAR OC</option>
                   <option value="TIPO_3">3 - O/C DEMORADAS APROBADAS</option>
                   <option value="TIPO_4">4 - URGENTE: RIESGO DE QUIEBRE</option>
+                  <option value="TIPO_5">5 - ADELANTAR OC</option>
                   <option value="OTRO">0 - Históricos / Otros</option>
                 </select>
 
@@ -462,7 +463,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
             </motion.div>
           )}
 
-          {/* TABLERO DE KPIs GERENCIALES CON RENDIMIENTO DE OPERARIOS */}
+          {/* TABLERO DE KPIs GERENCIALES */}
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -538,7 +539,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
-              {/* BLOQUE DE DISTRIBUCIÓN: PARETO + OPERARIOS */}
+              {/* CONTENEDOR DE DISTRIBUCIÓN ANALÍTICA */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-6">
@@ -572,7 +573,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   )}
                 </div>
 
-                {/* NUEVA TABLA: MONITOR DE RENDIMIENTO DEL EQUIPO */}
+                {/* MONITOR ANALÍTICO POR OPERARIO */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-6">
                     <Users size={20} className="text-slate-800"/>
