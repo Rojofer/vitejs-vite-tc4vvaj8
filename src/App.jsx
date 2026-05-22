@@ -392,11 +392,8 @@ const App = () => {
   };
 
   const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
-    // BLINDAJE: Si no hay destinatarios, usa un array vacío y no se rompe
-    const destinos = reclamoDraft?.destinatarios || [];
-    const correosDirectorio = destinos.map(id => (config?.contactos || []).find(c => c.id === id)?.email).filter(e => e);
-    const correoManual = reclamoDraft?.correoManual ? reclamoDraft.correoManual.trim() : "";
-    
+    const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
+    const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
@@ -409,10 +406,10 @@ const App = () => {
 
     const ejecutarFlujoNuevo = async () => {
       try {
-        // 1. ABRIR GMAIL PRIMERO (Engaña al navegador para que no lo bloquee)
-        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft?.asunto || "")}&body=${encodeURIComponent(reclamoDraft?.cuerpo || "")}`, '_blank');
+        // 1. ANTI-BLOQUEO: Abrir Gmail instantáneamente al hacer clic
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
         
-        // 2. LUEGO GUARDAR EN BD
+        // 2. Guardar en base de datos después
         await procesarGuardadoBD(reclamoDraft);
         
         setReclamoDraft(null);
@@ -425,9 +422,12 @@ const App = () => {
     
     if (modoAccion === 'HILO') {
       try {
-        navigator.clipboard.writeText(reclamoDraft?.cuerpo || "");
-        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft?.ticketBorrador || ""}"`, '_blank');
+        navigator.clipboard.writeText(reclamoDraft.cuerpo);
         
+        // 1. ANTI-BLOQUEO: Abrir Gmail instantáneamente
+        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
+        
+        // 2. Guardar en base de datos después
         await procesarGuardadoBD(reclamoDraft);
         
         setReclamoDraft(null);
@@ -437,7 +437,7 @@ const App = () => {
         console.error("Error en Hilo:", error);
       }
     } else {
-      if (reclamoDraft?.insumo?.ticketReclamo) {
+      if (reclamoDraft.insumo.ticketReclamo) {
         setDialogoConfirmacion({
           titulo: "⚠️ Atención: Reclamo ya iniciado",
           mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar.`,
