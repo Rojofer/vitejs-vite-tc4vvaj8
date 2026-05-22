@@ -214,8 +214,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     }
 
     const mesesDisponibles = useMemo(() => { 
-      const unique = Array.from=new Set(filtrados.map(r => obtenerMesAnio(r.fecha))); 
-      return unique.sort((a, b) => { 
+      const unique = Array.from(new Set(filtrados.map(r => obtenerMesAnio(r.fecha)))); 
+      return unique.sort((a, b) => {
         if (a === "Sin Fecha") return 1; if (b === "Sin Fecha") return -1; 
         const [mesA, anioA] = a.split(" "); const [mesB, anioB] = b.split(" "); 
         if (anioA !== anioB) return Number(anioB) - Number(anioA); 
