@@ -161,10 +161,14 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     if (filtroMes !== "TODOS") filtrados = filtrados.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
     
     if (filtroTipo !== "TODOS") {
-      if (filtroTipo === "RECHAZOS") filtrados = filtrados.filter(r => r.tipo === "RECHAZO GERENCIA");
-      if (filtroTipo === "APROBACIONES") filtrados = filtrados.filter(r => r.tipo === "APROBACION GERENCIA");
-      if (filtroTipo === "ALERTAS") filtrados = filtrados.filter(r => r.tipo === "equipo");
-      if (filtroTipo === "COMPRAS") filtrados = filtrados.filter(r => r.tipo === "compras");
+      if (filtroTipo === "TIPO_1") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("SOLPED"));
+      if (filtroTipo === "TIPO_2") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("AUTORIZAR"));
+      if (filtroTipo === "TIPO_3") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("APROBADA DEMORADA"));
+      if (filtroTipo === "TIPO_4") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("QUIEBRE"));
+      if (filtroTipo === "OTRO") filtrados = filtrados.filter(r => {
+        const txt = (r.mensaje || "").toUpperCase();
+        return !txt.includes("SOLPED") && !txt.includes("AUTORIZAR") && !txt.includes("APROBADA DEMORADA") && !txt.includes("QUIEBRE");
+      });
     }
 
     if (auditoriaTab === 'abiertos') {
@@ -184,7 +188,17 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     if (auditoriaFiltroInsumo) filtrados = filtrados.filter(r => r.insumoId === auditoriaFiltroInsumo);
 
     const hilos = useMemo(() => { const h = []; const m = {}; filtrados.forEach(r => { if (!m[r.insumoId]) { m[r.insumoId] = { ...r, totalReclamos: 1, subReclamos: [r] }; h.push(m[r.insumoId]); } else { m[r.insumoId].totalReclamos += 1; m[r.insumoId].subReclamos.push(r); } }); return h; }, [filtrados]);
-
+    
+    // CEREBRO: Lee el asunto y deduce la etiqueta visual con su número y color
+    const getTipoReclamo = (asunto) => {
+      const txt = (asunto || "").toUpperCase();
+      if (txt.includes("SOLPED")) return { num: "1", label: "SOLPEDS SIN O/C", style: "bg-sky-50 text-sky-700 border-sky-200" };
+      if (txt.includes("AUTORIZAR")) return { num: "2", label: "AUTORIZAR OC", style: "bg-purple-50 text-purple-700 border-purple-200" };
+      if (txt.includes("APROBADA DEMORADA")) return { num: "3", label: "O/C DEMORADAS", style: "bg-orange-50 text-orange-700 border-orange-200" };
+      if (txt.includes("QUIEBRE")) return { num: "4", label: "RIESGO DE QUIEBRE", style: "bg-red-50 text-red-700 border-red-200" };
+      return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
+    };
+    
     return (
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
@@ -219,10 +233,11 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
                 <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
                   <option value="TODOS">Todos los Tipos</option>
-                  <option value="COMPRAS">📦 Reclamos a Compras</option>
-                  <option value="ALERTAS">📢 Alertas Planta</option>
-                  <option value="APROBACIONES">✅ Aprobaciones</option>
-                  <option value="RECHAZOS">🚫 Rechazos</option>
+                  <option value="TIPO_1">1 - SOLPEDS SIN O/C</option>
+                  <option value="TIPO_2">2 - AUTORIZAR OC</option>
+                  <option value="TIPO_3">3 - O/C DEMORADAS APROBADAS</option>
+                  <option value="TIPO_4">4 - URGENTE: RIESGO DE QUIEBRE</option>
+                  <option value="OTRO">0 - Históricos / Otros</option>
                 </select>
 
                 <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
@@ -301,15 +316,15 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               </td>
 
                               <td className="py-4 px-4">
-                                {h.tipo === 'equipo' || h.tipo === 'ALERTA PLANTA' ? (
-                                  <span className="text-[9px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded shadow-sm">ALERTA PLANTA</span>
-                                ) : h.tipo === "APROBACION GERENCIA" ? (
-                                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded shadow-sm flex items-center gap-1 w-max"><CheckSquare size={10}/> APROBACIÓN</span>
-                                ) : h.tipo === "RECHAZO GERENCIA" ? (
-                                  <span className="text-[9px] font-black text-slate-600 bg-slate-100 border border-slate-300 px-2 py-1 rounded shadow-sm flex items-center gap-1 w-max"><X size={10}/> RECHAZO</span>
-                                ) : (
-                                  <span className="text-[9px] font-black text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded flex items-center gap-1 w-max shadow-sm"><AlertCircle size={10}/> RECLAMO COMPRAS</span>
-                                )}
+                                {(() => {
+                                  const tipo = getTipoReclamo(h.mensaje);
+                                  return (
+                                    <span className={`text-[9px] font-black border px-2 py-1 rounded flex items-center gap-1.5 w-max shadow-sm ${tipo.style}`}>
+                                      <span className="bg-white text-current rounded-sm px-1.5 py-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">{tipo.num}</span> 
+                                      {tipo.label}
+                                    </span>
+                                  );
+                                })()}
                               </td>
 
                               <td className="py-4 px-4">
