@@ -124,9 +124,16 @@ const ModalRedactor = ({
     }
 
     if (txt.includes('{solpeds_viejas}')) {
-      const solpedsViejas = (insumo.detalleSolpeds || []).filter(sp => parsearFecha(sp.fecha) < hace10Dias);
+      const solpedsViejas = (insumo.detalleSolpeds || []).filter(sp => {
+        // Prioridad 1: Fecha de creación/solicitud. Prioridad 2: Fecha de liberación.
+        const fechaBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
+        return parsearFecha(fechaBase) < hace10Dias;
+      });
       const str = solpedsViejas.length > 0
-        ? solpedsViejas.map(sp => `- S/P ${sp.numero} (${fmt(sp.cantidad)} un.) | Solicitada: ${formatearFechaCorta(sp.fecha)} | Días demorados: ${calcularDemora(sp.fecha)} | Resp: ${formatearComprador(sp.comprador)}`).join('\n')
+        ? solpedsViejas.map(sp => {
+            const fechaBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
+            return `- S/P ${sp.numero} (${fmt(sp.cantidad)} un.) | Emitida: ${formatearFechaCorta(fechaBase)} | Días en espera: ${calcularDemora(fechaBase)} | Resp: ${formatearComprador(sp.comprador)}`;
+          }).join('\n')
         : "No hay Solicitudes de Pedido con más de 10 días de antigüedad.";
       txt = txt.replace(/{solpeds_viejas}/g, str);
     }
