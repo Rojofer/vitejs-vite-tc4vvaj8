@@ -835,11 +835,9 @@ const App = () => {
                   </button>
                 )}
                 <div className="flex gap-3">
-                  <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
-                  <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>
-                    {dialogoConfirmacion.textoConfirmar || 'Aceptar'}
-                  </button>
-                </div>
+                <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
+                 <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null);
+                }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>{dialogoConfirmacion.textoConfirmar || 'Aceptar'}</button>
               </div>
             </motion.div>
           </div>
