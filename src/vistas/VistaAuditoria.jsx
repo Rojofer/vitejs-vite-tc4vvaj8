@@ -94,11 +94,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       doc.text(`CÓDIGO: ${insumo.codigo || 'S/C'}`, 18, 49);
       doc.text(`MATERIAL: ${insumo.nombre || 'GENERAL'}`, 18, 55);
       
-      const tableData = threadItems.map((item) => {
-        let accion = item.tipo === 'APROBACION FER' ? 'APROBACIÓN' 
-                   : item.tipo === 'RECHAZO FER' ? 'RECHAZO' 
-                   : item.tipo === 'equipo' || item.tipo === 'ALERTA PLANTA' ? 'ALERTA PLANTA' 
-                   : 'RECLAMO A COMPRAS.';
+     const tableData = threadItems.map((item) => {
+        const tipoReclamoDef = getTipoReclamo(item.mensaje);
+        let accion = `[${tipoReclamoDef.num}] ${tipoReclamoDef.label}`;
         let operarioLimpio = (item.operario || "").replace(/➡️/g, '->');
                    
         return [
@@ -352,16 +350,35 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                             </tr>
 
                             <AnimatePresence>
-                              {isExpanded && threadItems.slice(1).map((item, iIdx) => (
-                                <motion.tr key={item.id || iIdx} onClick={() => setActiveInsumo(insumoAsociado)} initial={{ opacity: 0, backgroundColor: "#f8fafc" }} animate={{ opacity: 1, backgroundColor: "#f8fafc" }} exit={{ opacity: 0 }} className="border-b border-slate-100/50 align-middle cursor-pointer">
-                                  <td className="py-3 px-4"></td>
-                                  <td colSpan="2" className="py-3 px-4 text-[9px] font-black text-slate-400 uppercase flex items-center gap-2"><CornerDownRight size={12}/> ITERACIÓN #{threadItems.length - iIdx - 1}</td>
-                                  <td className="py-3 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
-                                  <td colSpan="2" className="py-3 px-4"><button onClick={(e) => { e.stopPropagation(); setModalMensaje(item); }} className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 text-left"><Info size={12} className="shrink-0" /> {item.mensaje}</button></td>
-                                  <td className="py-3 px-4 text-[9px] font-black text-slate-500 uppercase">{item.operario}</td>
-                                  <td className="py-3 px-4"></td>
-                                </motion.tr>
-                              ))}
+                              {isExpanded && threadItems.slice(1).map((item, iIdx) => {
+                                const tipoSub = getTipoReclamo(item.mensaje);
+                                return (
+                                  <motion.tr key={item.id || iIdx} onClick={() => setActiveInsumo(insumoAsociado)} initial={{ opacity: 0, backgroundColor: "#f8fafc" }} animate={{ opacity: 1, backgroundColor: "#f8fafc" }} exit={{ opacity: 0 }} className="border-b border-slate-100/50 align-middle cursor-pointer">
+                                    <td className="py-3 px-4"></td>
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center gap-2">
+                                        <CornerDownRight size={12} className="text-slate-400" />
+                                        <span className="text-[9px] font-black text-slate-400 uppercase">ITERACIÓN #{threadItems.length - iIdx - 1}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
+                                    <td className="py-3 px-4"></td>
+                                    <td className="py-3 px-4">
+                                      <span className={`text-[8px] font-black border px-1.5 py-0.5 rounded flex items-center gap-1 w-max shadow-xs ${tipoSub.style}`}>
+                                        <span className="bg-white text-current rounded-sm px-1 py-0.1 shadow-xs">{tipoSub.num}</span> 
+                                        {tipoSub.label}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <button onClick={(e) => { e.stopPropagation(); setModalMensaje(item); }} className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 transition-colors text-left">
+                                        <Info size={12} className="shrink-0" /> {item.mensaje}
+                                      </button>
+                                    </td>
+                                    <td className="py-3 px-4 text-[9px] font-black text-slate-500 uppercase">{item.operario}</td>
+                                    <td className="py-3 px-4"></td>
+                                  </motion.tr>
+                                );
+                              })}
                             </AnimatePresence>
                           </React.Fragment>
                         );
