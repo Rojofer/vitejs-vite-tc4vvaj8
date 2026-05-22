@@ -371,18 +371,32 @@ const App = () => {
   };
 
   const procesarGuardadoBD = async (draft) => {
-    await addDoc(collection(db, "reclamos"), { 
-      insumoId: draft.insumo.id, operario: currentUser.nombre, mensaje: draft.asunto, 
-      cuerpoOriginal: draft.cuerpo, fecha: serverTimestamp(), estado: "ABIERTO", tipo: draft.tipoDestino 
-    });
-    let updates = {};
-    updates.ticketReclamo = draft.ticketBorrador;
-    await updateDoc(doc(db, "insumos", draft.insumo.id), updates);
+    try {
+      await addDoc(collection(db, "reclamos"), { 
+        insumoId: draft.insumo?.id || "ERROR", 
+        operario: currentUser?.nombre || "Usuario", 
+        mensaje: draft.asunto || "Sin Asunto", 
+        cuerpoOriginal: draft.cuerpo || "", 
+        fecha: serverTimestamp(), 
+        estado: "ABIERTO", 
+        tipo: draft.tipoDestino || "compras" 
+      });
+      if (draft.insumo?.id) {
+        await updateDoc(doc(db, "insumos", draft.insumo.id), { 
+          ticketReclamo: draft.ticketBorrador || null 
+        });
+      }
+    } catch (error) {
+      console.error("Error al guardar en BD:", error);
+    }
   };
 
   const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
-    const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
-    const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
+    // BLINDAJE: Si no hay destinatarios, usa un array vacío y no se rompe
+    const destinos = reclamoDraft?.destinatarios || [];
+    const correosDirectorio = destinos.map(id => (config?.contactos || []).find(c => c.id === id)?.email).filter(e => e);
+    const correoManual = reclamoDraft?.correoManual ? reclamoDraft.correoManual.trim() : "";
+    
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
@@ -395,8 +409,12 @@ const App = () => {
 
     const ejecutarFlujoNuevo = async () => {
       try {
+        // 1. ABRIR GMAIL PRIMERO (Engaña al navegador para que no lo bloquee)
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft?.asunto || "")}&body=${encodeURIComponent(reclamoDraft?.cuerpo || "")}`, '_blank');
+        
+        // 2. LUEGO GUARDAR EN BD
         await procesarGuardadoBD(reclamoDraft);
-        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
+        
         setReclamoDraft(null);
         setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
         setTimeout(() => setToastMsg(null), 4000);
@@ -407,9 +425,11 @@ const App = () => {
     
     if (modoAccion === 'HILO') {
       try {
-        navigator.clipboard.writeText(reclamoDraft.cuerpo);
+        navigator.clipboard.writeText(reclamoDraft?.cuerpo || "");
+        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft?.ticketBorrador || ""}"`, '_blank');
+        
         await procesarGuardadoBD(reclamoDraft);
-        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
+        
         setReclamoDraft(null);
         setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
         setTimeout(() => setToastMsg(null), 5000);
@@ -417,13 +437,15 @@ const App = () => {
         console.error("Error en Hilo:", error);
       }
     } else {
-      if (reclamoDraft.insumo.ticketReclamo) {
+      if (reclamoDraft?.insumo?.ticketReclamo) {
         setDialogoConfirmacion({
           titulo: "⚠️ Atención: Reclamo ya iniciado",
-          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón "CONTINUAR HILO".`,
-          textoConfirmar: "Forzar envío nuevo",
+          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar.`,
+          textoConfirmar: "Forzar Nuevo",
           colorBoton: "bg-red-500 hover:bg-red-600",
-          onConfirm: ejecutarFlujoNuevo
+          onConfirm: ejecutarFlujoNuevo,
+          textoAlternativo: "Continuar Hilo Existente",
+          onAlternativo: () => confirmarYGuardarReclamo('HILO')
         });
       } else {
         ejecutarFlujoNuevo();
@@ -829,21 +851,19 @@ const App = () => {
               <h3 className="text-slate-800 font-black text-lg mb-2 uppercase tracking-widest">{dialogoConfirmacion.titulo}</h3>
               <p className="text-slate-500 text-xs font-bold mb-8 px-2">{dialogoConfirmacion.mensaje}</p>
               
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setDialogoConfirmacion(null)} 
-                  className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null); }} 
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}
-                >
-                  {dialogoConfirmacion.textoConfirmar || 'Aceptar'}
-                </button>
+              <div className="flex flex-col gap-3">
+                {dialogoConfirmacion.textoAlternativo && (
+                  <button onClick={() => { dialogoConfirmacion.onAlternativo(); setDialogoConfirmacion(null); }} className="w-full py-3 rounded-xl font-black text-[11px] uppercase tracking-widest bg-sky-500 text-white hover:bg-sky-600 shadow-md transition-all flex items-center justify-center gap-2">
+                    <Search size={14} /> {dialogoConfirmacion.textoAlternativo}
+                  </button>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
+                  <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>
+                    {dialogoConfirmacion.textoConfirmar || 'Aceptar'}
+                  </button>
+                </div>
               </div>
-
             </motion.div>
           </div>
         )}
