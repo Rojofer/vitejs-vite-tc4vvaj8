@@ -37,8 +37,6 @@ const obtenerMesAnio = (fecha) => {
   } catch (e) { return "Sin Fecha"; }
 };
 
-const formatoNum = (num) => Number(num).toLocaleString('es-AR');
-
 const App = () => {
   const [usuarioLogueado, setUsuarioLogueado] = useState(null);
   const [cargandoAuth, setCargandoAuth] = useState(true);
@@ -65,7 +63,6 @@ const App = () => {
   const [vistaActiva, setVistaActiva] = useState('gestion'); 
   const [notiTabActiva, setNotiTabActiva] = useState('avisos');
   const [auditoriaFiltroInsumo, setAuditoriaFiltroInsumo] = useState(null);
-
   const [reclamoDraft, setReclamoDraft] = useState(null); 
   const [toastMsg, setToastMsg] = useState(null);
   const [dialogoConfirmacion, setDialogoConfirmacion] = useState(null);
@@ -112,8 +109,7 @@ const App = () => {
           const bgActive = col==='emerald'?'bg-emerald-500':col==='purple'?'bg-purple-500':col==='blue'?'bg-blue-500':col==='pink'?'bg-pink-500':col==='amber'?'bg-amber-500':col==='indigo'?'bg-indigo-500':'bg-slate-500';
           const isAct = filtroResponsable === ownerAlias;
           return (
-            <button key={ownerAlias} onClick={() => setFiltroResponsable(ownerAlias)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-1.5 ${isAct ?
-              `${bgActive} text-white shadow-md` : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}>
+            <button key={ownerAlias} onClick={() => setFiltroResponsable(ownerAlias)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-1.5 ${isAct ? `${bgActive} text-white shadow-md` : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}>
               {!isAct && <span className={`w-2 h-2 rounded-full ${bgActive}`}></span>}
               {ownerAlias}
             </button>
@@ -151,7 +147,6 @@ const App = () => {
     if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", etiquetaRol: "ESPECTADOR", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
     const emailLogueado = usuarioLogueado.email.toLowerCase();
 
-    // 1. EL ÚNICO OWNER VIP: Fernando
     if (emailLogueado === 'fernandocomex1@gmail.com') {
       return { id: 'owner_real', email: emailLogueado, nombre: "Fernando", rol: "owner", etiquetaRol: "OWNER VIP", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true, accesoAjustes: true };
     }
@@ -288,7 +283,6 @@ const App = () => {
   }, [insumos]);
 
   const guardarConfigEnFirebase = async (nuevaConfig) => { setConfig(nuevaConfig); await setDoc(doc(db, "config", "general"), nuevaConfig); };
-
   const toggleFavorito = async (insumo) => { await updateDoc(doc(db, "insumos", insumo.id), { esFavorito: !insumo.favorito }); };
 
   const calcularFechaQuiebre = (dias) => {
@@ -328,7 +322,6 @@ const App = () => {
     }) || [];
     const listaOcs = ocsD.length > 0 ? ocsD.map(oc => `- OC ${oc.numero} (${formatoNum(oc.cantidad)} un.)`).join("\n") : "Sin OC Demoradas";
     
-    // MOTOR 5: OCs a Futuro para Adelantar
     const ocsAdelantar = insumo.detalleOCs?.filter(oc => { 
       if (ocsIgnoradas.includes(oc.numero)) return false;
       const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha); 
@@ -497,9 +490,8 @@ const App = () => {
   const grupos = [...new Set(insumosVivos.map(item => item.grupo || 'SIN CLASIFICAR'))].sort((a, b) => a.localeCompare(b));
   const reclamosActivos = activeInsumo ? reclamos.filter(r => r.insumoId === activeInsumo.id) : [];
 
-  // --- FILTROS DE ALERTAS BLINDADOS (Array) ---
+  // --- ARQUITECTURA DE FILTRADO UNIFICADA ---
   let datosAlerta = []; let tituloAlerta = "";
-  const uCriticoApp = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
   const uUrgenciaApp = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
   
   const hoy = new Date();
@@ -516,17 +508,17 @@ const App = () => {
     return new Date(fRaw);
   };
 
-  if (filtroAlerta === 'quiebres') { 
-      datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uCriticoApp); 
-      tituloAlerta = "Quiebres Confirmados"; 
+  if (filtroAlerta === 'favoritos') { 
+      datosAlerta = insumosVivos.filter(i => i.favorito); 
+      tituloAlerta = "Todos los Favoritos"; 
   } 
   else if (filtroAlerta === 'riesgo') { 
       datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp); 
-      tituloAlerta = "Favoritos en Riesgo"; 
+      tituloAlerta = "Insumos en Riesgo Crítico"; 
   } 
   else if (filtroAlerta === 'ocs') { 
       datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); 
-      tituloAlerta = "OC Demoradas"; 
+      tituloAlerta = "Órdenes de Compra Demoradas"; 
   } 
   else if (filtroAlerta === 'solpeds_viejas') {
       datosAlerta = insumosVivos.filter(ins => 
@@ -536,18 +528,19 @@ const App = () => {
           return parsearFechaApp(fechaBase) < hace10DiasApp;
         })
       );
-      tituloAlerta = "SOLPEDS s/ OC (+10 Días)";
+      tituloAlerta = "SOLPEDS Emitidas s/ OC (+10 Días)";
   }
-  else if (filtroAlerta === 'mis_favoritos') { 
-      datosAlerta = insumosVivos.filter(i => i.favorito); 
-      tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; 
+  else if (filtroAlerta === 'tickets_abiertos') {
+      const insumosConTicket = [...new Set(reclamos.filter(r => r.estado === 'ABIERTO').map(r => r.insumoId))];
+      datosAlerta = insumosVivos.filter(i => insumosConTicket.includes(i.id));
+      tituloAlerta = "Insumos con Reclamos Activos";
   }
   else if (filtroAlerta === 'todos') { 
       datosAlerta = insumosVivos; 
       tituloAlerta = "Inventario Completo"; 
   }
   
-  if (currentUser.rol !== 'owner') {
+  if (currentUser.rol !== 'owner' && filtroAlerta) {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
   }
 
@@ -594,8 +587,6 @@ const App = () => {
 
       <div className="flex-1 flex flex-col h-full min-w-0 relative">
         <header className="h-20 flex items-center justify-between px-8 shrink-0 z-10 bg-white border-b border-slate-200 shadow-sm w-full">
-          
-          {/* POLO IZQUIERDO: TÍTULOS DINÁMICOS */}
           <div className="flex items-center gap-3 shrink-0 min-w-[200px]">
             {vistaActiva === 'gestion' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Brain size={20} className="text-orange-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden lg:block">Gestión de Insumos</h1></>}
             {vistaActiva === 'auditoria' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><History size={20} className="text-sky-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden lg:block">Auditoría de Reclamos</h1></>}
@@ -603,7 +594,6 @@ const App = () => {
             {vistaActiva === 'notificaciones' && <><div className="p-2 bg-slate-800 rounded-lg shadow-sm"><Bell size={20} className="text-yellow-500" /></div><h1 className="text-xl font-black text-slate-800 uppercase tracking-tight hidden lg:block">Notificaciones</h1></>}
           </div>
 
-          {/* CENTRO: BUSCADOR GLOBAL MÁGICO */}
           <div className="flex-1 max-w-xl mx-6 hidden md:block">
             <div className="relative group">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
@@ -620,21 +610,17 @@ const App = () => {
                 className="w-full pl-12 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-50 transition-all placeholder:text-slate-400 uppercase shadow-inner"
               />
               {searchTerm && (
-                <button 
-                  onClick={() => setSearchTerm("")} 
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 bg-slate-200/50 hover:bg-slate-200 p-1.5 rounded-lg transition-colors"
-                >
+                <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 bg-slate-200/50 hover:bg-slate-200 p-1.5 rounded-lg transition-colors">
                   <X size={14} />
                 </button>
               )}
             </div>
           </div>
 
-          {/* POLO DERECHO: RELOJ Y PERFIL DE USUARIO */}
           <div className="flex items-center justify-end gap-4 pl-6 border-l border-slate-200 shrink-0">
             <div className="mr-4 text-right hidden lg:block">
               <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> ACTUALIZADO </p>
-              <p className="text-xs font-bold text-slate-600">{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
+              <p className="text-xs font-bold text-slate-600">{ultimaAct ? obtenerMesAnio(ultimaAct) : 'Esperando Script...'}</p>
             </div>
             
             {realUser.rol === 'owner' && currentUser.id !== realUser.id ? (
@@ -658,14 +644,8 @@ const App = () => {
               </div>
             )}
             
-            <button 
-              onClick={() => signOut(auth)} 
-              className="ml-4 px-3 py-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors"
-            >
-              Salir
-            </button>
+            <button onClick={() => signOut(auth)} className="ml-4 px-3 py-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors">Salir</button>
           </div>
-
         </header>
 
         <main className="flex-1 overflow-auto relative bg-[#F8FAFC]">
@@ -686,57 +666,15 @@ const App = () => {
           )}
           {vistaActiva === 'notificaciones' && (
              <VistaNotificaciones 
-              currentUser={currentUser}
-              insumos={insumos}
-              reclamos={reclamos}
-              notiTabActiva={notiTabActiva}
-              setNotiTabActiva={setNotiTabActiva}
-              formatearFecha={formatearFecha}
-              setActiveInsumo={setActiveInsumo}
-              contactos={config?.contactos || []}
-              setToastMsg={setToastMsg}
+              currentUser={currentUser} insumos={insumos} reclamos={reclamos} notiTabActiva={notiTabActiva} setNotiTabActiva={setNotiTabActiva} formatearFecha={formatearFecha} setActiveInsumo={setActiveInsumo} contactos={config?.contactos || []} setToastMsg={setToastMsg}
             />
           )}
-
           {vistaActiva === 'archivados' && (
-            <VistaArchivados 
-              insumos={insumos}
-              currentUser={currentUser}
-              setToastMsg={setToastMsg}
-              setDialogoConfirmacion={setDialogoConfirmacion}
-            />
+            <VistaArchivados insumos={insumos} currentUser={currentUser} setToastMsg={setToastMsg} setDialogoConfirmacion={setDialogoConfirmacion} />
           )}
-          
-           {vistaActiva === 'gestion' && (
+          {vistaActiva === 'gestion' && (
             <VistaGestion 
-              currentUser={currentUser}
-              insumos={insumosVivos}
-              reclamos={reclamos}
-              config={config}
-              searchTerm={searchTerm}
-              resultadosBusqueda={resultadosBusqueda}
-              filtroAlerta={filtroAlerta}
-              setFiltroAlerta={setFiltroAlerta}
-              datosAlerta={datosAlerta}
-              tituloAlerta={tituloAlerta}
-              selectedGroup={selectedGroup}
-              setSelectedGroup={setSelectedGroup}
-              grupos={grupos}
-              filtroResponsable={filtroResponsable}
-              filtroVistaLista={filtroVistaLista}
-              setFiltroVistaLista={setFiltroVistaLista}
-              filtroRiesgoGrupo={filtroRiesgoGrupo}
-              setFiltroRiesgoGrupo={setFiltroRiesgoGrupo}
-              setActiveInsumo={setActiveInsumo}
-              toggleFavorito={toggleFavorito}
-              obtenerColorOwner={obtenerColorOwner}
-              renderRadarDinamico={renderRadarDinamico}
-              setSimulatedId={setSimulatedId}
-              perfilesSimulables={perfilesSimulables}
-              archivarInsumo={archivarInsumo}
-              cerrarReclamoManual={cerrarReclamoManual}
-              setDialogoConfirmacion={setDialogoConfirmacion}
-              setVistaActiva={setVistaActiva}
+              currentUser={currentUser} insumos={insumosVivos} reclamos={reclamos} config={config} searchTerm={searchTerm} resultadosBusqueda={resultadosBusqueda} filtroAlerta={filtroAlerta} setFiltroAlerta={setFiltroAlerta} datosAlerta={datosAlerta} tituloAlerta={tituloAlerta} selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} grupos={grupos} filtroResponsable={filtroResponsable} filtroVistaLista={filtroVistaLista} setFiltroVistaLista={setFiltroVistaLista} filtroRiesgoGrupo={filtroRiesgoGrupo} setFiltroRiesgoGrupo={setFiltroRiesgoGrupo} setActiveInsumo={setActiveInsumo} toggleFavorito={toggleFavorito} obtenerColorOwner={obtenerColorOwner} renderRadarDinamico={renderRadarDinamico} setSimulatedId={setSimulatedId} perfilesSimulables={perfilesSimulables} archivarInsumo={archivarInsumo} cerrarReclamoManual={cerrarReclamoManual} setDialogoConfirmacion={setDialogoConfirmacion} setVistaActiva={setVistaActiva}
             />
           )}
         </main>
@@ -744,19 +682,7 @@ const App = () => {
 
       <AnimatePresence>
        {activeInsumo && (
-          <PanelDetalle 
-            activeInsumo={activeInsumo}
-            setActiveInsumo={setActiveInsumo}
-            currentUser={currentUser}
-            config={config}
-            toggleFavorito={toggleFavorito}
-            formatearFecha={formatearFecha}
-            reclamosActivos={reclamosActivos}
-            abrirRedactorReclamo={abrirRedactorReclamo}
-            obtenerColorOwner={obtenerColorOwner}
-            archivarInsumo={archivarInsumo}
-            guardarNotaInterna={guardarNotaInterna}
-          />
+          <PanelDetalle activeInsumo={activeInsumo} setActiveInsumo={setActiveInsumo} currentUser={currentUser} config={config} toggleFavorito={toggleFavorito} formatearFecha={formatearFecha} reclamosActivos={reclamosActivos} abrirRedactorReclamo={abrirRedactorReclamo} obtenerColorOwner={obtenerColorOwner} archivarInsumo={archivarInsumo} guardarNotaInterna={guardarNotaInterna} />
         )}
       </AnimatePresence>
 
@@ -765,116 +691,24 @@ const App = () => {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
             <motion.div initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 flex flex-col">
               <div className="bg-slate-900 p-6 text-center relative">
-                <div className="w-16 h-16 bg-sky-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Mail size={32} className="text-sky-400" />
-                </div>
+                <div className="w-16 h-16 bg-sky-500/20 rounded-full flex items-center justify-center mx-auto mb-3"><Mail size={32} className="text-sky-400" /></div>
                 <h3 className="text-white font-black uppercase tracking-widest text-lg">Modo Hilo Activado</h3>
-                <p className="text-slate-400 text-xs font-bold mt-1">El texto ya fue copiado al portapapeles</p>
               </div>
-              
-              <div className="p-6 bg-slate-50">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Pasos a seguir en Gmail:</p>
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 text-xs font-bold text-slate-600 space-y-3 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">1</span> 
-                    <p>Se abrirá Gmail buscando el <span className="text-orange-500 font-black">ticket anterior</span>.</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">2</span> 
-                    <p>Abrí ese correo viejo.</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">3</span> 
-                    <p>Tocá la flecha de <span className="text-sky-600 font-black">Responder</span>.</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="bg-slate-100 text-slate-800 rounded-full w-6 h-6 flex items-center justify-center shrink-0 font-black text-[10px]">4</span> 
-                    <p>Presioná <span className="bg-slate-800 text-white px-1.5 py-0.5 rounded uppercase font-black text-[9px]">Ctrl + V</span> para pegar el reclamo.</p>
-                  </div>
-                </div>
-              </div>
-              
               <div className="p-5 bg-white border-t border-slate-100 flex gap-3">
-                <button 
-                  onClick={() => { 
-                    setAlertaHilo(null);
-                    setToastMsg("Envío pausado. Podés enviarlo manualmente luego."); 
-                    setTimeout(()=>setToastMsg(null),4000);
-                  }} 
-                  className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-all"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={async () => { 
-                    await procesarGuardadoBD(alertaHilo.reclamoData);
-                    window.open(alertaHilo.url, '_blank'); 
-                    setAlertaHilo(null); 
-                    setReclamoDraft(null); 
-                    setToastMsg("✅ Reclamo sumado al hilo y registrado en auditoría.");
-                    setTimeout(() => setToastMsg(null), 4000);
-                  }} 
-                  className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-sky-500 text-white hover:bg-sky-600 shadow-[0_5px_15px_rgba(14,165,233,0.3)] transition-all active:scale-95"
-                >
-                  Entendido, Abrir Gmail <ChevronRight size={14}/>
-                </button>
+                <button onClick={() => setAlertaHilo(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
+                <button onClick={async () => { await procesarGuardadoBD(alertaHilo.reclamoData); window.open(alertaHilo.url, '_blank'); setAlertaHilo(null); setReclamoDraft(null); setToastMsg("✅ Reclamo sumado al hilo."); setTimeout(() => setToastMsg(null), 4000); }} className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-sky-500 text-white hover:bg-sky-600 shadow-md transition-all">Entendido, Abrir Gmail <ChevronRight size={14}/></button>
                </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {reclamoDraft && (
-          <ModalRedactor 
-            reclamoDraft={reclamoDraft}
-            setReclamoDraft={setReclamoDraft}
-            config={config}
-            currentUser={currentUser}
-            getPlantillasDinamicas={getPlantillasDinamicas}
-            aplicarPlantilla={aplicarPlantilla}
-            confirmarYGuardarReclamo={confirmarYGuardarReclamo}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showSettings && (
+      {reclamoDraft && <ModalRedactor reclamoDraft={reclamoDraft} setReclamoDraft={setReclamoDraft} config={config} currentUser={currentUser} getPlantillasDinamicas={getPlantillasDinamicas} aplicarPlantilla={aplicarPlantilla} confirmarYGuardarReclamo={confirmarYGuardarReclamo} />}
+      {showSettings && (
           <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8">
-            <PanelAjustes 
-              configInicial={config} 
-              onClose={() => setShowSettings(false)} 
-              onGuardar={(nuevaConfig) => {
-                guardarConfigEnFirebase(nuevaConfig);
-                setToastMsg("✅ Ajustes guardados en la nube exitosamente.");
-                setTimeout(() => setToastMsg(null), 3000);
-              }}
-              onExportar={exportarBackupDB}
-              onImportar={importarBackupDB}
-            />
+            <PanelAjustes configInicial={config} onClose={() => setShowSettings(false)} onGuardar={(nuevaConfig) => { guardarConfigEnFirebase(nuevaConfig); setToastMsg("✅ Ajustes guardados."); setTimeout(() => setToastMsg(null), 3000); }} onExportar={exportarBackupDB} onImportar={importarBackupDB} />
           </div>
-        )}
-      </AnimatePresence>
-      
-      <AnimatePresence>
-        {dialogoConfirmacion && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 p-6 text-center">
-              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                <AlertTriangle size={32} className="text-slate-400" />
-              </div>
-              <h3 className="text-slate-800 font-black text-lg mb-2 uppercase tracking-widest">{dialogoConfirmacion.titulo}</h3>
-              <p className="text-slate-500 text-xs font-bold mb-8 px-2">{dialogoConfirmacion.mensaje}</p>
-              <div className="flex gap-3">
-                <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
-                <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null);
-                }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>{dialogoConfirmacion.textoConfirmar || 'Aceptar'}</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-      
+      )}
     </div>
   );
 };
