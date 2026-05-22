@@ -34,6 +34,41 @@ const VistaGestion = ({
   setVistaActiva,
   archivarInsumo
 }) => {
+  // LÓGICA DE CÁLCULO LOCAL PARA LOS BOTONES Y TARJETAS
+  const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
+  
+  const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
+  const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
+
+  const kpiQuiebres = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uCritico);
+  const kpiFavRiesgo = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia);
+  const kpiDemoras = misInsumosDashboard.filter(i => i.ocDemorada > 0);
+  
+  const hace10DiasLocal = new Date();
+  hace10DiasLocal.setDate(new Date().getDate() - 10);
+  
+  const parsearFechaLocal = (fRaw) => {
+    if (!fRaw) return new Date(2100, 1, 1);
+    if (fRaw.seconds) return new Date(fRaw.seconds * 1000);
+    if (typeof fRaw === 'string' && fRaw.includes('/')) {
+      const p = fRaw.split('/');
+      if (p.length === 3) return new Date(p[2], p[1]-1, p[0]);
+    }
+    return new Date(fRaw);
+  };
+  
+  const kpiSolpeds = misInsumosDashboard.filter(ins => 
+    (ins.detalleSolpeds || []).some(sp => {
+      const fechaBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
+      if (!fechaBase) return false;
+      return parsearFechaLocal(fechaBase) < hace10DiasLocal;
+    })
+  );
+  
+  const misInsumosIds = misInsumosDashboard.map(i => i.id);
+  const kpiReclamosAbiertos = (reclamos || []).filter(r => r.estado === 'ABIERTO' && r.tipo !== 'AVISO GERENCIA' && misInsumosIds.includes(r.insumoId));
+  const total = misInsumosDashboard.length || 1;
+
   return (
     <div className="p-4 md:p-6 h-full max-w-full">
       
@@ -42,7 +77,6 @@ const VistaGestion = ({
         
         {/* BARRA DE SALUD OPERATIVA (HEADER) CON MINI-KPIS */}
         {(() => {
-          const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
           const totalProductos = misInsumosDashboard.length;
           const totalFavs = misInsumosDashboard.filter(i => i.favorito).length;
           
@@ -51,7 +85,6 @@ const VistaGestion = ({
           
           let gruposSanos = totalGrupos;
           let tieneFantasmas = false;
-          
           if (currentUser.rol === 'owner') {
             const gruposConFantasmas = gruposDelUsuario.filter(g => {
               return misInsumosDashboard.some(i => (i.grupo || 'SIN CLASIFICAR') === g && (!i.owner || i.owner.trim() === '' || i.owner.toUpperCase().trim() === 'SIN ASIGNAR'));
@@ -60,23 +93,21 @@ const VistaGestion = ({
             tieneFantasmas = gruposConFantasmas.length > 0;
           }
 
-          const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
-          const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
-
           if (totalFavs === 0) return null;
-          
           const quiebres = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uCritico).length;
           const riesgos = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia && i.supervivencia > uCritico).length;
           const sanos = Math.max(0, totalFavs - quiebres - riesgos);
           const score = totalFavs > 0 ? Math.round((sanos / totalFavs) * 100) : 100;
 
-          let colorClass = "bg-emerald-500"; let bgClass = "bg-emerald-50"; let borderClass = "border-emerald-200"; let textClass = "text-emerald-700";
+          let colorClass = "bg-emerald-500"; let bgClass = "bg-emerald-50"; let borderClass = "border-emerald-200";
+          let textClass = "text-emerald-700";
           let msj = currentUser.rol === 'owner' ? "Operación global impecable." : "Cobertura total de tus FAVORITOS.";
-          
           if (score < 100 && score >= 80) {
-            colorClass = "bg-amber-500"; bgClass = "bg-amber-50"; borderClass = "border-amber-200"; textClass = "text-amber-700"; msj = "Frentes que requieren atención.";
+            colorClass = "bg-amber-500";
+            bgClass = "bg-amber-50"; borderClass = "border-amber-200"; textClass = "text-amber-700"; msj = "Frentes que requieren atención.";
           } else if (score < 80) {
-            colorClass = "bg-red-500"; bgClass = "bg-red-50"; borderClass = "border-red-200"; textClass = "text-red-700"; msj = "Riesgo de quiebres inminentes.";
+            colorClass = "bg-red-500";
+            bgClass = "bg-red-50"; borderClass = "border-red-200"; textClass = "text-red-700"; msj = "Riesgo de quiebres inminentes.";
           }
 
           return (
@@ -87,7 +118,8 @@ const VistaGestion = ({
                 <div onClick={() => setFiltroAlerta('todos')} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center shadow-sm min-w-[320px] hover:shadow-md transition-shadow shrink-0 cursor-pointer group">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumen de Inventario</h3>
-                    <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${tieneFantasmas ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-100 shadow-sm'}`}>
+                    <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${tieneFantasmas ? 
+                      'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-100 shadow-sm'}`}>
                       Grupos: {gruposSanos}/{totalGrupos}
                     </div>
                   </div>
@@ -136,11 +168,11 @@ const VistaGestion = ({
                 </div>
                 
                 <div className={`hidden sm:flex flex-col gap-1.5 shrink-0 border-l pl-4 relative z-10 ${borderClass}`}>
-                 <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-sm bg-emerald-500 shadow-sm"></div>
                       <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{sanos}</strong> Sanos</span>
                    </div>
-                  <div className="flex items-center gap-2">
+                   <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-sm bg-amber-500 shadow-sm"></div>
                       <span className={`text-[9px] font-bold uppercase tracking-widest ${textClass}`}><strong className="font-black">{riesgos}</strong> Riesgo</span>
                    </div>
@@ -163,7 +195,6 @@ const VistaGestion = ({
               <h2 className="text-xl font-black uppercase tracking-tight">Resultados: {searchTerm}</h2>
               {renderRadarDinamico(resultadosBusqueda.filter(i => currentUser.rol === 'owner' || i.owner?.toUpperCase().trim() === currentUser.aliasMatch))}
             </div>
-        
             <TablaInsumos 
               datos={resultadosBusqueda.filter(i => currentUser.rol === 'owner' ? (filtroResponsable === 'TODOS' ? true : i.owner?.toUpperCase().trim() === filtroResponsable) : i.owner?.toUpperCase().trim() === currentUser.aliasMatch)} 
               config={config} 
@@ -225,85 +256,113 @@ const VistaGestion = ({
         ) : !selectedGroup ? (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             
-            {/* GRILLA DE KPIS - 5 COLUMNAS SIMÉTRICAS */}
+            {/* BOTONERA TÁCTICA DE ALERTAS (NUEVO DISEÑO 4 BOTONES) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <button 
+                onClick={() => setFiltroAlerta('quiebres')}
+                className={`p-4 rounded-2xl border text-left transition-all bg-white border-slate-100 text-slate-600 hover:border-red-200 group hover:shadow-md`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <AlertTriangle size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full bg-red-50 text-red-600`}>{kpiQuiebres.length}</span>
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Quiebres</p>
+                <p className="text-xs font-black mt-0.5 text-slate-800">Confirmados</p>
+              </button>
+
+              <button 
+                onClick={() => setFiltroAlerta('riesgo')}
+                className={`p-4 rounded-2xl border text-left transition-all bg-white border-slate-100 text-slate-600 hover:border-amber-200 group hover:shadow-md`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <Activity size={18} className="text-amber-500 group-hover:scale-110 transition-transform" />
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-600`}>{kpiFavRiesgo.length}</span>
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">En Riesgo</p>
+                <p className="text-xs font-black mt-0.5 text-slate-800">Stock Crítico</p>
+              </button>
+
+              <button 
+                onClick={() => setFiltroAlerta('ocs')}
+                className={`p-4 rounded-2xl border text-left transition-all bg-white border-slate-100 text-slate-600 hover:border-orange-200 group hover:shadow-md`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <Clock size={18} className="text-orange-500 group-hover:scale-110 transition-transform" />
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-600`}>{kpiDemoras.length}</span>
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">OC Demoradas</p>
+                <p className="text-xs font-black mt-0.5 text-slate-800">Aprobadas s/ Recibir</p>
+              </button>
+
+              <button 
+                onClick={() => setFiltroAlerta('solpeds_viejas')}
+                className={`p-4 rounded-2xl border text-left transition-all bg-white border-slate-100 text-slate-600 hover:border-indigo-200 group hover:shadow-md`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <MessageSquare size={18} className="text-indigo-500 group-hover:scale-110 transition-transform" />
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600`}>{kpiSolpeds.length}</span>
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Solpeds s/ OC</p>
+                <p className="text-xs font-black mt-0.5 text-slate-800">Dormidas +10 Días</p>
+              </button>
+            </div>
+
+            {/* GRILLA DE KPIS DASHBOARD - 5 COLUMNAS SIMÉTRICAS */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
-              {(() => {
-                const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
-                
-                const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
-                const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
+              <div onClick={() => setFiltroAlerta('quiebres')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-red-200 transition-all duration-300 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] sm:text-[11px] font-black text-red-500 uppercase tracking-widest leading-tight">Quiebres</span>
+                  <div className="p-2 bg-red-50 rounded-xl"><AlertTriangle size={16} className="text-red-500"/></div>
+                </div>
+                <div className="flex items-end justify-between">
+                  <p className="text-3xl font-black text-slate-800 leading-none">{kpiQuiebres.length}</p>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
+                </div>
+              </div>
 
-                const kpiQuiebres = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uCritico);
-                const kpiFavRiesgo = misInsumosDashboard.filter(i => i.favorito && i.supervivencia <= uUrgencia && i.supervivencia > uCritico);
-                const kpiDemoras = misInsumosDashboard.filter(i => i.ocDemorada > 0);
-                const kpiMisFavoritos = misInsumosDashboard.filter(i => i.favorito);
-                
-                // NUEVO KPI: Calculamos los reclamos ABIERTOS que corresponden a los insumos de este usuario
-                const misInsumosIds = misInsumosDashboard.map(i => i.id);
-                const kpiReclamosAbiertos = (reclamos || []).filter(r => r.estado === 'ABIERTO' && r.tipo !== 'AVISO GERENCIA' && misInsumosIds.includes(r.insumoId));
-                const total = misInsumosDashboard.length || 1;
+              <div onClick={() => setFiltroAlerta('riesgo')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-orange-200 transition-all duration-300 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] sm:text-[11px] font-black text-orange-500 uppercase tracking-widest leading-tight">En Riesgo</span>
+                  <div className="p-2 bg-orange-50 rounded-xl"><Activity size={16} className="text-orange-500"/></div>
+                </div>
+                <div className="flex items-end justify-between">
+                  <p className="text-3xl font-black text-slate-800 leading-none">{kpiFavRiesgo.length}</p>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
+                </div>
+              </div>
 
-                return (
-                  <>
-                    <div onClick={() => setFiltroAlerta('quiebres')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-red-200 transition-all duration-300 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] sm:text-[11px] font-black text-red-500 uppercase tracking-widest leading-tight">Sin Stock</span>
-                        <div className="p-2 bg-red-50 rounded-xl"><AlertTriangle size={16} className="text-red-500"/></div>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiQuiebres.length}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
-                      </div>
-                    </div>
-  
-                    <div onClick={() => setFiltroAlerta('favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-orange-200 transition-all duration-300 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] sm:text-[11px] font-black text-orange-500 uppercase tracking-widest leading-tight">En Riesgo</span>
-                        <div className="p-2 bg-orange-50 rounded-xl"><Activity size={16} className="text-orange-500"/></div>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiFavRiesgo.length}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
-                      </div>
-                    </div>
+              <div onClick={() => setFiltroAlerta('ocs')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-rose-200 transition-all duration-300 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] sm:text-[11px] font-black text-rose-500 uppercase tracking-widest leading-tight">Demoradas</span>
+                  <div className="p-2 bg-rose-50 rounded-xl"><Clock size={16} className="text-rose-500"/></div>
+                </div>
+                <div className="flex items-end justify-between">
+                  <p className="text-3xl font-black text-slate-800 leading-none">{kpiDemoras.length}</p>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
+                </div>
+              </div>
 
-                    <div onClick={() => setFiltroAlerta('oc_tardia')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-rose-200 transition-all duration-300 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] sm:text-[11px] font-black text-rose-500 uppercase tracking-widest leading-tight">Demoradas</span>
-                        <div className="p-2 bg-rose-50 rounded-xl"><Clock size={16} className="text-rose-500"/></div>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiDemoras.length}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
-                      </div>
-                    </div>
+              <div onClick={() => setFiltroAlerta('solpeds_viejas')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-indigo-200 transition-all duration-300 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] sm:text-[11px] font-black text-indigo-500 uppercase tracking-widest leading-tight">Solpeds s/ OC</span>
+                  <div className="p-2 bg-indigo-50 rounded-xl"><MessageSquare size={16} className="text-indigo-500"/></div>
+                </div>
+                <div className="flex items-end justify-between">
+                  <p className="text-3xl font-black text-slate-800 leading-none">{kpiSolpeds.length}</p>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
+                </div>
+              </div>
 
-                    <div onClick={() => setFiltroAlerta('mis_favoritos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-yellow-200 transition-all duration-300 flex flex-col justify-between">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] sm:text-[11px] font-black text-yellow-500 uppercase tracking-widest leading-tight">Favoritos</span>
-                        <div className="p-2 bg-yellow-50 rounded-xl"><Star size={16} className="text-yellow-500"/></div>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiMisFavoritos.length}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">De {total}</span>
-                      </div>
-                    </div>
-
-                    {/* NUEVA TARJETA: TICKETS ABIERTOS */}
-                    <div onClick={() => setVistaActiva('auditoria')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-blue-300 transition-all duration-300 flex flex-col justify-between group">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] sm:text-[11px] font-black text-blue-500 uppercase tracking-widest leading-tight">Tickets Abiertos</span>
-                        <div className="p-2 bg-blue-50 rounded-xl"><MessageSquare size={16} className="text-blue-500"/></div>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiReclamosAbiertos.length}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Activos</span>
-                      </div>
-                    </div>
-                    
-                  </>
-                );
-              })()}
+              <div onClick={() => setVistaActiva('auditoria')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-blue-300 transition-all duration-300 flex flex-col justify-between group">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] sm:text-[11px] font-black text-blue-500 uppercase tracking-widest leading-tight">Tickets Abiertos</span>
+                  <div className="p-2 bg-blue-50 rounded-xl"><MessageSquare size={16} className="text-blue-500"/></div>
+                </div>
+                <div className="flex items-end justify-between">
+                  <p className="text-3xl font-black text-slate-800 leading-none">{kpiReclamosAbiertos.length}</p>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Activos</span>
+                </div>
+              </div>
             </div>
                         
             {/* DETALLE DE SALUD POR OPERARIO (SOLO ADMIN) - LIMPIADO */}
@@ -333,7 +392,7 @@ const VistaGestion = ({
                   <h3 className="text-[10px] font-black uppercase tracking-widest mb-3 text-slate-400">Radiografía Táctica del Equipo</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 w-full">
                     {operariosStats.map(op => {
-                      const cStyle = obtenerColorOwner(op.nombre);
+                       const cStyle = obtenerColorOwner(op.nombre);
                       let opColorBar = "bg-emerald-500";
                       if (op.score < 100 && op.score >= 80) opColorBar = "bg-amber-500";
                       else if (op.score < 80) opColorBar = "bg-red-500";
@@ -345,7 +404,7 @@ const VistaGestion = ({
                           key={op.nombre} 
                           onClick={() => {
                             if (perfilDestino && typeof setSimulatedId === 'function') {
-                              setSimulatedId(perfilDestino.id);
+                               setSimulatedId(perfilDestino.id);
                             }
                           }}
                           className={`bg-white rounded-xl p-3 border border-slate-200 shadow-sm flex flex-col gap-2 hover:shadow-md transition-all ${perfilDestino ? 'cursor-pointer hover:-translate-y-1 hover:border-orange-300 ring-2 ring-transparent hover:ring-orange-100' : ''}`}
@@ -365,7 +424,7 @@ const VistaGestion = ({
                           </div>
                           
                           <div className="flex justify-between items-center text-[8px] font-black uppercase text-slate-400">
-                            <span title="Sanos / Total de Favoritos asignados">{op.sanos}/{op.total} OK</span>
+                             <span title="Sanos / Total de Favoritos asignados">{op.sanos}/{op.total} OK</span>
                             {(op.quiebres > 0 || op.riesgos > 0) ? (
                               <span className={`${op.quiebres > 0 ? 'text-red-500' : 'text-amber-500'} bg-slate-50 px-1 py-0.5 rounded border border-slate-100`}>
                                 {op.quiebres > 0 && `${op.quiebres}Q `}{op.riesgos > 0 && `${op.riesgos}R`}
@@ -398,7 +457,7 @@ const VistaGestion = ({
                 let gruposAMostrar = grupos;
                 if (currentUser.rol !== 'owner') {
                   const misGrupos = [...new Set(insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch).map(i => i.grupo || 'SIN CLASIFICAR'))];
-                  gruposAMostrar = grupos.filter(g => misGrupos.includes(g));
+                   gruposAMostrar = grupos.filter(g => misGrupos.includes(g));
                 } else if (filtroResponsable !== 'TODOS') {
                   const gruposDelFiltro = [...new Set(insumos.filter(i => i.owner?.toUpperCase().trim() === filtroResponsable).map(i => i.grupo || 'SIN CLASIFICAR'))];
                   gruposAMostrar = grupos.filter(g => gruposDelFiltro.includes(g));
@@ -433,7 +492,7 @@ const VistaGestion = ({
                     <div key={grupo} onClick={() => setSelectedGroup(grupo)} className="bg-white rounded-2xl p-5 cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:border-slate-300 transition-all duration-300 flex flex-col justify-between min-h-[210px] relative border border-slate-200 group">
                       <div className="z-10">
                         <div className="flex justify-between items-center mb-1">
-                         <h3 className="font-black text-2xl uppercase tracking-tighter text-slate-800 truncate pr-4" title={grupo}>{grupo}</h3>
+                          <h3 className="font-black text-2xl uppercase tracking-tighter text-slate-800 truncate pr-4" title={grupo}>{grupo}</h3>
                          <span className={`text-[9px] font-black px-2.5 py-1 rounded shadow-sm transition-colors border ${scoreG < 80 ? 'bg-red-50 text-red-700 border-red-200' : scoreG < 100 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                            {scoreG}% SALUD
                          </span>
@@ -463,7 +522,7 @@ const VistaGestion = ({
                         </div>
                       </div>
                       <div className="flex justify-between items-end border-t pt-3 border-slate-50">
-                        <div className="flex flex-col">
+                         <div className="flex flex-col">
                           <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Métricas de Stock</span>
                           <div className="flex items-baseline gap-2 mt-1">
                             <span className="text-xl font-black text-slate-800 leading-none">{itemsDelGrupo.length}</span>
