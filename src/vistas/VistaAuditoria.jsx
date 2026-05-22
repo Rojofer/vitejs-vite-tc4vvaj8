@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users } from 'lucide-react';
+import { db } from '../firebase'; // Asegurar la importación para el cierre masivo
+import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, cerrarReclamoManual, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo, setActiveInsumo, setDialogoConfirmacion}) => {
     const [filtroMes, setFiltroMes] = useState("TODOS");
@@ -50,7 +52,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       validos.forEach(r => {
          conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1;
       });
-      const topOfensores = Object.keys(conteoPorInsumo)
+      const topOf异 = Object.keys(conteoPorInsumo)
         .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
         .filter(obj => obj.insumo)
         .sort((a,b) => b.cantidad - a.cantidad)
@@ -65,14 +67,72 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const totalHilos = hilosUnicos + hilosMultiples;
       const efectividadPrimerContacto = totalHilos > 0 ? Math.round((hilosUnicos / totalHilos) * 100) : 100;
 
+      // Cálculo de rendimiento por operario para la nueva tabla
+      const rankingOperarios = {};
+      validos.forEach(r => {
+        const op = r.operario || "Sin Nombre";
+        if (!rankingOperarios[op]) {
+          rankingOperarios[op] = { total: 0, cerrados: 0 };
+        }
+        rankingOperarios[op].total++;
+        if (r.estado === 'CERRADO') {
+          rankingOperarios[op].cerrados++;
+        }
+      });
+
+      const listaOperarios = Object.keys(rankingOperarios).map(name => {
+        const item = rankingOperarios[name];
+        return {
+          nombre: name,
+          total: item.total,
+          efectividad: Math.round((item.cerrados / item.total) * 100)
+        };
+      }).sort((a, b) => b.total - a.total);
+
       return {
         tasaResolucion, reclamosMes: reclamosMes.length, cerradosMes: cerradosMes.length,
         leadTime,
-        topOfensores,
+        topOfensores: topOf异,
         efectividadPrimerContacto,
-        totalGestionados: validos.length
+        totalGestionados: validos.length,
+        listaOperarios
       };
     }, [reclamos, insumos]);
+
+    // --- FUNCIÓN TÁCTICA: CIERRE MASIVO COMPLETO DE TICKET ---
+    const ejecutarCierreMasivoEnBloque = async (insumoId) => {
+      try {
+        const batch = writeBatch(db);
+        
+        // 1. Buscamos todas las iteraciones abiertas de este material en Firestore
+        const qReclamos = query(
+          collection(db, "reclamos"), 
+          where("insumoId", "==", insumoId), 
+          where("estado", "==", "ABIERTO")
+        );
+        const snapshot = await getDocs(qReclamos);
+        
+        snapshot.docs.forEach((documento) => {
+          batch.update(doc(db, "reclamos", documento.id), {
+            estado: 'CERRADO',
+            fechaCierre: serverTimestamp(),
+            motivoCierre: `Cierre unificado por ${currentUser.nombre}`
+          });
+        });
+
+        // 2. Rompemos el candado de ticket en la grilla principal
+        batch.update(doc(db, "insumos", insumoId), { ticketReclamo: null });
+
+        await batch.commit();
+        setExpandedRow(null);
+        setToastMsg("✅ Ticket cerrado por completo. Todas las iteraciones pasaron a historial.");
+        setTimeout(() => setToastMsg(null), 4000);
+      } catch (error) {
+        console.error("Error en cierre masivo:", error);
+        setToastMsg("⚠️ Error al intentar cerrar el bloque de datos.");
+        setTimeout(() => setToastMsg(null), 4000);
+      }
+    };
 
     // --- FUNCIÓN: GENERADOR DE DOSSIER PDF ---
     const exportarDossierPDF = (hiloActivo) => {
@@ -154,7 +214,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     }
 
     const mesesDisponibles = useMemo(() => { 
-      const unique = Array.from(new Set(filtrados.map(r => obtenerMesAnio(r.fecha)))); 
+      const unique = Array.from=new Set(filtrados.map(r => obtenerMesAnio(r.fecha))); 
       return unique.sort((a, b) => { 
         if (a === "Sin Fecha") return 1; if (b === "Sin Fecha") return -1; 
         const [mesA, anioA] = a.split(" "); const [mesB, anioB] = b.split(" "); 
@@ -346,10 +406,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               <td className="py-4 px-4 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                   {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
-                                    <button onClick={(e) => { e.stopPropagation(); if(setDialogoConfirmacion) { const insumoAsociado = insumos.find(i => i.id === h.insumoId);
-                                      setDialogoConfirmacion({ titulo: "Cerrar Reclamo", mensaje: `¿Confirmás que querés dar por cumplido y cerrar el reclamo de "${insumoAsociado?.nombre || 'este material'}"?`, textoConfirmar: "Sí, Cerrar Reclamo", colorBoton: "bg-emerald-500 hover:bg-emerald-600", onConfirm: () => cerrarReclamoManual(h.id) });
-                                    } else { cerrarReclamoManual(h.id, e); } }} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1">
-                                      <X size={10} /> Cerrar
+                                    <button onClick={(e) => { e.stopPropagation(); setDialogoConfirmacion({ titulo: "Cerrar Ticket Completo", mensaje: `¿Confirmás que querés liquidar y cerrar el ticket completo de "${insumoAsociado?.nombre || 'este material'}"? Esto procesará todas las iteraciones en bloque.`, textoConfirmar: "Sí, Cerrar Todo", colorBoton: "bg-emerald-500 hover:bg-emerald-600", onConfirm: () => ejecutarCierreMasivoEnBloque(h.insumoId) }); }} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1">
+                                      <X size={10} /> Cerrar Ticket
                                     </button>
                                   )}
                                   {currentUser.rol === 'owner' && (
@@ -374,7 +432,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                       </div>
                                     </td>
                                     <td className="py-3 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
-                                    <td className="py-3 px-4"></td>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-xs"><span className="w-1 h-1 rounded-full bg-slate-300"></span> Archivada</span>
+                                    </td>
                                     <td className="py-3 px-4 text-center">
                                       <span className={`text-[8px] font-black border px-1.5 py-0.5 rounded flex items-center gap-1 mx-auto w-max shadow-xs ${tipoSub.style}`}>
                                         <span className="bg-white text-current rounded-sm px-1 py-0.1 shadow-xs">{tipoSub.num}</span> 
@@ -402,7 +462,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
             </motion.div>
           )}
 
-          {/* NUEVO MÓDULO DE TABLERO DE KPIs GERENCIALES */}
+          {/* TABLERO DE KPIs GERENCIALES CON RENDIMIENTO DE OPERARIOS */}
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -478,36 +538,76 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                  <BarChart2 size={20} className="text-slate-800"/>
-                  <h3 className="text-lg font-black uppercase tracking-tight text-slate-800">Top Ofensores (Pareto de Reclamos)</h3>
-                </div>
-                
-                {kpiData.topOfensores.length === 0 ? (
-                  <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">No hay datos suficientes para el Pareto</div>
-                ) : (
-                  <div className="space-y-4">
-                    {kpiData.topOfensores.map((item, idx) => {
-                      const maximo = kpiData.topOfensores[0].cantidad;
-                      const porcentaje = Math.round((item.cantidad / maximo) * 100);
-                      return (
-                        <div key={item.id} className="flex items-center gap-4">
-                          <div className="w-6 text-center font-black text-slate-300 text-lg">#{idx + 1}</div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-end mb-1">
-                              <span className="text-xs font-bold text-slate-700 uppercase truncate max-w-[200px] sm:max-w-md">{item.insumo.nombre}</span>
-                              <span className="text-xs font-black text-rose-500">{item.cantidad} Reclamos</span>
-                            </div>
-                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-rose-400 rounded-full transition-all duration-1000" style={{width: `${porcentaje}%`}}></div>
+              {/* BLOQUE DE DISTRIBUCIÓN: PARETO + OPERARIOS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-6">
+                    <BarChart2 size={20} className="text-slate-800"/>
+                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Top Ofensores (Pareto de Reclamos)</h3>
+                  </div>
+                  
+                  {kpiData.topOfensores.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">No hay datos suficientes para el Pareto</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {kpiData.topOfensores.map((item, idx) => {
+                        const maximo = kpiData.topOfensores[0].cantidad;
+                        const porcentaje = Math.round((item.cantidad / maximo) * 100);
+                        return (
+                          <div key={item.id} className="flex items-center gap-4">
+                            <div className="w-6 text-center font-black text-slate-300 text-lg">#{idx + 1}</div>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-end mb-1">
+                                <span className="text-xs font-bold text-slate-700 uppercase truncate max-w-[200px] sm:max-w-xs">{item.insumo.nombre}</span>
+                                <span className="text-xs font-black text-rose-500">{item.cantidad} Reclamos</span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-rose-400 rounded-full" style={{width: `${porcentaje}%`}}></div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* NUEVA TABLA: MONITOR DE RENDIMIENTO DEL EQUIPO */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Users size={20} className="text-slate-800"/>
+                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Control de Alertas por Operario</h3>
                   </div>
-                )}
+                  
+                  {kpiData.listaOperarios.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">Sin registros de operarios activos</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left whitespace-nowrap text-xs font-bold">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <th className="pb-3">Nombre Operario</th>
+                            <th className="pb-3 text-center">Alertas Emitidas</th>
+                            <th className="pb-3 text-right">Efectividad de Cierre</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {kpiData.listaOperarios.map((op) => (
+                            <tr key={op.nombre} className="text-slate-700">
+                              <td className="py-3 uppercase text-slate-800 font-black">{op.nombre}</td>
+                              <td className="py-3 text-center text-slate-600">{op.total} alertas</td>
+                              <td className="py-3 text-right">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black ${op.efectividad >= 80 ? 'bg-emerald-50 text-emerald-700' : op.efectividad >= 40 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
+                                  {op.efectividad}% resuelto
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
