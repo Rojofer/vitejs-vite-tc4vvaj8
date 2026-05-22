@@ -371,30 +371,17 @@ const App = () => {
   };
 
   const procesarGuardadoBD = async (draft) => {
-    try {
-      await addDoc(collection(db, "reclamos"), { 
-        insumoId: draft.insumo?.id || "ERROR", 
-        operario: currentUser?.nombre || "Usuario", 
-        mensaje: draft.asunto || "Sin Asunto", 
-        cuerpoOriginal: draft.cuerpo || "", 
-        fecha: serverTimestamp(), 
-        estado: "ABIERTO", 
-        tipo: draft.tipoDestino || "compras" 
-      });
-      if (draft.insumo?.id) {
-        await updateDoc(doc(db, "insumos", draft.insumo.id), { 
-          ticketReclamo: draft.ticketBorrador || null 
-        });
-      }
-    } catch(e) {
-      console.error("Error táctico en la Base de Datos:", e);
-    }
+    await addDoc(collection(db, "reclamos"), { 
+      insumoId: draft.insumo.id, operario: currentUser.nombre, mensaje: draft.asunto, 
+      cuerpoOriginal: draft.cuerpo, fecha: serverTimestamp(), estado: "ABIERTO", tipo: draft.tipoDestino 
+    });
+    let updates = {};
+    updates.ticketReclamo = draft.ticketBorrador;
+    await updateDoc(doc(db, "insumos", draft.insumo.id), updates);
   };
 
   const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
-    // 1. BLINDAJE ANTI-CRASH: Evitar fallos si hay contactos borrados o vacíos
-    const destinos = reclamoDraft.destinatarios || [];
-    const correosDirectorio = destinos.map(id => (config.contactos || []).find(c => c.id === id)?.email).filter(e => e);
+    const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
     const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
@@ -408,14 +395,10 @@ const App = () => {
 
     const ejecutarFlujoNuevo = async () => {
       try {
-        // 2. ABRIR GMAIL PRIMERO: Esto engaña al navegador para que NO bloquee la pestaña
-        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto || "")}&body=${encodeURIComponent(reclamoDraft.cuerpo || "")}`, '_blank');
-        
-        // 3. LUEGO GUARDAR EN LA BASE DE DATOS
         await procesarGuardadoBD(reclamoDraft);
-        
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
         setReclamoDraft(null);
-        setToastMsg("✅ Reclamo registrado y Gmail abierto.");
+        setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
         setTimeout(() => setToastMsg(null), 4000);
       } catch (error) {
         console.error("Error guardando reclamo:", error);
@@ -424,12 +407,9 @@ const App = () => {
     
     if (modoAccion === 'HILO') {
       try {
-        navigator.clipboard.writeText(reclamoDraft.cuerpo || "");
-        // ABRIR GMAIL PRIMERO
-        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
-        
+        navigator.clipboard.writeText(reclamoDraft.cuerpo);
         await procesarGuardadoBD(reclamoDraft);
-        
+        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
         setReclamoDraft(null);
         setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
         setTimeout(() => setToastMsg(null), 5000);
@@ -437,15 +417,13 @@ const App = () => {
         console.error("Error en Hilo:", error);
       }
     } else {
-      if (reclamoDraft.insumo?.ticketReclamo) {
+      if (reclamoDraft.insumo.ticketReclamo) {
         setDialogoConfirmacion({
           titulo: "⚠️ Atención: Reclamo ya iniciado",
-          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar.`,
-          textoConfirmar: "Forzar Nuevo",
+          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón "CONTINUAR HILO".`,
+          textoConfirmar: "Forzar envío nuevo",
           colorBoton: "bg-red-500 hover:bg-red-600",
-          onConfirm: ejecutarFlujoNuevo,
-          textoAlternativo: "Continuar Hilo Existente",
-          onAlternativo: () => confirmarYGuardarReclamo('HILO')
+          onConfirm: ejecutarFlujoNuevo
         });
       } else {
         ejecutarFlujoNuevo();
