@@ -258,7 +258,8 @@ const App = () => {
           favorito: d.esFavorito || false, owner: d.owner || "Sin asignar" 
         };
       });
-      setInsumosRaw(data); if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
+      setInsumosRaw(data); 
+      if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -423,7 +424,6 @@ const App = () => {
           textoConfirmar: "Forzar Nuevo",
           colorBoton: "bg-red-500 hover:bg-red-600",
           onConfirm: ejecutarFlujoNuevo,
-          // ACÁ INYECTAMOS LA MAGIA DEL 3ER BOTÓN
           textoAlternativo: "Continuar Hilo Existente",
           onAlternativo: () => confirmarYGuardarReclamo('HILO')
         });
