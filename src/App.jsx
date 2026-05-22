@@ -18,8 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const formatearFecha = (fecha) => {
   if (!fecha || fecha === "-") return "-";
   try {
-    let f = (fecha && typeof fecha.toDate === 'function') ?
-      fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
+    let f = (fecha && typeof fecha.toDate === 'function') ? fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
     if (isNaN(f.getTime())) return String(fecha);
     const dia = String(f.getDate()).padStart(2, '0'); const mes = String(f.getMonth() + 1).padStart(2, '0'); const anio = String(f.getFullYear()).slice(-2);
     return `${dia}/${mes}/${anio} ${String(f.getHours()).padStart(2, '0')}:${String(f.getMinutes()).padStart(2, '0')}`;
@@ -29,13 +28,14 @@ const formatearFecha = (fecha) => {
 const obtenerMesAnio = (fecha) => {
   if (!fecha) return "Sin Fecha";
   try {
-    let f = (fecha && typeof fecha.toDate === 'function') ?
-      fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
+    let f = (fecha && typeof fecha.toDate === 'function') ? fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
     if (isNaN(f.getTime())) return "Sin Fecha";
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     return `${meses[f.getMonth()]} ${f.getFullYear()}`;
   } catch (e) { return "Sin Fecha"; }
 };
+
+const formatoNum = (num) => Number(num).toLocaleString('es-AR');
 
 const App = () => {
   const [usuarioLogueado, setUsuarioLogueado] = useState(null);
@@ -58,7 +58,6 @@ const App = () => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [activeInsumo, setActiveInsumo] = useState(null);
   const [filtroAlerta, setFiltroAlerta] = useState(null);
-
   const [showSettings, setShowSettings] = useState(false);
   const [vistaActiva, setVistaActiva] = useState('gestion'); 
   const [notiTabActiva, setNotiTabActiva] = useState('avisos');
@@ -67,7 +66,6 @@ const App = () => {
   const [toastMsg, setToastMsg] = useState(null);
   const [dialogoConfirmacion, setDialogoConfirmacion] = useState(null);
   const [alertaHilo, setAlertaHilo] = useState(null);
-
   const [filtroResponsable, setFiltroResponsable] = useState("TODOS");
   const [filtroRiesgoGrupo, setFiltroRiesgoGrupo] = useState(false);
   const [filtroVistaLista, setFiltroVistaLista] = useState('todos');
@@ -76,7 +74,6 @@ const App = () => {
     if (!ownerString || ownerString === "Sin asignar" || ownerString === "SIN ASIGNAR") return { bg: 'bg-slate-50', text: 'text-slate-400', border: 'border-slate-200', dot: 'bg-slate-300' };
     const txt = String(ownerString).trim().toUpperCase();
     const contacto = (config?.contactos || []).find(c => c.alias && String(c.alias).trim().toUpperCase() === txt);
-
     if (contacto && contacto.color) {
       const paleta = [
           { id: 'emerald', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
@@ -256,7 +253,7 @@ const App = () => {
           favorito: d.esFavorito || false, owner: d.owner || "Sin asignar" 
         };
       });
-      setInsumosRaw(data);
+      setInsumosRaw(data); 
       if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
     });
     return () => unsubscribe();
@@ -445,104 +442,55 @@ const App = () => {
     }
   };
 
-  const cerrarReclamoManual = async (reclamoId, e) => {
-    if (e) e.stopPropagation();
-    try {
-      const reclamoObj = reclamos.find(r => r.id === reclamoId);
-      await updateDoc(doc(db, "reclamos", reclamoId), { 
-        estado: 'CERRADO',
-        fechaCierre: serverTimestamp(),
-        motivoCierre: 'Cierre manual por operario'
-      });
-      if (reclamoObj && reclamoObj.insumoId) {
-         await updateDoc(doc(db, "insumos", reclamoObj.insumoId), { ticketReclamo: null });
+  const canalFiltroAlertaLocal = useMemo(() => {
+    const uUrgenciaApp = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
+    const hace10DiasApp = new Date();
+    hace10DiasApp.setDate(new Date().getDate() - 10);
+
+    const parsearFechaApp = (fRaw) => {
+      if (!fRaw) return new Date(2100, 1, 1);
+      if (fRaw.seconds) return new Date(fRaw.seconds * 1000);
+      if (typeof fRaw === 'string' && fRaw.includes('/')) {
+        const p = fRaw.split('/');
+        if (p.length === 3) return new Date(p[2], p[1]-1, p[0]);
       }
-      setToastMsg("✅ Reclamo cerrado y pizarra limpia para futuros avisos.");
-      setTimeout(() => setToastMsg(null), 4000);
-    } catch (error) {
-      console.error("Error táctico cerrando el reclamo:", error);
-    }
-  };
-
-  const exportarBackupDB = () => {
-    const data = JSON.stringify({ insumos: insumosRaw, reclamos: reclamosRaw, config }, null, 2);
-    const blob = new Blob([data], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Backup_ERP_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-  };
-
-  const importarBackupDB = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = JSON.parse(event.target.result);
-        if (data.config) await guardarConfigEnFirebase(data.config);
-        if (data.reclamos) for (const r of data.reclamos) { const { id, ...rest } = r; await setDoc(doc(db, "reclamos", id), rest); }
-        if (data.insumos) for (const i of data.insumos) { const { id, ...rest } = i; await setDoc(doc(db, "insumos", id), rest); }
-        alert("¡Base de datos restaurada con éxito!");
-      } catch (err) { alert("Error al leer el archivo JSON: Archivo corrupto o formato inválido."); }
+      return new Date(fRaw);
     };
-    reader.readAsText(file);
-  };
 
-  const insumosVivos = insumos.filter(i => !i.discontinuado);
-  const resultadosBusqueda = insumosVivos.filter(i => i.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) || i.codigo?.toLowerCase().includes(searchTerm.toLowerCase()));
-  const grupos = [...new Set(insumosVivos.map(item => item.grupo || 'SIN CLASIFICAR'))].sort((a, b) => a.localeCompare(b));
-  const reclamosActivos = activeInsumo ? reclamos.filter(r => r.insumoId === activeInsumo.id) : [];
+    // 1. Filtrado de Visibilidad Base por el Usuario Conectado
+    const baseInsumosVisibles = insumosVivos.filter(i => {
+      if (currentUser.rol === 'owner') return true;
+      return i.owner?.toUpperCase().trim() === currentUser.aliasMatch;
+    });
 
-  // --- ARQUITECTURA DE FILTRADO UNIFICADA ---
-  let datosAlerta = []; let tituloAlerta = "";
-  const uUrgenciaApp = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
-  
-  const hoy = new Date();
-  const hace10DiasApp = new Date();
-  hace10DiasApp.setDate(hoy.getDate() - 10);
-
-  const parsearFechaApp = (fRaw) => {
-    if (!fRaw) return new Date(2100, 1, 1);
-    if (fRaw.seconds) return new Date(fRaw.seconds * 1000);
-    if (typeof fRaw === 'string' && fRaw.includes('/')) {
-      const p = fRaw.split('/');
-      if (p.length === 3) return new Date(p[2], p[1]-1, p[0]);
-    }
-    return new Date(fRaw);
-  };
-
-  if (filtroAlerta === 'favoritos') { 
-      datosAlerta = insumosVivos.filter(i => i.favorito); 
-      tituloAlerta = "Todos los Favoritos"; 
-  } 
-  else if (filtroAlerta === 'riesgo') { 
-      datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp); 
-      tituloAlerta = "Insumos en Riesgo Crítico"; 
-  } 
-  else if (filtroAlerta === 'ocs') { 
-      datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); 
-      tituloAlerta = "Órdenes de Compra Demoradas"; 
-  } 
-  else if (filtroAlerta === 'solpeds_viejas') {
-      datosAlerta = insumosVivos.filter(ins => 
+    // 2. Retorno de Listas Filtradas Reales para la Tabla
+    if (filtroAlerta === 'favoritos') return baseInsumosVisibles.filter(i => i.favorito);
+    if (filtroAlerta === 'riesgo') return baseInsumosVisibles.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp);
+    if (filtroAlerta === 'ocs') return baseInsumosVisibles.filter(i => i.ocDemorada > 0);
+    if (filtroAlerta === 'solpeds_viejas') {
+      return baseInsumosVisibles.filter(ins => 
         (ins.detalleSolpeds || []).some(sp => {
           const fechaBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
           if (!fechaBase) return false;
           return parsearFechaApp(fechaBase) < hace10DiasApp;
         })
       );
-      tituloAlerta = "SOLPEDS Emitidas s/ OC (+10 Días)";
-  }
-  else if (filtroAlerta === 'tickets_abiertos') {
-      const insumosConTicket = [...new Set(reclamos.filter(r => r.estado === 'ABIERTO').map(r => r.insumoId))];
-      datosAlerta = insumosVivos.filter(i => insumosConTicket.includes(i.id));
-      tituloAlerta = "Insumos con Reclamos Activos";
-  }
-  else if (filtroAlerta === 'todos') { 
-      datosAlerta = insumosVivos; 
-      tituloAlerta = "Inventario Completo"; 
-  }
-  
-  if (currentUser.rol !== 'owner' && filtroAlerta) {
-    datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
-  }
+    }
+    if (filtroAlerta === 'tickets_abiertos') {
+      const hilosActivosIds = [...new Set(reclamos.filter(r => r.estado === 'ABIERTO').map(r => r.insumoId))];
+      return baseInsumosVisibles.filter(i => hilosActivosIds.includes(i.id));
+    }
+    return baseInsumosVisibles;
+  }, [insumosVivos, reclamos, filtroAlerta, currentUser, config]);
+
+  const tituloAlerta = useMemo(() => {
+    if (filtroAlerta === 'favoritos') return "TODOS LOS MATERIALES FAVORITOS";
+    if (filtroAlerta === 'riesgo') return "MATERIALES FAVORITOS EN RIESGO CRÍTICO";
+    if (filtroAlerta === 'ocs') return "ORDENES DE COMPRA DEMORADAS EN PLAZO VENCIDO";
+    if (filtroAlerta === 'solpeds_viejas') return "SOLPEDS EMITIDAS SIN O/C (+10 DÍAS)";
+    if (filtroAlerta === 'tickets_abiertos') return "INSUMOS CON RECLAMOS LOGÍSTICOS ACTIVOS";
+    return "TODOS LOS INSUMOS OPERATIVOS";
+  }, [filtroAlerta]);
 
   if (cargandoAuth) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-500">Verificando credenciales...</div>;
   if (!usuarioLogueado) return <VistaLogin />;
@@ -620,7 +568,7 @@ const App = () => {
           <div className="flex items-center justify-end gap-4 pl-6 border-l border-slate-200 shrink-0">
             <div className="mr-4 text-right hidden lg:block">
               <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 justify-end text-slate-400"><Clock size={10}/> ACTUALIZADO </p>
-              <p className="text-xs font-bold text-slate-600">{ultimaAct ? obtenerMesAnio(ultimaAct) : 'Esperando Script...'}</p>
+              <p className="text-xs font-bold text-slate-600">{ultimaAct ? formatearFecha(ultimaAct) : 'Esperando Script...'}</p>
             </div>
             
             {realUser.rol === 'owner' && currentUser.id !== realUser.id ? (
@@ -651,17 +599,7 @@ const App = () => {
         <main className="flex-1 overflow-auto relative bg-[#F8FAFC]">
           {vistaActiva === 'auditoria' && (
             <VistaAuditoria 
-              insumos={insumos} 
-              reclamos={reclamos} 
-              currentUser={currentUser} 
-              formatearFecha={formatearFecha} 
-              obtenerMesAnio={obtenerMesAnio} 
-              setToastMsg={setToastMsg} 
-              cerrarReclamoManual={cerrarReclamoManual}
-              auditoriaFiltroInsumo={auditoriaFiltroInsumo}
-              setAuditoriaFiltroInsumo={setAuditoriaFiltroInsumo}
-              setActiveInsumo={setActiveInsumo} 
-              setDialogoConfirmacion={setDialogoConfirmacion}
+              insumos={insumos} reclamos={reclamos} currentUser={currentUser} formatearFecha={formatearFecha} obtenerMesAnio={obtenerMesAnio} setToastMsg={setToastMsg} cerrarReclamoManual={cerrarReclamoManual} auditoriaFiltroInsumo={auditoriaFiltroInsumo} setAuditoriaFiltroInsumo={setAuditoriaFiltroInsumo} setActiveInsumo={setActiveInsumo} setDialogoConfirmacion={setDialogoConfirmacion}
             />
           )}
           {vistaActiva === 'notificaciones' && (
@@ -674,7 +612,7 @@ const App = () => {
           )}
           {vistaActiva === 'gestion' && (
             <VistaGestion 
-              currentUser={currentUser} insumos={insumosVivos} reclamos={reclamos} config={config} searchTerm={searchTerm} resultadosBusqueda={resultadosBusqueda} filtroAlerta={filtroAlerta} setFiltroAlerta={setFiltroAlerta} datosAlerta={datosAlerta} tituloAlerta={tituloAlerta} selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} grupos={grupos} filtroResponsable={filtroResponsable} filtroVistaLista={filtroVistaLista} setFiltroVistaLista={setFiltroVistaLista} filtroRiesgoGrupo={filtroRiesgoGrupo} setFiltroRiesgoGrupo={setFiltroRiesgoGrupo} setActiveInsumo={setActiveInsumo} toggleFavorito={toggleFavorito} obtenerColorOwner={obtenerColorOwner} renderRadarDinamico={renderRadarDinamico} setSimulatedId={setSimulatedId} perfilesSimulables={perfilesSimulables} archivarInsumo={archivarInsumo} cerrarReclamoManual={cerrarReclamoManual} setDialogoConfirmacion={setDialogoConfirmacion} setVistaActiva={setVistaActiva}
+              currentUser={currentUser} insumos={insumosVivos} reclamos={reclamos} config={config} searchTerm={searchTerm} resultadosBusqueda={resultadosBusqueda} filtroAlerta={filtroAlerta} setFiltroAlerta={setFiltroAlerta} datosAlerta={canalFiltroAlertaLocal} tituloAlerta={tituloAlerta} selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} grupos={grupos} filtroResponsable={filtroResponsable} filtroVistaLista={filtroVistaLista} setFiltroVistaLista={setFiltroVistaLista} filtroRiesgoGrupo={filtroRiesgoGrupo} setFiltroRiesgoGrupo={setFiltroRiesgoGrupo} setActiveInsumo={setActiveInsumo} toggleFavorito={toggleFavorito} obtenerColorOwner={obtenerColorOwner} renderRadarDinamico={renderRadarDinamico} setSimulatedId={setSimulatedId} perfilesSimulables={perfilesSimulables} archivarInsumo={archivarInsumo} cerrarReclamoManual={cerrarReclamoManual} setDialogoConfirmacion={setDialogoConfirmacion} setVistaActiva={setVistaActiva}
             />
           )}
         </main>
