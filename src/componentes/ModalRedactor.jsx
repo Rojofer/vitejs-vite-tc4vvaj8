@@ -23,16 +23,12 @@ const ModalRedactor = ({
       const nombreA = (a.nombre || "").trim();
       const nombreB = (b.nombre || "").trim();
       
-      // Extraemos el primer carácter numérico si existe
       const numA = parseInt(nombreA.charAt(0), 10);
       const numB = parseInt(nombreB.charAt(0), 10);
       
-      // Si ambos tienen número al inicio, comparamos numéricamente
       if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-      // Si solo uno tiene número, ese va primero
       if (!isNaN(numA)) return -1;
       if (!isNaN(numB)) return 1;
-      // Fallback: orden alfabético general
       return nombreA.localeCompare(nombreB);
     });
   }, [plantillas]);
@@ -140,12 +136,12 @@ const ModalRedactor = ({
 
   // --- MOTOR 2: MATCH AUTOMÁTICO DE CONTACTOS INTERNOS ---
   const autoSeleccionarDestinatarios = (textoTemplateCrudo, insumo, plantillaId) => {
+    // Si es plantilla de Autorización, el destino obligatorio es el Directorio de Planta
     if (plantillaId === 'comprasGrave' || plantillaId === 'comprasLeve' ? false : (plantillaId === 'comprasGrave' || String(plantillaId).toUpperCase().includes('AUTORIZAR') || String(textoTemplateCrudo).toUpperCase().includes('AUTORIZAR'))) {
       return contactos.filter(c => c.tipo === 'planta').map(c => c.id);
     }
 
     let matchNames = [];
-    let sendToAllCompras = false;
     const originalText = textoTemplateCrudo || "";
 
     if (originalText.includes('{solpeds_viejas}')) {
@@ -164,9 +160,8 @@ const ModalRedactor = ({
       if (!rawName) return;
       const cleanName = String(rawName).trim().toLowerCase();
       
-      if (cleanName === "sin asignar" || cleanName === "no_asignada") {
-        sendToAllCompras = true;
-      } else {
+      // EXTERMINADO: Si viene "sin asignar" o vacío, ya NO se marca la variable global de tildar a todos.
+      if (cleanName !== "sin asignar" && cleanName !== "no_asignada" && cleanName !== "" && cleanName !== "-") {
         const contactoEncontrado = contactos.find(c => {
           const aliasC = String(c.alias || "").trim().toLowerCase();
           const labelC = String(c.label || "").trim().toLowerCase();
@@ -179,10 +174,6 @@ const ModalRedactor = ({
         }
       }
     });
-
-    if (sendToAllCompras) {
-      contactos.filter(c => c.tipo === 'compras').forEach(c => matchedIds.push(c.id));
-    }
 
     return [...new Set(matchedIds)];
   };
@@ -198,7 +189,7 @@ const ModalRedactor = ({
       setReclamoDraft(prev => ({
         ...prev,
         cuerpo: nuevoCuerpo,
-        destinatarios: nuevosDestinos.length > 0 ? nuevosDestinos : prev.destinatarios
+        destinatarios: nuevosDestinos
       }));
       setProcesadoInicial(true);
     }
