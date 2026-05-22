@@ -18,7 +18,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 const formatearFecha = (fecha) => {
   if (!fecha || fecha === "-") return "-";
   try {
-    let f = (fecha && typeof fecha.toDate === 'function') ? fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
+    let f = (fecha && typeof fecha.toDate === 'function') ?
+      fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
     if (isNaN(f.getTime())) return String(fecha);
     const dia = String(f.getDate()).padStart(2, '0'); const mes = String(f.getMonth() + 1).padStart(2, '0'); const anio = String(f.getFullYear()).slice(-2);
     return `${dia}/${mes}/${anio} ${String(f.getHours()).padStart(2, '0')}:${String(f.getMinutes()).padStart(2, '0')}`;
@@ -28,7 +29,8 @@ const formatearFecha = (fecha) => {
 const obtenerMesAnio = (fecha) => {
   if (!fecha) return "Sin Fecha";
   try {
-    let f = (fecha && typeof fecha.toDate === 'function') ? fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
+    let f = (fecha && typeof fecha.toDate === 'function') ?
+      fecha.toDate() : (fecha && fecha.seconds ? new Date(fecha.seconds * 1000) : new Date(fecha));
     if (isNaN(f.getTime())) return "Sin Fecha";
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     return `${meses[f.getMonth()]} ${f.getFullYear()}`;
@@ -58,14 +60,17 @@ const App = () => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [activeInsumo, setActiveInsumo] = useState(null);
   const [filtroAlerta, setFiltroAlerta] = useState(null);
+
   const [showSettings, setShowSettings] = useState(false);
   const [vistaActiva, setVistaActiva] = useState('gestion'); 
   const [notiTabActiva, setNotiTabActiva] = useState('avisos');
   const [auditoriaFiltroInsumo, setAuditoriaFiltroInsumo] = useState(null);
+
   const [reclamoDraft, setReclamoDraft] = useState(null); 
   const [toastMsg, setToastMsg] = useState(null);
   const [dialogoConfirmacion, setDialogoConfirmacion] = useState(null);
   const [alertaHilo, setAlertaHilo] = useState(null);
+
   const [filtroResponsable, setFiltroResponsable] = useState("TODOS");
   const [filtroRiesgoGrupo, setFiltroRiesgoGrupo] = useState(false);
   const [filtroVistaLista, setFiltroVistaLista] = useState('todos');
@@ -74,6 +79,7 @@ const App = () => {
     if (!ownerString || ownerString === "Sin asignar" || ownerString === "SIN ASIGNAR") return { bg: 'bg-slate-50', text: 'text-slate-400', border: 'border-slate-200', dot: 'bg-slate-300' };
     const txt = String(ownerString).trim().toUpperCase();
     const contacto = (config?.contactos || []).find(c => c.alias && String(c.alias).trim().toUpperCase() === txt);
+
     if (contacto && contacto.color) {
       const paleta = [
           { id: 'emerald', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
@@ -106,7 +112,8 @@ const App = () => {
           const bgActive = col==='emerald'?'bg-emerald-500':col==='purple'?'bg-purple-500':col==='blue'?'bg-blue-500':col==='pink'?'bg-pink-500':col==='amber'?'bg-amber-500':col==='indigo'?'bg-indigo-500':'bg-slate-500';
           const isAct = filtroResponsable === ownerAlias;
           return (
-            <button key={ownerAlias} onClick={() => setFiltroResponsable(ownerAlias)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-1.5 ${isAct ? `${bgActive} text-white shadow-md` : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}>
+            <button key={ownerAlias} onClick={() => setFiltroResponsable(ownerAlias)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-1.5 ${isAct ?
+              `${bgActive} text-white shadow-md` : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}>
               {!isAct && <span className={`w-2 h-2 rounded-full ${bgActive}`}></span>}
               {ownerAlias}
             </button>
@@ -144,30 +151,27 @@ const App = () => {
     if (!usuarioLogueado) return { id: 'invitado', nombre: "Cargando...", rol: "espectador", etiquetaRol: "ESPECTADOR", inicial: "-", aliasMatch: "NINGUNO", editorFavoritos: false };
     const emailLogueado = usuarioLogueado.email.toLowerCase();
 
-    // 1. EL ÚNICO OWNER VIP: Fernando (Acceso total + Ajustes)
+    // 1. EL ÚNICO OWNER VIP: Fernando
     if (emailLogueado === 'fernandocomex1@gmail.com') {
       return { id: 'owner_real', email: emailLogueado, nombre: "Fernando", rol: "owner", etiquetaRol: "OWNER VIP", inicial: "F", aliasMatch: "TODOS", editorFavoritos: true, accesoAjustes: true };
     }
 
-    // 2. BUSCAMOS EN EL DIRECTORIO
     const operarioMatch = (config?.contactos || []).find(c => c.email && c.email.toLowerCase() === emailLogueado);
 
     if (operarioMatch) {
       if (operarioMatch.visionGlobal) {
-        // PERFIL SUPERVISOR (Tiene el Ojo activado)
         return {
           id: operarioMatch.id,
           email: emailLogueado,
           nombre: operarioMatch.label || emailLogueado.split('@')[0],
-          rol: "owner", // Le damos poderes de owner
-          etiquetaRol: "SUPERVISOR", // Pero le ponemos su propia etiqueta
+          rol: "owner",
+          etiquetaRol: "SUPERVISOR",
           inicial: (operarioMatch.label || emailLogueado.split('@')[0]).charAt(0).toUpperCase(),
           aliasMatch: "TODOS",
           editorFavoritos: true,
-          accesoAjustes: false // CANDADO AL PANEL DE AJUSTES
+          accesoAjustes: false
         };
       } else {
-        // PERFIL OPERARIO ESTÁNDAR
         return {
           id: operarioMatch.id,
           email: emailLogueado,
@@ -181,7 +185,6 @@ const App = () => {
       }
     }
 
-    // 3. VISITAS
     const nombreVisita = emailLogueado.split('@')[0];
     return { id: usuarioLogueado.uid, email: emailLogueado, nombre: nombreVisita, rol: "espectador", etiquetaRol: "VISITA", inicial: nombreVisita.charAt(0).toUpperCase(), aliasMatch: "NINGUNO", editorFavoritos: false };
   }, [usuarioLogueado, config]);
@@ -258,7 +261,7 @@ const App = () => {
           favorito: d.esFavorito || false, owner: d.owner || "Sin asignar" 
         };
       });
-      setInsumosRaw(data); 
+      setInsumosRaw(data);
       if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
     });
     return () => unsubscribe();
@@ -325,16 +328,16 @@ const App = () => {
     }) || [];
     const listaOcs = ocsD.length > 0 ? ocsD.map(oc => `- OC ${oc.numero} (${formatoNum(oc.cantidad)} un.)`).join("\n") : "Sin OC Demoradas";
     
-    // NUEVO MOTOR 5: OCs a Futuro para Adelantar
+    // MOTOR 5: OCs a Futuro para Adelantar
     const ocsAdelantar = insumo.detalleOCs?.filter(oc => { 
       if (ocsIgnoradas.includes(oc.numero)) return false;
       const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha); 
       const fCheck = new Date(f); fCheck.setHours(0,0,0,0); 
-      return fCheck >= hoyCheck; // Busca las que NO están demoradas
+      return fCheck >= hoyCheck;
     }).sort((a,b) => {
       const fa = a.fecha?.seconds ? a.fecha.seconds : new Date(a.fecha).getTime()/1000;
       const fb = b.fecha?.seconds ? b.fecha.seconds : new Date(b.fecha).getTime()/1000;
-      return fa - fb; // Ordena de la más próxima a la más lejana
+      return fa - fb;
     }) || [];
     
     const listaOcsAdelantar = ocsAdelantar.length > 0 ? ocsAdelantar.map(oc => {
@@ -347,7 +350,6 @@ const App = () => {
     
     const procesar = (txt) => {
       if (!txt) return "";
-      // Agregamos el replace de ocs_a_adelantar
       return txt.replace(/{nombre}/g, insumo.nombre || "").replace(/{codigo}/g, insumo.codigo || "").replace(/{dias}/g, dias >= 999 ? 'Infinitos' : dias).replace(/{fechaQuiebre}/g, fechaQ).replace(/{ocs}/g, listaOcs).replace(/{solpeds}/g, listaSolpeds).replace(/{ocs_a_adelantar}/g, listaOcsAdelantar);
     };
     return { asunto: procesar(template.asunto || "⚠️ Asunto vacío"), cuerpo: procesar(template.cuerpo || "⚠️ Cuerpo vacío"), destino: template.destino || "compras" };
@@ -405,7 +407,7 @@ const App = () => {
     const correosFinales = [...correosDirectorio];
     if (correoManual) correosFinales.push(correoManual);
     const correosStr = correosFinales.join(",");
-    
+
     if (correosStr.length === 0 && modoAccion !== 'HILO') {
       setToastMsg("⚠️ Error: Seleccioná un destinatario antes de continuar.");
       setTimeout(() => setToastMsg(null), 4000);
@@ -423,7 +425,7 @@ const App = () => {
         console.error("Error guardando reclamo:", error);
       }
     };
-    
+
     if (modoAccion === 'HILO') {
       try {
         navigator.clipboard.writeText(reclamoDraft.cuerpo);
@@ -449,7 +451,7 @@ const App = () => {
       }
     }
   };
-  
+
   const cerrarReclamoManual = async (reclamoId, e) => {
     if (e) e.stopPropagation();
     try {
@@ -468,7 +470,7 @@ const App = () => {
       console.error("Error táctico cerrando el reclamo:", error);
     }
   };
-  
+
   const exportarBackupDB = () => {
     const data = JSON.stringify({ insumos: insumosRaw, reclamos: reclamosRaw, config }, null, 2);
     const blob = new Blob([data], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Backup_ERP_${new Date().toISOString().split('T')[0]}.json`;
@@ -482,10 +484,8 @@ const App = () => {
       try {
         const data = JSON.parse(event.target.result);
         if (data.config) await guardarConfigEnFirebase(data.config);
-        if (data.reclamos) for (const r of data.reclamos) { const { id, ...rest } = r;
-          await setDoc(doc(db, "reclamos", id), rest); }
-        if (data.insumos) for (const i of data.insumos) { const { id, ...rest } = i;
-          await setDoc(doc(db, "insumos", id), rest); }
+        if (data.reclamos) for (const r of data.reclamos) { const { id, ...rest } = r; await setDoc(doc(db, "reclamos", id), rest); }
+        if (data.insumos) for (const i of data.insumos) { const { id, ...rest } = i; await setDoc(doc(db, "insumos", id), rest); }
         alert("¡Base de datos restaurada con éxito!");
       } catch (err) { alert("Error al leer el archivo JSON: Archivo corrupto o formato inválido."); }
     };
@@ -497,44 +497,60 @@ const App = () => {
   const grupos = [...new Set(insumosVivos.map(item => item.grupo || 'SIN CLASIFICAR'))].sort((a, b) => a.localeCompare(b));
   const reclamosActivos = activeInsumo ? reclamos.filter(r => r.insumoId === activeInsumo.id) : [];
 
+  // --- FILTROS DE ALERTAS BLINDADOS (Array) ---
   let datosAlerta = []; let tituloAlerta = "";
   const uCriticoApp = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
   const uUrgenciaApp = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
   
-  if (filtroAlerta === 'quiebres') { datosAlerta = insumosVivos.filter(i => i.stock <= 0); tituloAlerta = "Quiebres Confirmados"; } 
-  else if (filtroAlerta === 'favoritos') { datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp && i.supervivencia > uCriticoApp); tituloAlerta = "Favoritos en Riesgo"; } 
-  else if (filtroAlerta === 'oc_tardia') { datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); tituloAlerta = "OC Demoradas"; } 
-  else if (filtroAlerta === 'mis_favoritos') { datosAlerta = insumosVivos.filter(i => i.favorito); tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; }
-  else if (filtroAlerta === 'todos') { datosAlerta = insumosVivos; tituloAlerta = "Inventario Completo"; }
+  const hoy = new Date();
+  const hace10DiasApp = new Date();
+  hace10DiasApp.setDate(hoy.getDate() - 10);
+
+  const parsearFechaApp = (fRaw) => {
+    if (!fRaw) return new Date(2100, 1, 1);
+    if (fRaw.seconds) return new Date(fRaw.seconds * 1000);
+    if (typeof fRaw === 'string' && fRaw.includes('/')) {
+      const p = fRaw.split('/');
+      if (p.length === 3) return new Date(p[2], p[1]-1, p[0]);
+    }
+    return new Date(fRaw);
+  };
+
+  if (filtroAlerta === 'quiebres') { 
+      datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uCriticoApp); 
+      tituloAlerta = "Quiebres Confirmados"; 
+  } 
+  else if (filtroAlerta === 'riesgo') { 
+      datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp); 
+      tituloAlerta = "Favoritos en Riesgo"; 
+  } 
+  else if (filtroAlerta === 'ocs') { 
+      datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); 
+      tituloAlerta = "OC Demoradas"; 
+  } 
+  else if (filtroAlerta === 'solpeds_viejas') {
+      datosAlerta = insumosVivos.filter(ins => 
+        (ins.detalleSolpeds || []).some(sp => {
+          const fechaBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
+          if (!fechaBase) return false;
+          return parsearFechaApp(fechaBase) < hace10DiasApp;
+        })
+      );
+      tituloAlerta = "SOLPEDS s/ OC (+10 Días)";
+  }
+  else if (filtroAlerta === 'mis_favoritos') { 
+      datosAlerta = insumosVivos.filter(i => i.favorito); 
+      tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; 
+  }
+  else if (filtroAlerta === 'todos') { 
+      datosAlerta = insumosVivos; 
+      tituloAlerta = "Inventario Completo"; 
+  }
   
   if (currentUser.rol !== 'owner') {
     datosAlerta = datosAlerta.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
   }
 
-  useEffect(() => {
-    const modoCierre = config?.modoCierreReclamos || 'manual';
-    if (currentUser?.rol !== 'owner' || insumos.length === 0 || reclamos.length === 0) return;
-
-    const procesarLimpieza = async () => {
-      const reclamosAbiertos = reclamos.filter(r => r.estado === 'ABIERTO');
-      const umbral = config?.umbralUrgencia || 15;
-
-      for (const reclamo of reclamosAbiertos) {
-        const insumo = insumos.find(i => i.id === reclamo.insumoId);
-        if (!insumo || insumo.discontinuado || (modoCierre === 'auto' && insumo.supervivencia > umbral)) {
-          try {
-            await updateDoc(doc(db, "reclamos", reclamo.id), { 
-              estado: 'CERRADO',
-              fechaCierre: serverTimestamp(),
-              motivoCierre: insumo?.discontinuado ? 'Auto-cierre: Insumo al sótano' : 'Auto-cierre: Stock regularizado'
-            });
-          } catch (e) { console.error("Error en auto-cierre:", e); }
-        }
-      }
-    };
-    procesarLimpieza();
-  }, [insumos, reclamos, currentUser, config]);
-  
   if (cargandoAuth) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-500">Verificando credenciales...</div>;
   if (!usuarioLogueado) return <VistaLogin />;
 
@@ -846,12 +862,12 @@ const App = () => {
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 p-6 text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                 <AlertTriangle size={32} className="text-slate-400" />
-               </div>
+              </div>
               <h3 className="text-slate-800 font-black text-lg mb-2 uppercase tracking-widest">{dialogoConfirmacion.titulo}</h3>
               <p className="text-slate-500 text-xs font-bold mb-8 px-2">{dialogoConfirmacion.mensaje}</p>
               <div className="flex gap-3">
                 <button onClick={() => setDialogoConfirmacion(null)} className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Cancelar</button>
-                 <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null);
+                <button onClick={() => { dialogoConfirmacion.onConfirm(); setDialogoConfirmacion(null);
                 }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-md ${dialogoConfirmacion.colorBoton || 'bg-orange-500 hover:bg-orange-600'}`}>{dialogoConfirmacion.textoConfirmar || 'Aceptar'}</button>
               </div>
             </motion.div>
