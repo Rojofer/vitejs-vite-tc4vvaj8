@@ -233,7 +233,6 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                     </button>
                     
                     <button 
-                      <button 
                       onClick={() => setLocalConfig({ ...localConfig, modoCierreReclamos: 'auto' })}
                       className={`flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${localConfig.modoCierreReclamos === 'auto' ? 'bg-white border-purple-500 shadow-md text-purple-700' : 'bg-purple-100/50 border-transparent text-purple-400 hover:bg-white'}`}
                     >
@@ -242,7 +241,6 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                     </button>
                   </div>
                 </div>
-
                 {/* --- NUEVO MÓDULO: ALERTAS AUTOMÁTICAS DIARIAS GMAIL --- */}
                 <div className="bg-indigo-50/50 border border-indigo-100 p-6 rounded-2xl shadow-sm md:col-span-2 mt-2 space-y-6">
                   <div>
