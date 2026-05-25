@@ -233,6 +233,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                     </button>
                     
                     <button 
+                      <button 
                       onClick={() => setLocalConfig({ ...localConfig, modoCierreReclamos: 'auto' })}
                       className={`flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${localConfig.modoCierreReclamos === 'auto' ? 'bg-white border-purple-500 shadow-md text-purple-700' : 'bg-purple-100/50 border-transparent text-purple-400 hover:bg-white'}`}
                     >
@@ -241,6 +242,61 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                     </button>
                   </div>
                 </div>
+
+                {/* --- NUEVO MÓDULO: ALERTAS AUTOMÁTICAS DIARIAS GMAIL --- */}
+                <div className="bg-indigo-50/50 border border-indigo-100 p-6 rounded-2xl shadow-sm md:col-span-2 mt-2 space-y-6">
+                  <div>
+                    <h5 className="font-black text-indigo-900 text-sm uppercase tracking-tight flex items-center gap-2">🤖 Configuración de Alertas Diarias (08:00 AM)</h5>
+                    <p className="text-[9px] font-bold text-indigo-400 uppercase mt-0.5">Parámetros del motor de correo automático para operarios</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Email Administrador Alertas</label>
+                      <input 
+                        type="email" 
+                        value={localConfig.emailAdminAlertas || ""} 
+                        onChange={(e) => setLocalConfig({ ...localConfig, emailAdminAlertas: e.target.value })}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500 bg-white shadow-sm"
+                        placeholder="ejemplo@devesa.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Umbral Antigüedad SOLPEDs</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="90"
+                          value={localConfig.diasUmbralSolped !== undefined ? localConfig.diasUmbralSolped : 10} 
+                          onChange={(e) => setLocalConfig({ ...localConfig, diasUmbralSolped: Number(e.target.value) })}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500 bg-white shadow-sm"
+                        />
+                        <span className="flex items-center text-[10px] font-black uppercase text-slate-400">Días</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Umbral de Riesgo por Mail</label>
+                        <span className="text-xs font-black text-indigo-600 bg-indigo-100/50 px-2 py-0.5 rounded-md border border-indigo-200">
+                          {localConfig.umbralMailRiesgo !== undefined ? localConfig.umbralMailRiesgo : 15} d
+                        </span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="1" 
+                        max="60" 
+                        value={localConfig.umbralMailRiesgo !== undefined ? localConfig.umbralMailRiesgo : 15} 
+                        onChange={(e) => setLocalConfig({ ...localConfig, umbralMailRiesgo: Number(e.target.value) })} 
+                        className="w-full accent-indigo-600 cursor-pointer h-2 bg-indigo-200 rounded-lg appearance-none mt-3.5" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+              </div>
                 
               </div>
             </motion.div>
