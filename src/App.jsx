@@ -290,6 +290,19 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
+  // --- CORTE QUIRÚRGICO: ESCAPE PARA OCULTAR PANEL Y DETALLES ---
+  useEffect(() => {
+    const controlarEscape = (event) => {
+      if (event.key === 'Escape') {
+        setActiveInsumo(null); // Oculta el panel lateral derecho de detalles
+        setReclamoDraft(null); // Cierra el redactor si estaba a mitad de camino
+        setAlertaHilo(null);   // Limpia popups de hilos
+      }
+    };
+    window.addEventListener('keydown', controlarEscape);
+    return () => window.removeEventListener('keydown', controlarEscape);
+  }, []);
+
   const reclamos = useMemo(() => {
     const asc = [...reclamosRaw].sort((a, b) => (a.fecha?.seconds || 0) - (b.fecha?.seconds || 0)); const counts = {};
     const procesados = asc.map(r => { if(r.insumoId !== "BROADCAST") counts[r.insumoId] = (counts[r.insumoId] || 0) + 1; return { ...r, iteracion: counts[r.insumoId] || 0 }; });
