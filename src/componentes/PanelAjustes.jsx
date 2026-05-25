@@ -295,11 +295,11 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                     <h5 className="font-black text-slate-800 text-sm uppercase tracking-tight flex items-center gap-2 mb-4"><CheckCircle size={16} className="text-purple-500"/> Resolución de Tickets</h5>
                     <p className="text-[10px] font-bold text-slate-500 mb-4 leading-relaxed">Definí cómo el sistema limpia la pizarra de auditoría cuando un insumo recupera su nivel de stock o sale de la zona de riesgo.</p>
                     <div className="flex gap-3 mt-auto">
-                      <button onClick={() => setLocalConfig({...localConfig, modoCierreReclamos: 'manual'})} className={`flex-1 py-3 px-4 rounded-xl border text-left transition-all ${localConfig.modoCierreReclamos !== 'auto' ? 'bg-purple-50 border-purple-300 shadow-sm' : 'bg-white border-slate-200 hover:border-purple-200'}`}>
+                      <button type="button" onClick={() => setLocalConfig({...localConfig, modoCierreReclamos: 'manual'})} className={`flex-1 py-3 px-4 rounded-xl border text-left transition-all ${localConfig.modoCierreReclamos !== 'auto' ? 'bg-purple-50 border-purple-300 shadow-sm' : 'bg-white border-slate-200 hover:border-purple-200'}`}>
                         <span className={`block text-[10px] font-black uppercase tracking-widest mb-0.5 ${localConfig.modoCierreReclamos !== 'auto' ? 'text-purple-700' : 'text-slate-600'}`}>Manual</span>
                         <span className="text-[9px] font-bold text-slate-400">El operario cierra el hilo</span>
                       </button>
-                      <button onClick={() => setLocalConfig({...localConfig, modoCierreReclamos: 'auto'})} className={`flex-1 py-3 px-4 rounded-xl border text-left transition-all ${localConfig.modoCierreReclamos === 'auto' ? 'bg-purple-50 border-purple-300 shadow-sm' : 'bg-white border-slate-200 hover:border-purple-200'}`}>
+                      <button type="button" onClick={() => setLocalConfig({...localConfig, modoCierreReclamos: 'auto'})} className={`flex-1 py-3 px-4 rounded-xl border text-left transition-all ${localConfig.modoCierreReclamos === 'auto' ? 'bg-purple-50 border-purple-300 shadow-sm' : 'bg-white border-slate-200 hover:border-purple-200'}`}>
                         <span className={`block text-[10px] font-black uppercase tracking-widest mb-0.5 ${localConfig.modoCierreReclamos === 'auto' ? 'text-purple-700' : 'text-slate-600'}`}>Automático</span>
                         <span className="text-[9px] font-bold text-slate-400">Si el stock sube, se cierra</span>
                       </button>
