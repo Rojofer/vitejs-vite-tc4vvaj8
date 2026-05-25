@@ -232,7 +232,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                       <span className="text-[9px] font-bold text-center px-4">El operario debe cerrarlo a mano confirmando el ingreso físico o estratégico.</span>
                     </button>
                     
-                    <button 
+                  <button 
                       onClick={() => setLocalConfig({ ...localConfig, modoCierreReclamos: 'auto' })}
                       className={`flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${localConfig.modoCierreReclamos === 'auto' ? 'bg-white border-purple-500 shadow-md text-purple-700' : 'bg-purple-100/50 border-transparent text-purple-400 hover:bg-white'}`}
                     >
@@ -241,6 +241,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                     </button>
                   </div>
                 </div>
+
                 {/* --- NUEVO MÓDULO: ALERTAS AUTOMÁTICAS DIARIAS GMAIL --- */}
                 <div className="bg-indigo-50/50 border border-indigo-100 p-6 rounded-2xl shadow-sm md:col-span-2 mt-2 space-y-6">
                   <div>
@@ -294,10 +295,8 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                   </div>
                 </div>
                 
-              </div>
-                
-              </div>
-            </motion.div>
+              </div>  
+                  </motion.div>
           )}
 
           {settingsTab === 'feriados' && (<motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}><h4 className="text-lg font-black text-slate-800 uppercase tracking-tight mb-2">Gestor de Feriados</h4><div className="flex items-center gap-4 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm"><input type="date" value={nuevoFeriado} onChange={(e) => setNuevoFeriado(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm outline-none" /><button onClick={() => {if(!nuevoFeriado) return; setLocalConfig({ ...localConfig, feriados: [...(localConfig.feriados || []), nuevoFeriado].sort() }); setNuevoFeriado("");}} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-black uppercase flex items-center gap-2 hover:bg-slate-700"><Plus size={16}/> Cargar Feriado</button></div><div className="grid grid-cols-4 gap-4">{(localConfig.feriados||[]).map((f, idx) => { const fecha = new Date(f + "T12:00:00"); return (<div key={idx} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center"><div><p className="text-[10px] font-black text-slate-400 uppercase">Feriado</p><p className="text-sm font-bold text-slate-800">{fecha.toLocaleDateString('es-AR')}</p></div><button onClick={() => { setLocalConfig({ ...localConfig, feriados: (localConfig.feriados || []).filter(x => x !== f) }); }} className="text-slate-300 hover:text-red-500"><Trash2 size={16}/></button></div>);})}</div></motion.div>)}
