@@ -233,6 +233,19 @@ const App = () => {
 
   const [showWelcome, setShowWelcome] = useState(true);
 
+  // --- CORTE QUIRÚRGICO: ESCAPE PARA CERRAR PANEL ---
+  useEffect(() => {
+    const handleEsc = (event) => {
+      if (event.key === 'Escape') {
+        setActiveInsumo(null); // Cierra el PanelDetalle
+        setReclamoDraft(null); // Cierra el ModalRedactor si está abierto
+        setAlertaHilo(null);   // Cierra la alerta de hilo
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
+
   useEffect(() => {
     const unsubConfig = onSnapshot(doc(db, "config", "general"), (docSnap) => { if (docSnap.exists()) setConfig(docSnap.data()); else setDoc(doc(db, "config", "general"), config); });
     return () => unsubConfig();
