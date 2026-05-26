@@ -20,10 +20,18 @@ const VistaNotificaciones = ({
   const equipo = contactos.filter(c => c.tipo === 'equipo');
 
   // Filtramos los BROADCAST. El Owner ve todos, el operario solo los suyos.
-  const misNotificaciones = reclamos.filter(r => 
-    r.insumoId === "BROADCAST" && 
-    (currentUser.rol === 'owner' || r.destinatarioId?.includes(String(currentUser.id)))
-  );
+  const misNotificaciones = reclamos.filter(r => {
+    const esBroadcast = r.insumoId === "BROADCAST";
+    const esTicketAbierto = r.estado === 'ABIERTO';
+    
+    // Si es un aviso general, aplica el filtro de destino original
+    if (esBroadcast) {
+      return currentUser.rol === 'owner' || r.destinatarioId?.includes(String(currentUser.id));
+    }
+    
+    // Si es un reclamo de insumo, entra a la bandeja si está abierto
+    return esTicketAbierto;
+  });
 
   const marcarComoLeido = async (noti) => {
     if (!noti.leidoPor?.includes(currentUser.nombre)) {
