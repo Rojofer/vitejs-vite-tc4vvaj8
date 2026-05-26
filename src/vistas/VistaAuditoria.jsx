@@ -439,13 +439,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                 const tipoSub = getTipoReclamo(item.mensaje);
                                 return (
                                   <motion.tr key={item.id || iIdx} onClick={() => setActiveInsumo(insumoAsociado)} initial={{ opacity: 0, backgroundColor: "#f8fafc" }} animate={{ opacity: 1, backgroundColor: "#f8fafc" }} exit={{ opacity: 0 }} className="border-b border-slate-100/50 align-middle cursor-pointer">
-                                    {/* 1. Celda bajo el botón de expansión */}
                                     <td className="py-3 px-4"></td>
-                                    
-                                    {/* 2. Celda bajo el número de Ticket (queda vacía en las iteraciones secundarias) */}
                                     <td className="py-3 px-4"></td>
-                                    
-                                    {/* 3. Celda bajo el código/nombre del insumo, donde arranca la flecha de la iteración */}
                                     <td className="py-3 px-4">
                                       <div className="flex items-center gap-2">
                                         <CornerDownRight size={12} className="text-slate-400" />
