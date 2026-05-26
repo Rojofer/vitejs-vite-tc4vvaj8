@@ -148,11 +148,13 @@ const ModalRedactor = ({
     }
 
     let matchNames = [];
-    const originalText = textoTemplateCrudo || "";
-    if (originalText.includes('{solpeds_viejas}')) {
+    const originalTextUpper = String(textoTemplateCrudo || "").toUpperCase();
+    
+    // Escáner flexible de etiquetas en la plantilla
+    if (originalTextUpper.includes('{SOLPEDS_VIEJAS}') || originalTextUpper.includes('{SOLPEDS}')) {
       (insumo.detalleSolpeds || []).forEach(sp => matchNames.push(sp.comprador));
     } 
-    if (originalText.includes('{ocs_aprobadas}') || originalText.includes('{ocs_todas_etiquetadas}') || originalText.includes('{ocs_pendientes}')) {
+    if (originalTextUpper.includes('{OCS_APROBADAS}') || originalTextUpper.includes('{OCS_TODAS_ETIQUETADAS}') || originalTextUpper.includes('{OCS_PENDIENTES}') || originalTextUpper.includes('{OCS_A_ADELANTAR}') || originalTextUpper.includes('{OCS}')) {
       (insumo.detalleOCs || []).forEach(oc => matchNames.push(oc.comprador));
     }
 
@@ -166,7 +168,8 @@ const ModalRedactor = ({
       .filter(r => r !== "sin asignar" && r !== "no_asignada" && r !== "" && r !== "-");
 
     let matchedIds = [];
-    // Función auxiliar para remover acentos, diéresis y dejar el texto plano
+    
+    // Función para pulverizar acentos, diéresis y eñes
     const limpiarAcentos = (str) => 
       String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
