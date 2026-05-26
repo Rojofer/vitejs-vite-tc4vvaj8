@@ -585,6 +585,7 @@ const App = () => {
     tituloAlerta = "SOLPEDS Emitidas s/ OC (+10 Días)";
   }
   else if (filtroAlerta === 'tickets_abiertos') {
+    // Agrupa por ID de insumo único para no duplicar tickets si hay varios reclamos en un mismo hilo
     const insumosConTicket = [...new Set(reclamos.filter(r => r.estado === 'ABIERTO').map(r => r.insumoId))];
     datosAlerta = insumosVivos.filter(i => insumosConTicket.includes(i.id));
     tituloAlerta = "Insumos con Reclamos Activos";
