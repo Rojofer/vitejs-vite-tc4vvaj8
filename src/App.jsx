@@ -372,7 +372,7 @@ const App = () => {
     
     const listaOcsAdelantar = ocsAdelantar.length > 0 ? ocsAdelantar.map(oc => {
       const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha);
-      return `- OC ${oc.numero} (${formatoNum(oc.cantidad)} un.) | Ingreso Pautado: ${f.toLocaleDateString('es-AR')} | Adelantar para: ${fechaQ}`;
+      return `- OC ${oc.numero} (${formatoNum(oc.cantidad)} un.) | Ingreso Pautado: ${f.toLocaleDateString('es-AR')} | Adelantar para: ${fechaQ} | Resp: ${oc.comprador || 'SIN ASIGNAR'}`;
     }).join("\n") : "Sin OCs a futuro para adelantar";
 
     const solpedsD = insumo.detalleSolpeds || [];
