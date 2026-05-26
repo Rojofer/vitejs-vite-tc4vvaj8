@@ -331,6 +331,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <thead className="sticky top-0 z-20 shadow-sm">
                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       <th className="py-4 px-4 w-12 text-center bg-white rounded-tl-3xl border-b border-slate-200"></th>
+                      <th className="py-4 px-4 bg-white border-b border-slate-200 text-center w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nro. Ticket</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Cód. / Insumo</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Última Act.</th>
                       <th className="py-4 px-4 text-center bg-white border-b border-slate-200">Estado</th>
@@ -355,6 +356,19 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                           <React.Fragment key={h.insumoId || idx}>
                             <tr onClick={() => setActiveInsumo(insumoAsociado)} className="hover:bg-slate-50/80 transition-colors group align-middle cursor-pointer">
                               <td className="py-4 px-4 text-center">
+                                {h.totalReclamos > 1 ? (
+                                  <button onClick={(e) => { e.stopPropagation(); setExpandedRow(isExpanded ? null : h.insumoId); }} className="p-1 rounded bg-white border border-slate-200 text-slate-500 hover:border-slate-400 transition-colors shadow-sm">
+                                    <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}/>
+                                  </button>
+                                ) : ( <span className="w-6 inline-block"></span> )}
+                              </td>
+
+                              {/* NUEVA CELDA: NRO DE TICKET */}
+                              <td className="py-4 px-4 text-center align-middle">
+                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-700 tracking-wide border border-slate-200">
+                                  {insumoAsociado.ticketReclamo || "-"}
+                                </span>
+                              </td>
                                 {h.totalReclamos > 1 ? (
                                   <button onClick={(e) => { e.stopPropagation(); setExpandedRow(isExpanded ? null : h.insumoId); }} className="p-1 rounded bg-white border border-slate-200 text-slate-500 hover:border-slate-400 transition-colors shadow-sm">
                                     <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}/>
@@ -426,6 +440,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                 return (
                                   <motion.tr key={item.id || iIdx} onClick={() => setActiveInsumo(insumoAsociado)} initial={{ opacity: 0, backgroundColor: "#f8fafc" }} animate={{ opacity: 1, backgroundColor: "#f8fafc" }} exit={{ opacity: 0 }} className="border-b border-slate-100/50 align-middle cursor-pointer">
                                     <td className="py-3 px-4"></td>
+                                    <td className="py-3 px-4"></td> {/* Relleno por columna Nro Ticket */}
                                     <td className="py-3 px-4">
                                       <div className="flex items-center gap-2">
                                         <CornerDownRight size={12} className="text-slate-400" />
