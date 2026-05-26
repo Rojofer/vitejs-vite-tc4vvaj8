@@ -143,14 +143,12 @@ const ModalRedactor = ({
 
   // --- MOTOR 2: MATCH AUTOMÁTICO DE CONTACTOS INTERNOS ---
   const autoSeleccionarDestinatarios = (textoTemplateCrudo, insumo, plantillaId) => {
-    // Si es plantilla de Autorización, el destino obligatorio es el Directorio de Planta
-    if (plantillaId === 'comprasGrave' || plantillaId === 'comprasLeve' ? false : (plantillaId === 'comprasGrave' || String(plantillaId).toUpperCase().includes('AUTORIZAR') || String(textoTemplateCrudo).toUpperCase().includes('AUTORIZAR'))) {
+    if (plantillaId !== 'comprasGrave' && plantillaId !== 'comprasLeve' && (String(plantillaId).toUpperCase().includes('AUTORIZAR') || String(textoTemplateCrudo).toUpperCase().includes('AUTORIZAR'))) {
       return contactos.filter(c => c.tipo === 'planta').map(c => c.id);
     }
 
     let matchNames = [];
     const originalText = textoTemplateCrudo || "";
-
     if (originalText.includes('{solpeds_viejas}')) {
       (insumo.detalleSolpeds || []).forEach(sp => matchNames.push(sp.comprador));
     } 
@@ -162,23 +160,18 @@ const ModalRedactor = ({
       matchNames.push(insumo.owner);
     }
 
+    const responsablesFiltrados = matchNames
+      .filter(Boolean)
+      .map(r => String(r).trim().toLowerCase())
+      .filter(r => r !== "sin asignar" && r !== "no_asignada" && r !== "" && r !== "-");
+
     let matchedIds = [];
-    matchNames.forEach(rawName => {
-      if (!rawName) return;
-      const cleanName = String(rawName).trim().toLowerCase();
+    contactos.forEach(c => {
+      const terminos = [c.alias, c.label, c.email?.split('@')[0]].filter(Boolean).map(t => String(t).trim().toLowerCase());
+      const coincidencia = terminos.some(t => responsablesFiltrados.some(r => r.includes(t) || t.includes(r)));
       
-      // EXTERMINADO: Si viene "sin asignar" o vacío, ya NO se marca la variable global de tildar a todos.
-      if (cleanName !== "sin asignar" && cleanName !== "no_asignada" && cleanName !== "" && cleanName !== "-") {
-        const contactoEncontrado = contactos.find(c => {
-          const aliasC = String(c.alias || "").trim().toLowerCase();
-          const labelC = String(c.label || "").trim().toLowerCase();
-          if (aliasC && cleanName.includes(aliasC)) return true;
-          if (labelC && cleanName.includes(labelC)) return true;
-          return false;
-        });
-        if (contactoEncontrado && contactoEncontrado.tipo === 'compras') {
-          matchedIds.push(contactoEncontrado.id);
-        }
+      if (coincidencia && c.tipo === 'compras') {
+        matchedIds.push(c.id);
       }
     });
 
