@@ -646,7 +646,7 @@ const App = () => {
           <div className="relative">
             <Bell size={22} />
             {(() => {
-              const msjSinLeer = reclamos.filter(r => r.insumoId === "BROADCAST" && r.destinatarioId?.includes(String(currentUser.id)) && !(r.leidoPor || []).includes(currentUser.nombre)).length;
+              const msjSinLeer = [...new Set(reclamos.filter(r => r.estado === 'ABIERTO' && r.insumoId !== "BROADCAST").map(r => r.insumoId))].length;
               if (msjSinLeer > 0) return <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full border-2 border-slate-900 shadow-[0_0_8px_rgba(239,68,68,0.8)]">{msjSinLeer}</span>;
               return null;
             })()}
