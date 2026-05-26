@@ -279,7 +279,7 @@ const App = () => {
     };
   });
 
-  // --- 🛡️ ESCUDO ANTI-DUPLICADOS Y FANTASMAS ---
+  // --- 🛡️ ESCUDO ANTI-DUPLICADOS Y FANTASMAS REFORZADO ---
   const mapUnicos = new Map();
   data.forEach(item => {
     const cod = item.codigo || item.id;
@@ -287,15 +287,16 @@ const App = () => {
       mapUnicos.set(cod, item);
     } else {
       const existente = mapUnicos.get(cod);
-      // Si el script clonó el insumo y una versión ya estaba en el sótano, prevalece el archivo
-      if (existente.discontinuado || item.discontinuado) {
+      if (existente.discontinuado || item.discontinuado || existente.estado === 'archivado' || item.estado === 'archivado') {
         item.discontinuado = true;
       }
       mapUnicos.set(cod, item);
     }
   });
   
-  setInsumosRaw(Array.from(mapUnicos.values()));
+  // Filtrado final de seguridad: si está discontinuado, no entra al almacenamiento raw activo
+  const limpiosDeArchivo = Array.from(mapUnicos.values()).filter(i => !i.discontinuado && i.estado !== 'archivado');
+  setInsumosRaw(limpiosDeArchivo);
   if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
 });
     return () => unsubscribe();
