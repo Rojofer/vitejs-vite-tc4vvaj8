@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Star, Clock, ArrowLeft, Package, Activity, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Star, Clock, ArrowLeft, Package, Activity, MessageSquare, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TablaInsumos from '../componentes/TablaInsumos';
 
@@ -248,8 +248,8 @@ const VistaGestion = ({
           (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             
-            {/* GRILLA DE KPIS - 5 COLUMNAS SIMÉTRICAS */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
+            {/* GRILLA DE KPIS - 6 COLUMNAS SIMÉTRICAS (ALTA DENSIDAD SAAS) */}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-10">
               {(() => {
                 const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
                 
@@ -281,7 +281,16 @@ const VistaGestion = ({
                 
                 const misInsumosIds = misInsumosDashboard.map(i => i.id);
                 const kpiTickets = (reclamos || []).filter(r => r.estado === 'ABIERTO' && r.tipo !== 'AVISO GERENCIA' && misInsumosIds.includes(r.insumoId));
-                
+
+                // Nuevo KPI: OCs Trabadas por firmas (Lee directo de SAP)
+                const kpiOcPendientes = misInsumosDashboard.filter(i => 
+                  i.detalleOCs && i.detalleOCs.some(oc => 
+                    String(oc.estado || '').toUpperCase().includes('PROCESO') || 
+                    String(oc.estado || '').toUpperCase().includes('AUTORIZAC') || 
+                    String(oc.estado || '').toUpperCase().includes('PENDIENTE')
+                  )
+                );
+
                 const total = misInsumosDashboard.length || 1;
 
                 return (
@@ -327,10 +336,22 @@ const VistaGestion = ({
                       <div className="flex items-end justify-between">
                         <p className="text-3xl font-black text-slate-800 leading-none">{kpiSolpeds.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">+10 Días</span>
-                      </div>
-                    </div>
+                  </div>
+                </div>
 
-                    <div onClick={() => setFiltroAlerta('tickets_abiertos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-blue-300 transition-all duration-300 flex flex-col justify-between">
+                {/* NUEVA TARJETA: OC PENDIENTES DE APROBACIÓN */}
+                <div onClick={() => setFiltroAlerta('oc_pend_aprobacion')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-cyan-300 transition-all duration-300 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] sm:text-[11px] font-black text-cyan-600 uppercase tracking-widest leading-tight">OC a Firmar</span>
+                    <div className="p-2 bg-cyan-50 rounded-xl"><CheckSquare size={16} className="text-cyan-600"/></div>
+                  </div>
+                  <div className="flex items-end justify-between">
+                    <p className="text-3xl font-black text-slate-800 leading-none">{kpiOcPendientes.length}</p>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Trabadas</span>
+                  </div>
+                </div>
+
+                <div onClick={() => setFiltroAlerta('tickets_abiertos')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-blue-300 transition-all duration-300 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-4">
                         <span className="text-[10px] sm:text-[11px] font-black text-blue-500 uppercase tracking-widest leading-tight">Tickets Abiertos</span>
                         <div className="p-2 bg-blue-50 rounded-xl"><MessageSquare size={16} className="text-blue-500"/></div>
