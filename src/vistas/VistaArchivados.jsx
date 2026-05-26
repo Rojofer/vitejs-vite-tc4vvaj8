@@ -56,7 +56,7 @@ const VistaArchivados = ({ insumos, currentUser, setToastMsg, setDialogoConfirma
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-y-auto max-h-[72vh] scrollbar-thin">
         {archivados.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20">
             <AlertCircle size={40} className="mb-3 opacity-20" />
