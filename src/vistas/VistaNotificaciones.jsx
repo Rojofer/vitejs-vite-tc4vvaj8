@@ -29,8 +29,8 @@ const VistaNotificaciones = ({
       return currentUser.rol === 'owner' || r.destinatarioId?.includes(String(currentUser.id));
     }
     
-    // Si es un reclamo de insumo, entra a la bandeja si está abierto
-    return esTicketAbierto;
+    // SÓLO EL OWNER VE LOS RECLAMOS ABIERTOS EN ESTA BANDEJA
+    return esTicketAbierto && currentUser.rol === 'owner';
   });
 
   const marcarComoLeido = async (noti) => {
