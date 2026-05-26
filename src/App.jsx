@@ -404,11 +404,10 @@ const App = () => {
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
     let destinatariosMatch = [];
-    const respSAP = [insumo.owner, ...(insumo.detalleOCs || []).map(oc => oc.comprador), ...(insumo.detalleSolpeds || []).map(sp => sp.comprador)].filter(Boolean).map(r => String(r).trim().toLowerCase());
-    (config.contactos || []).forEach(c => {
-        const terminos = [c.alias, c.label, c.email?.split('@')[0]].filter(Boolean).map(t => String(t).trim().toLowerCase());
-        if (terminos.some(t => respSAP.some(r => r.includes(t) || t.includes(r))) && c.tipo === destino && !destinatariosMatch.includes(c.id)) destinatariosMatch.push(c.id);
-    });(contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
+    if (insumo.owner && insumo.owner !== "Sin asignar") { // [cite: 194]
+        const txtOwner = String(insumo.owner).trim().toLowerCase(); // [cite: 194]
+        const contacto = (config.contactos || []).find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner)); // [cite: 195]
+        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id); // 
     }
 
     setReclamoDraft({ 
