@@ -240,45 +240,40 @@ const ModalRedactor = ({
 
   const tipoFiltroContacto = (reclamoDraft.tipoPlantilla?.toUpperCase().includes('AUTORIZAR') || reclamoDraft.tipoDestino === 'planta') ? 'planta' : 'compras';
 
-  return (
+    return (
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       exit={{ opacity: 0 }} 
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 sm:p-6"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 sm:p-6"
     >
       <motion.div 
-        initial={{ scale: 0.95, y: 10 }} 
+        initial={{ scale: 0.96, y: 8 }} 
         animate={{ scale: 1, y: 0 }} 
-        exit={{ scale: 0.95, opacity: 0 }} 
-        className="bg-white rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl overflow-hidden max-h-[95vh]"
+        exit={{ scale: 0.96, opacity: 0 }} 
+        className="bg-white rounded-3xl w-full max-w-5xl flex flex-col shadow-2xl overflow-hidden max-h-[90vh] border border-slate-200"
       >
-        <div className="flex justify-between items-center px-8 pt-6 pb-2 border-b border-transparent">
-          <h2 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <Send size={18} className="text-orange-500" /> Emisión de Reclamo
-          </h2>
+        {/* CABECERA COMPACTA CON INTEGRACIÓN DE CANAL */}
+        <div className="flex justify-between items-center px-8 py-4 border-b border-slate-100 bg-white">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-base font-black text-slate-800 tracking-tight uppercase">
+              <Send size={16} className="text-orange-500" /> 
+              <span>Emisión de Reclamo</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-purple-50 rounded-full border border-purple-100 text-[10px] font-black text-purple-700 tracking-wider uppercase">
+              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
+              Interacción {tipoFiltroContacto === 'planta' ? '--> ADMINISTRACIÓN' : '--> SECTOR COMPRAS'}
+            </div>
+          </div>
           <button 
             onClick={() => setReclamoDraft(null)} 
             className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 rounded-full transition-colors"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="px-8 mt-2">
-          <div className="bg-sky-50 text-sky-700 text-[10px] font-bold px-4 py-2 rounded-lg flex items-center gap-2 border border-sky-100">
-            <Info size={14} className="shrink-0"/>
-            El sistema seleccionará automáticamente a los destinatarios según la plantilla que elijas. Verificá los tildes antes de disparar.
-          </div>
-        </div>
-
-        <div className="px-8 mt-2">
-          <div className="bg-purple-50 text-purple-700 text-[10px] font-bold px-4 py-1.5 rounded-lg flex items-center gap-2 border border-purple-100 uppercase tracking-wide">
-            <strong>Canal Activo:</strong> Dirección e Interacción con {tipoFiltroContacto === 'planta' ? '-->ADMINISTRACION' : '--> SECTOR COMPRAS'}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-8 py-4 flex flex-col gap-5">
+        <div className="flex-1 overflow-y-auto px-8 py-5 flex flex-col gap-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 shrink-0">
             <div>
               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Plantilla Operativa</label>
@@ -298,11 +293,19 @@ const ModalRedactor = ({
               <div className="relative">
                 <div 
                   onClick={() => setReclamoDraft({...reclamoDraft, showDestinatarios: !reclamoDraft.showDestinatarios})}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-all shadow-sm min-h-[42px]"
                 >
-                  <span>{reclamoDraft.destinatarios?.length > 0 ? `${reclamoDraft.destinatarios.length} SELECCIONADOS` : 'SELECCIONAR DESTINATARIO'}</span>
-                  <span className="text-[10px] text-slate-400">▼</span>
-                </div>
+                  <span className="truncate uppercase font-black text-slate-700 max-w-[90%]">
+                    {reclamoDraft.destinatarios?.length > 0 
+                      ? reclamoDraft.destinatarios.map(id => {
+                          const c = contactos.find(x => x.id === id);
+                          return c ? (c.alias || c.label) : '';
+                        }).filter(Boolean).join(', ')
+                      : 'SELECCIONAR DESTINATARIO'
+                    }
+                  </span>
+                  <span className="text-[9px] text-slate-400 select-none">▼</span>
+                </div>  
                 
                 {reclamoDraft.showDestinatarios && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto p-2">
