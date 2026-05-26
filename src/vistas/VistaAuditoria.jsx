@@ -362,20 +362,11 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   </button>
                                 ) : ( <span className="w-6 inline-block"></span> )}
                               </td>
-
-                              {/* NUEVA CELDA: NRO DE TICKET */}
                               <td className="py-4 px-4 text-center align-middle">
                                 <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-700 tracking-wide border border-slate-200">
                                   {insumoAsociado.ticketReclamo || "-"}
                                 </span>
                               </td>
-                                {h.totalReclamos > 1 ? (
-                                  <button onClick={(e) => { e.stopPropagation(); setExpandedRow(isExpanded ? null : h.insumoId); }} className="p-1 rounded bg-white border border-slate-200 text-slate-500 hover:border-slate-400 transition-colors shadow-sm">
-                                    <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}/>
-                                  </button>
-                                ) : ( <span className="w-6 inline-block"></span> )}
-                              </td>
-
                               <td className="py-4 px-4">
                                 <div className="flex flex-col">
                                   <span className="text-[9px] font-mono text-slate-400">CÓD: {insumoAsociado.codigo || 'S/C'}</span>
@@ -385,9 +376,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   </span>
                                 </div>
                               </td>
-
                               <td className="py-4 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</td>
-
                               <td className="py-4 px-4 text-center">
                                 {h.estado === 'ABIERTO' && h.tipo !== "APROBACION GERENCIA" ? (
                                   <span className="px-2 py-1 rounded bg-orange-100 text-orange-700 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-orange-500"></span> Abierto</span>
@@ -397,7 +386,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-slate-400"></span> Resuelto</span>
                                 )}
                               </td>
-
                               <td className="py-4 px-4 text-center">
                                 {(() => {
                                   const tipo = getTipoReclamo(h.mensaje);
@@ -409,15 +397,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   );
                                 })()}
                               </td>
-
                               <td className="py-4 px-4">
                                 <button onClick={(e) => { e.stopPropagation(); setModalMensaje(h); }} className="text-[10px] text-sky-600 hover:text-sky-800 font-bold uppercase truncate max-w-[250px] flex items-center gap-1.5 transition-colors text-left">
                                   <Info size={12} className="shrink-0" /> {h.mensaje}
                                 </button>
                               </td>
-
                               {currentUser.rol === 'owner' && <td className="py-4 px-4 text-[9px] font-black text-slate-700 uppercase tracking-wide">{h.operario}</td>}
-
                               <td className="py-4 px-4 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                   {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
