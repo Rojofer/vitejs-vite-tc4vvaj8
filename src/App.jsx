@@ -589,6 +589,15 @@ const App = () => {
     const insumosConTicket = [...new Set(reclamos.filter(r => r.estado === 'ABIERTO').map(r => r.insumoId))];
     datosAlerta = insumosVivos.filter(i => insumosConTicket.includes(i.id));
     tituloAlerta = "Insumos con Reclamos Activos";
+  } else if (filtroAlerta === 'oc_pend_aprobacion') {
+    datosAlerta = insumosVivos.filter(i => 
+      i.detalleOCs && i.detalleOCs.some(oc => 
+        String(oc.estado || '').toUpperCase().includes('PROCESO') || 
+        String(oc.estado || '').toUpperCase().includes('AUTORIZAC') || 
+        String(oc.estado || '').toUpperCase().includes('PENDIENTE')
+      )
+    );
+    tituloAlerta = "Órdenes de Compra a Firmar / Pendientes";
   }
   else if (filtroAlerta === 'todos') { 
     datosAlerta = insumosVivos; 
