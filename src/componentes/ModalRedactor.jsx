@@ -166,9 +166,18 @@ const ModalRedactor = ({
       .filter(r => r !== "sin asignar" && r !== "no_asignada" && r !== "" && r !== "-");
 
     let matchedIds = [];
+    // Función auxiliar para remover acentos, diéresis y dejar el texto plano
+    const limpiarAcentos = (str) => 
+      String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+    const responsablesLimpios = responsablesFiltrados.map(r => limpiarAcentos(r));
+
     contactos.forEach(c => {
-      const terminos = [c.alias, c.label, c.email?.split('@')[0]].filter(Boolean).map(t => String(t).trim().toLowerCase());
-      const coincidencia = terminos.some(t => responsablesFiltrados.some(r => r.includes(t) || t.includes(r)));
+      const terminos = [c.alias, c.label, c.email?.split('@')[0]]
+        .filter(Boolean)
+        .map(t => limpiarAcentos(t));
+        
+      const coincidencia = terminos.some(t => responsablesLimpios.some(r => r.includes(t) || t.includes(r)));
       
       if (coincidencia && c.tipo === 'compras') {
         matchedIds.push(c.id);
