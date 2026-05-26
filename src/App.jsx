@@ -295,8 +295,7 @@ const App = () => {
   });
   
   // Filtrado final de seguridad: si está discontinuado, no entra al almacenamiento raw activo
-  const limpiosDeArchivo = Array.from(mapUnicos.values()).filter(i => !i.discontinuado && i.estado !== 'archivado');
-  setInsumosRaw(limpiosDeArchivo);
+  setInsumosRaw(Array.from(mapUnicos.values()));
   if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
 });
     return () => unsubscribe();
