@@ -276,11 +276,28 @@ const App = () => {
           id: doc.id, ...d, stock, ocDemorada: ocDemoradaTotal, ocFutura: ocFuturaTotal, sp, consumo: consumoMes, 
           supervivencia: supervivencia > 998 ? 999 : supervivencia, cobertura: coberturaReal > 998 ? 999 : coberturaReal, 
           favorito: d.esFavorito || false, owner: d.owner || "Sin asignar" 
-        };
-      });
-      setInsumosRaw(data);
-      if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
-    });
+    };
+  });
+
+  // --- 🛡️ ESCUDO ANTI-DUPLICADOS Y FANTASMAS ---
+  const mapUnicos = new Map();
+  data.forEach(item => {
+    const cod = item.codigo || item.id;
+    if (!mapUnicos.has(cod)) {
+      mapUnicos.set(cod, item);
+    } else {
+      const existente = mapUnicos.get(cod);
+      // Si el script clonó el insumo y una versión ya estaba en el sótano, prevalece el archivo
+      if (existente.discontinuado || item.discontinuado) {
+        item.discontinuado = true;
+      }
+      mapUnicos.set(cod, item);
+    }
+  });
+  
+  setInsumosRaw(Array.from(mapUnicos.values()));
+  if (maxTime > 0) setUltimaAct(new Date(maxTime)); setLoading(false);
+});
     return () => unsubscribe();
   }, []);
 
