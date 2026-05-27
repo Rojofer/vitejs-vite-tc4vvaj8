@@ -663,7 +663,11 @@ const App = () => {
                 if (yaLoLeyo) return false;
                 
                 const esBroadcast = r.insumoId === "BROADCAST";
-                if (esBroadcast) return currentUser.rol === 'owner' || r.destinatarioId?.includes(String(currentUser.id));
+                if (esBroadcast) {
+                  const esParaTodos = r.destinatarioId === 'TODOS';
+                  const esParaMi = Array.isArray(r.destinatarioId) ? r.destinatarioId.includes(String(currentUser.id)) : false;
+                  return currentUser.rol === 'owner' || esParaTodos || esParaMi;
+                }
                 
                 // Los reclamos abiertos solo suman a la campana del Owner
                 return r.estado === 'ABIERTO' && currentUser.rol === 'owner';
