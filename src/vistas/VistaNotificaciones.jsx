@@ -19,18 +19,19 @@ const VistaNotificaciones = ({
 
   const equipo = contactos.filter(c => c.tipo === 'equipo');
 
-  // Filtramos la Bandeja: Avisos Globales + Tickets Abiertos (solo para Owner)
-  const misNotificaciones = reclamos.filter(r => {
-    if (r.insumoId === "BROADCAST") {
-      // El Owner ve todo. El operario ve si es para TODOS o si su ID está en el array de destinatarios.
-      const esParaTodos = r.destinatarioId === 'TODOS';
-      const esParaOperario = Array.isArray(r.destinatarioId) ? r.destinatarioId.includes(String(currentUser.id)) : false;
-      return currentUser.rol === 'owner' || esParaTodos || esParaOperario;
-    }
-    
-    // Si no es BROADCAST, es un reclamo operativo. SÓLO lo ve la gerencia si está ABIERTO.
-    return r.estado === 'ABIERTO' && currentUser.rol === 'owner';
-  });
+  // Sincronización reactiva en tiempo real enganchada al onSnapshot de Firebase
+  const misNotificaciones = React.useMemo(() => {
+    return reclamos.filter(r => {
+      if (r.insumoId === "BROADCAST") {
+        const esParaTodos = r.destinatarioId === 'TODOS';
+        const esParaOperario = Array.isArray(r.destinatarioId) ? r.destinatarioId.includes(String(currentUser.id)) : false;
+        return currentUser.rol === 'owner' || esParaTodos || esParaOperario;
+      }
+      
+      // El Dueño VIP asimila los reclamos operativos en curso al instante
+      return r.estado === 'ABIERTO' && currentUser.rol === 'owner';
+    });
+  }, [reclamos, currentUser]);
 
   const marcarComoLeido = async (noti) => {
     if (!noti.leidoPor?.includes(currentUser.nombre)) {
