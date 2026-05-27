@@ -19,18 +19,17 @@ const VistaNotificaciones = ({
 
   const equipo = contactos.filter(c => c.tipo === 'equipo');
 
-  // Filtramos los BROADCAST. El Owner ve todos, el operario solo los suyos.
+  // Filtramos la Bandeja: Avisos Globales + Tickets Abiertos (solo para Owner)
   const misNotificaciones = reclamos.filter(r => {
-    const esBroadcast = r.insumoId === "BROADCAST";
-    const esTicketAbierto = r.estado === 'ABIERTO';
-    
-    // Si es un aviso general, aplica el filtro de destino original
-    if (esBroadcast) {
-      return currentUser.rol === 'owner' || r.destinatarioId?.includes(String(currentUser.id));
+    if (r.insumoId === "BROADCAST") {
+      // El Owner ve todo. El operario ve si es para TODOS o si su ID está en el array de destinatarios.
+      const esParaTodos = r.destinatarioId === 'TODOS';
+      const esParaOperario = Array.isArray(r.destinatarioId) ? r.destinatarioId.includes(String(currentUser.id)) : false;
+      return currentUser.rol === 'owner' || esParaTodos || esParaOperario;
     }
     
-    // SÓLO EL OWNER VE LOS RECLAMOS ABIERTOS EN ESTA BANDEJA
-    return esTicketAbierto && currentUser.rol === 'owner';
+    // Si no es BROADCAST, es un reclamo operativo. SÓLO lo ve la gerencia si está ABIERTO.
+    return r.estado === 'ABIERTO' && currentUser.rol === 'owner';
   });
 
   const marcarComoLeido = async (noti) => {
@@ -54,12 +53,8 @@ const VistaNotificaciones = ({
     
     setEnviando(true);
     try {
-      let destinatariosIds = [];
-      if (avisoDestinatario === 'TODOS') {
-        destinatariosIds = equipo.map(c => c.id);
-      } else {
-        destinatariosIds = [avisoDestinatario];
-      }
+      // Blindaje: Si es a todos, guardamos el string 'TODOS'. Si es a uno, armamos el array con su ID.
+      const destinatariosIds = avisoDestinatario === 'TODOS' ? 'TODOS' : [avisoDestinatario];
 
       const nuevoAviso = {
         insumoId: "BROADCAST",
