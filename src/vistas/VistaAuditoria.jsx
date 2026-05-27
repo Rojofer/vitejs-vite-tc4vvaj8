@@ -271,12 +271,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
           
-          <div className="flex items-center justify-end mb-6">
-            <button onClick={() => descargarExcelAuditoria(filtrados)} className="flex items-center gap-2 bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 hover:text-emerald-700 font-black text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl transition-all shadow-sm">
-              <FileSpreadsheet size={16}/> Descargar XLS
-            </button>
-          </div>
-          
           <div className="flex gap-6 border-b border-slate-200 mb-6">
             <button onClick={() => setAuditoriaTab('abiertos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'abiertos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>En Curso</button>
             <button onClick={() => setAuditoriaTab('resueltos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'resueltos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Resueltos</button>
@@ -313,6 +307,11 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <option value="TODOS">Mes: Total</option>
                   {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
+
+                {/* BOTÓN DESCARGA COMPACTO SAAS STYLE */}
+                <button onClick={() => descargarExcelAuditoria(filtrados)} className="p-3 bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 hover:text-emerald-700 rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0" title="Descargar XLS">
+                  <FileSpreadsheet size={18}/>
+                </button>
               </div>
               
               {auditoriaFiltroInsumo && (
@@ -334,7 +333,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                       <th className="py-4 px-4 bg-white border-b border-slate-200 text-center w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nro. Ticket</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Cód. / Insumo</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Última Act.</th>
-                      <th className="py-4 px-4 text-center bg-white border-b border-slate-200">Estado</th>
                       <th className="py-4 px-4 text-center bg-white border-b border-slate-200">Tipo</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Asunto (Clic para leer)</th>
                       {currentUser.rol === 'owner' && <th className="py-4 px-4 bg-white border-b border-slate-200">Operario</th>}
@@ -377,15 +375,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                 </div>
                               </td>
                               <td className="py-4 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</td>
-                              <td className="py-4 px-4 text-center">
-                                {h.estado === 'ABIERTO' && h.tipo !== "APROBACION GERENCIA" ? (
-                                  <span className="px-2 py-1 rounded bg-orange-100 text-orange-700 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-orange-500"></span> Abierto</span>
-                                ) : h.tipo === "APROBACION GERENCIA" ? (
-                                  <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><Clock size={10}/> Esperando Envío</span>
-                                ) : (
-                                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-sm"><span className="w-1 h-1 rounded-full bg-slate-400"></span> Resuelto</span>
-                                )}
-                              </td>
+
                               <td className="py-4 px-4 text-center">
                                 {(() => {
                                   const tipo = getTipoReclamo(h.mensaje);
