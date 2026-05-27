@@ -486,7 +486,10 @@ const App = () => {
         console.error("Error en Hilo:", error);
       }
     } else {
-      if (reclamoDraft.insumo.ticketReclamo) {
+      // Verifica si existe algún reclamo real de este insumo que todavía esté ABIERTO en la base de datos
+      const tieneTicketActivoReal = reclamos.some(r => r.insumoId === reclamoDraft.insumo.id && r.estado === 'ABIERTO');
+
+      if (reclamoDraft.insumo.ticketReclamo && tieneTicketActivoReal) {
         setDialogoConfirmacion({
           titulo: "⚠️ Atención: Reclamo ya iniciado",
           mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón "CONTINUAR HILO".`,
