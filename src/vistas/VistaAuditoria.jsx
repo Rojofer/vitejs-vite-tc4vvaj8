@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users,Copy } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -360,10 +360,31 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   </button>
                                 ) : ( <span className="w-6 inline-block"></span> )}
                               </td>
+                              {/* CELDA: NRO DE TICKET CON COPIADO RÁPIDO */}
                               <td className="py-4 px-4 text-center align-middle">
-                                <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-700 tracking-wide border border-slate-200">
-                                  {insumoAsociado.ticketReclamo || "-"}
-                                </span>
+                                {insumoAsociado.ticketReclamo ? (
+                                  <div className="flex items-center justify-center gap-1.5 group/ticket">
+                                    <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-700 tracking-wide border border-slate-200">
+                                      {insumoAsociado.ticketReclamo}
+                                    </span>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(`[${insumoAsociado.ticketReclamo}]`);
+                                        if (setToastMsg) {
+                                          setToastMsg(`📋 Copiado: [${insumoAsociado.ticketReclamo}]`);
+                                          setTimeout(() => setToastMsg(null), 2000);
+                                        }
+                                      }}
+                                      className="p-1 rounded-md text-slate-400 hover:text-cyan-600 hover:bg-slate-100 opacity-0 group-hover/ticket:opacity-100 transition-all"
+                                      title="Copiar Ticket"
+                                    >
+                                      <Copy size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
                               </td>
                               <td className="py-4 px-4">
                                 <div className="flex flex-col">
