@@ -226,7 +226,10 @@ const App = () => {
   const [simulatedId, setSimulatedId] = useState('owner_real');
 
   const currentUser = useMemo(() => {
-    if (realUser.rol !== 'owner') return realUser; 
+    // BLINDAJE DE IDENTIDAD: SÓLO Fernando (owner_real) adopta la simulación.
+    // Si Tomás u otro entra como supervisor, conserva su nombre y firma original.
+    if (realUser.id !== 'owner_real') return realUser; 
+    
     const simulado = perfilesSimulables.find(p => p.id === simulatedId);
     return simulado || realUser;
   }, [realUser, simulatedId, perfilesSimulables]);
