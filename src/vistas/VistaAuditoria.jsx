@@ -35,7 +35,27 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const extraerComprador = (cuerpo) => {
       if (!cuerpo) return 'SIN ASIGNAR';
       const match = cuerpo.match(/Resp:\s*([^\n]+)/i);
-      return match ? match[1].trim().toUpperCase() : 'SIN ASIGNAR';
+      if (!match) return 'SIN ASIGNAR';
+
+      let rawName = match[1].trim().toUpperCase();
+
+      // DICCIONARIO DE NORMALIZACIÓN (MACHEO INTELIGENTE)
+      // Si detecta parte del nombre, lo unifica bajo una única etiqueta oficial.
+      if (rawName.includes('ARGÜERO') || rawName.includes('ARGUERO') || rawName.includes('HERNÁN')) {
+        return 'HERNÁN ARGÜERO (G03)';
+      }
+      if (rawName.includes('LILIAN') || rawName.includes('SAMANIEGO')) {
+        return 'LILIAN SAMANIEGO (G04)';
+      }
+      if (rawName.includes('JUMILLA')) {
+        return 'JUMILLA';
+      }
+      if (rawName.includes('NAHUEL')) {
+        return 'NAHUEL';
+      }
+
+      // Si hay un comprador nuevo que no está en la lista, lo devuelve tal cual
+      return rawName;
     };
 
     // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (INTERACTIVO Y CON FILTRO MENSUAL GLOBAL) ---
