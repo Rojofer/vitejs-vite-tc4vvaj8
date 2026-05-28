@@ -12,6 +12,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [filtroOperario, setFiltroOperario] = useState("TODOS");
     const [busquedaAuditoria, setBusquedaAuditoria] = useState("");
     const [auditoriaTab, setAuditoriaTab] = useState('abiertos');
+    const [ordenTabla, setOrdenTabla] = useState('recientes'); // NUEVO ESTADO PARA ORDENAR LA TABLA
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null);
 
@@ -316,8 +317,24 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           m[r.insumoId].subReclamos.push(r); 
         } 
       }); 
+      
+      // MOTOR DE ORDENAMIENTO DE LA TABLA
+      h.sort((a, b) => {
+        if (ordenTabla === 'recientes') {
+          return (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0);
+        } else if (ordenTabla === 'criticos' || ordenTabla === 'antiguos') {
+          // Ordena los más viejos primero (mayor demora en planta)
+          return (a.fecha?.seconds || 0) - (b.fecha?.seconds || 0);
+        } else if (ordenTabla === 'insumo') {
+          const insA = insumos.find(i => i.id === a.insumoId)?.nombre || '';
+          const insB = insumos.find(i => i.id === b.insumoId)?.nombre || '';
+          return insA.localeCompare(insB);
+        }
+        return 0;
+      });
+
       return h; 
-    }, [filtrados]);
+    }, [filtrados, insumos, ordenTabla]);
 
     return (
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
@@ -332,12 +349,19 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {(auditoriaTab === 'abiertos' || auditoriaTab === 'resueltos') && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <div className="relative flex-1">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-6">
+                <div className="relative flex-1 min-w-[200px]">
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input type="text" placeholder="Buscar código, insumo o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
                 </div>
        
+                {/* SELECT DE ORDENAMIENTO (NUEVO) */}
+                <select value={ordenTabla} onChange={e => setOrdenTabla(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
+                  <option value="recientes">Más recientes</option>
+                  <option value="criticos">Mayor demora</option>
+                  <option value="insumo">A-Z Insumo</option>
+                </select>
+
                 {currentUser.rol === 'owner' && (
                   <select value={filtroOperario} onChange={e => setFiltroOperario(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
                     <option value="TODOS">Todos los Operarios</option>
@@ -377,14 +401,14 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               )}
               
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200">
-                <table className="w-full text-left whitespace-nowrap">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-x-auto w-full">
+                <table className="w-full text-left whitespace-nowrap min-w-[900px]">
                   <thead className="sticky top-0 z-20 shadow-sm">
                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       <th className="py-4 px-4 w-12 text-center bg-white rounded-tl-3xl border-b border-slate-200"></th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200 text-center w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nro. Ticket</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Cód. / Insumo</th>
-                      <th className="py-4 px-4 bg-white border-b border-slate-200">Última Act.</th>
+                      <th className="py-4 px-4 bg-white border-b border-slate-200 text-center">Última Act.</th>
                       <th className="py-4 px-4 text-center bg-white border-b border-slate-200">Tipo</th>
                       <th className="py-4 px-4 bg-white border-b border-slate-200">Asunto (Clic para leer)</th>
                       {currentUser.rol === 'owner' && <th className="py-4 px-4 bg-white border-b border-slate-200">Operario</th>}
@@ -402,11 +426,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                         const isExpanded = expandedRow === h.insumoId;
                         const insumoAsociado = insumos.find(i => i.id === h.insumoId) || {};
                         
-                        // Cálculo de días activo para el badge
-                        const fInicio = h.fecha?.seconds ? h.fecha.seconds : new Date(h.fecha).getTime() / 1000;
-                        const ahora = Date.now() / 1000;
-                        const diasActivo = Math.floor((ahora - fInicio) / 86400);
-                        const esCritico = diasActivo > 7;
+                        // Cálculo de días activo para el badge (Basado en días calendario para evitar el salto de 24hs)
+                        const fInicio = h.fecha?.seconds ? h.fecha.seconds * 1000 : new Date(h.fecha).getTime();
+                        const fInicioDia = new Date(fInicio).setHours(0,0,0,0);
+                        const hoyDia = new Date().setHours(0,0,0,0);
+                        const diasActivo = Math.floor((hoyDia - fInicioDia) / 86400000);
+                        const esCritico = diasActivo >= 7;
 
                         return (
                           <React.Fragment key={h.insumoId || idx}>
@@ -446,19 +471,21 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               </td>
                               <td className="py-4 px-4">
                                 <div className="flex flex-col">
-                                  <span className="text-[9px] font-mono text-slate-400">CÓD: {insumoAsociado.codigo || 'S/C'}</span>
+                                  {/* TIPOGRAFÍA UNIFICADA: Eliminado el font-mono */}
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CÓDIGO: {insumoAsociado.codigo || 'S/C'}</span>
                                   <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
                                     {insumoAsociado.nombre || 'GENERAL'}
                                     {h.totalReclamos > 1 && <span className="bg-slate-200 text-slate-600 text-[8px] px-1.5 py-0.5 rounded-full">{h.totalReclamos} MSJS</span>}
                                   </span>
                                 </div>
                               </td>
-                              <td className="py-4 px-4">
-                                <div className="flex flex-col gap-1.5 items-start">
+                              {/* COLUMNA CENTRALIZADA ÚLTIMA ACT. */}
+                              <td className="py-4 px-4 text-center">
+                                <div className="flex flex-col gap-1.5 items-center">
                                   <span className="text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</span>
                                   {h.estado === 'ABIERTO' && (
                                     <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm ${esCritico ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>
-                                      🕒 {diasActivo} {diasActivo === 1 ? 'DÍA' : 'DÍAS'} ACTIVO
+                                      {diasActivo === 0 ? 'HOY' : `🕒 ${diasActivo} ${diasActivo === 1 ? 'DÍA' : 'DÍAS'} ACTIVO`}
                                     </span>
                                   )}
                                 </div>
@@ -522,7 +549,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                         <span className="text-[9px] font-black text-slate-400 uppercase">ITERACIÓN #{threadItems.length - iIdx - 1}</span>
                                       </div>
                                     </td>
-                                    <td className="py-3 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
+                                    <td className="py-3 px-4 text-center text-[10px] font-bold text-slate-500">{formatearFecha(item.fecha)}</td>
                                     <td className="py-3 px-4 text-center">
                                       <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 text-[9px] font-black uppercase flex items-center gap-1 mx-auto w-max shadow-xs"><span className="w-1 h-1 rounded-full bg-slate-300"></span> Archivada</span>
                                     </td>
