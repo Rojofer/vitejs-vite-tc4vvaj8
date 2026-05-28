@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users, Copy, Package } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, ShieldCheck, Timer, Users, Copy, Plus, Package } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -16,8 +16,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null);
     
-    // NUEVO ESTADO: Filtro Interactivo de KPIs
+    // ESTADOS DE INTERACTIVIDAD DEL DASHBOARD KPI
     const [operarioEnfoque, setOperarioEnfoque] = useState(null);
+    const [grupoEnfoque, setGrupoEnfoque] = useState(null);
 
     // CEREBRO CLASIFICADOR: Deduce la etiqueta visual con su número, texto y color
     const getTipoReclamo = (asunto) => {
@@ -30,13 +31,30 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES INTERACTIVOS ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (INTERACTIVO CRUZADO) ---
     const kpiData = useMemo(() => {
-      // 1. Matriz Global (Siempre calcula a todos los operarios para la tabla de ranking)
+      // Base general de reclamos válidos
       const validosGlobal = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
 
+      // 1. LISTA DE GRUPOS (Se filtra por el Operario Seleccionado, si lo hay)
+      const validosForGrupos = operarioEnfoque ? validosGlobal.filter(r => r.operario === operarioEnfoque) : validosGlobal;
+      const conteoGrupos = {};
+      validosForGrupos.forEach(r => {
+          const ins = insumos.find(i => i.id === r.insumoId);
+          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
+          conteoGrupos[g] = (conteoGrupos[g] || 0) + 1;
+      });
+      const listaGrupos = Object.entries(conteoGrupos).map(([nombre, cantidad]) => ({nombre, cantidad})).sort((a,b) => b.cantidad - a.cantidad);
+
+      // 2. LISTA DE OPERARIOS (Se filtra por el Grupo Seleccionado, si lo hay)
+      const validosForOperarios = grupoEnfoque ? validosGlobal.filter(r => {
+          const ins = insumos.find(i => i.id === r.insumoId);
+          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
+          return g === grupoEnfoque;
+      }) : validosGlobal;
+
       const rankingOperarios = {};
-      validosGlobal.forEach(r => {
+      validosForOperarios.forEach(r => {
         const op = r.operario || "Sin Nombre";
         if (!rankingOperarios[op]) {
           rankingOperarios[op] = { total: 0, cerrados: 0 };
@@ -46,7 +64,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           rankingOperarios[op].cerrados++;
         }
       });
-
       const listaOperarios = Object.keys(rankingOperarios).map(name => {
         const item = rankingOperarios[name];
         return {
@@ -56,8 +73,16 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         };
       }).sort((a, b) => b.total - a.total);
 
-      // 2. Matriz de Enfoque (Filtra todo el tablero si hay un operario seleccionado)
-      const validos = operarioEnfoque ? validosGlobal.filter(r => r.operario === operarioEnfoque) : validosGlobal;
+      // 3. MATRIZ DE ENFOQUE (Aplica AMBOS filtros para las tarjetas de KPIs y el Pulso)
+      const validos = validosGlobal.filter(r => {
+         const ins = insumos.find(i => i.id === r.insumoId);
+         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
+         
+         const matchOperario = operarioEnfoque ? r.operario === operarioEnfoque : true;
+         const matchGrupo = grupoEnfoque ? g === grupoEnfoque : true;
+         
+         return matchOperario && matchGrupo;
+      });
 
       const hoy = new Date();
       const mesActual = hoy.getMonth();
@@ -131,43 +156,17 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
       const maxActividadPulso = Math.max(...lista20Dias.map(d => d.cantidad), 1);
 
-      // PARETO DE OFENSORES
-      const topOfensoresList = Object.keys(conteoPorInsumo)
-        .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
-        .filter(obj => obj.insumo)
-        .sort((a,b) => b.cantidad - a.cantidad)
-        .slice(0, 5);
-
-      // NUEVO KPI: GRUPO MÁS PROBLEMÁTICO
-      const conteoGrupos = {};
-      validos.forEach(r => {
-        const ins = insumos.find(i => i.id === r.insumoId);
-        const grupoStr = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
-        conteoGrupos[grupoStr] = (conteoGrupos[grupoStr] || 0) + 1;
-      });
-
-      let topGrupoNombre = "N/A";
-      let topGrupoCantidad = 0;
-      Object.entries(conteoGrupos).forEach(([g, c]) => {
-        if (c > topGrupoCantidad) {
-          topGrupoCantidad = c;
-          topGrupoNombre = g;
-        }
-      });
-
       return {
         tasaResolucion, abiertosEsteMes: abiertosEsteMes.length, cerradosEsteMes: cerradosEsteMes.length,
         leadTime,
         activosBacklog: activosBacklog.length, activosCriticos: activosCriticos.length,
-        topOfensores: topOfensoresList,
         efectividadPrimerContacto,
         listaOperarios,
+        listaGrupos,
         pulsoSemanas: lista20Dias,
-        maxActividadPulso,
-        topGrupoNombre,
-        topGrupoCantidad
+        maxActividadPulso
       };
-    }, [reclamos, insumos, operarioEnfoque]);
+    }, [reclamos, insumos, operarioEnfoque, grupoEnfoque]);
 
     // --- ACCIONES DE REPORTE KPI ---
     const enviarReporteEmail = () => {
@@ -193,8 +192,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           ['Evacuación Mensual', `${kpiData.tasaResolucion}%`, `${kpiData.cerradosEsteMes} cerrados vs ${kpiData.abiertosEsteMes} nuevos`],
           ['Lead Time Promedio', `${kpiData.leadTime} Días`, 'Tiempo neto de resolución'],
           ['Eficiencia de Contacto', `${kpiData.efectividadPrimerContacto}%`, 'Resueltos en el primer aviso'],
-          ['Backlog Activo', `${kpiData.activosBacklog} Tickets`, `${kpiData.activosCriticos} tickets con demora crítica (>7 días)`],
-          ['Top Grupo Problemático', kpiData.topGrupoNombre, `${kpiData.topGrupoCantidad} reclamos históricos`]
+          ['Backlog Activo', `${kpiData.activosBacklog} Tickets`, `${kpiData.activosCriticos} tickets con demora crítica (>7 días)`]
         ],
         theme: 'grid',
         headStyles: { fillColor: [15, 23, 42] }
@@ -640,15 +638,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               
-              <div className="flex flex-col sm:flex-row justify-end gap-3 border-b border-slate-200 pb-4">
-                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
-                   <FileText size={14} /> Exportar Reporte PDF
-                </button>
-                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
-                   <Mail size={14} /> Generar y Enviar Reporte
-                </button>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
@@ -723,34 +712,40 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   </div>
                 </div>
 
-                {/* 5TA TARJETA: GRUPO MÁS RECLAMADO */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grupo más Problemático</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Top Categoría SAP</p>
-                    </div>
-                    <div className="p-2 bg-sky-50 rounded-xl"><Package size={16} className="text-sky-500"/></div>
-                  </div>
-                  <div>
-                    <div className="flex items-end gap-2 mb-2">
-                      <span className="text-lg font-black text-slate-800 leading-none line-clamp-2" title={kpiData.topGrupoNombre}>{kpiData.topGrupoNombre}</span>
-                    </div>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{kpiData.topGrupoCantidad} RECLAMOS ACUMULADOS</p>
-                  </div>
+                {/* ESPACIO RESERVADO PARA 5TA TARJETA */}
+                <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-5 text-center min-h-[140px]">
+                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                     <Plus size={16} className="text-slate-400" />
+                   </div>
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nuevo Indicador</span>
+                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Espacio Reservado</span>
                 </div>
               </div>
 
               {/* GRÁFICO DE PULSO DEL EQUIPO - 20 DÍAS CALENDARIO CON SCROLL HORIZONTAL */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full">
-                <div className="flex items-center gap-2 mb-6">
-                  <History size={20} className="text-slate-800"/>
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">
-                      Pulso del Equipo {operarioEnfoque ? `(Filtro Activo: ${operarioEnfoque})` : '(Frecuencia Diaria)'}
-                    </h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen de interacciones en los últimos 20 días calendario</p>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <History size={20} className="text-slate-800"/>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">
+                        Pulso del Equipo 
+                        {operarioEnfoque && !grupoEnfoque && ` (Operario: ${operarioEnfoque})`}
+                        {grupoEnfoque && !operarioEnfoque && ` (Grupo: ${grupoEnfoque})`}
+                        {operarioEnfoque && grupoEnfoque && ` (${operarioEnfoque} | ${grupoEnfoque})`}
+                      </h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen de interacciones en los últimos 20 días calendario</p>
+                    </div>
                   </div>
+                  {/* Botón de limpieza rápida si hay filtros activos */}
+                  {(operarioEnfoque || grupoEnfoque) && (
+                    <button 
+                      onClick={() => { setOperarioEnfoque(null); setGrupoEnfoque(null); }}
+                      className="text-[9px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors"
+                    >
+                      Limpiar Filtros
+                    </button>
+                  )}
                 </div>
                 
                 <div className="flex items-end gap-2 sm:gap-4 h-48 pt-6 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent w-full border-b border-slate-100 px-2 pb-2">
@@ -782,27 +777,41 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* RANKING DE GRUPOS DE INSUMOS INTERACTIVO */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-6">
-                    <BarChart2 size={20} className="text-slate-800"/>
-                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">
-                      Top Ofensores {operarioEnfoque ? `(${operarioEnfoque})` : '(Pareto de Reclamos)'}
-                    </h3>
+                    <Package size={20} className="text-slate-800"/>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">
+                        Ranking de Grupos
+                      </h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Clickeá un grupo para filtrar el tablero</p>
+                    </div>
                   </div>
                   
-                  {kpiData.topOfensores.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">No hay datos suficientes para el Pareto</div>
+                  {kpiData.listaGrupos.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">No hay datos de grupos</div>
                   ) : (
-                    <div className="space-y-4">
-                      {kpiData.topOfensores.map((item, idx) => {
-                        const maximo = kpiData.topOfensores[0].cantidad;
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+                      {kpiData.listaGrupos.map((item, idx) => {
+                        const maximo = kpiData.listaGrupos[0].cantidad;
                         const porcentaje = Math.round((item.cantidad / maximo) * 100);
+                        const isSelected = grupoEnfoque === item.nombre;
+
                         return (
-                          <div key={item.id} className="flex items-center gap-4">
-                            <div className="w-6 text-center font-black text-slate-300 text-lg">#{idx + 1}</div>
+                          <div 
+                            key={item.nombre} 
+                            onClick={() => setGrupoEnfoque(isSelected ? null : item.nombre)}
+                            className={`flex items-center gap-4 cursor-pointer p-2 rounded-xl transition-all ${isSelected ? 'bg-sky-50 border border-sky-200 shadow-sm' : 'hover:bg-slate-50 border border-transparent'}`}
+                          >
+                            <div className="w-6 text-center font-black text-slate-300 text-sm">#{idx + 1}</div>
                             <div className="flex-1">
                               <div className="flex justify-between items-end mb-1">
-                                <span className="text-xs font-bold text-slate-700 uppercase truncate max-w-[200px] sm:max-w-xs">{item.insumo.nombre}</span>
+                                <span className="text-xs font-bold text-slate-700 uppercase flex items-center gap-2">
+                                  {item.nombre}
+                                  {isSelected && <span className="text-[8px] bg-sky-500 text-white px-1.5 py-0.5 rounded shadow-sm">FILTRANDO</span>}
+                                </span>
                                 <span className="text-xs font-black text-rose-500">{item.cantidad} Reclamos</span>
                               </div>
                               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -828,9 +837,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   {kpiData.listaOperarios.length === 0 ? (
                     <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">Sin registros de operarios activos</div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto max-h-[300px] scrollbar-thin scrollbar-thumb-slate-200">
                       <table className="w-full text-left whitespace-nowrap text-xs font-bold">
-                        <thead>
+                        <thead className="sticky top-0 bg-white z-10">
                           <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             <th className="pb-3 px-3">Nombre Operario</th>
                             <th className="pb-3 px-3 text-center">Alertas Emitidas</th>
