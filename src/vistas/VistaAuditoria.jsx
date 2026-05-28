@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users, Copy } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users, Copy, Plus } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -79,9 +79,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return ((ahora - fInicio) / 86400) > 7; 
       });
 
-      // --- GRÁFICO DE PULSO LOGÍSTICO: ÚLTIMOS 14 DÍAS CALENDARIO (NUEVO) ---
-      const lista14Dias = [];
-      for (let i = 13; i >= 0; i--) {
+      // --- GRÁFICO DE PULSO LOGÍSTICO: ÚLTIMOS 20 DÍAS CALENDARIO ---
+      const lista20Dias = [];
+      for (let i = 19; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         d.setHours(0,0,0,0);
@@ -98,14 +98,14 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           return target === d.getTime();
         }).length;
 
-        lista14Dias.push({
+        lista20Dias.push({
           label: `${diaStr}/${mesStr}`,
           cantidad: totalAlertasDia
         });
       }
 
       // Máximo volumen para el cálculo de porcentaje de la barra Tailwind
-      const maxActividadPulso = Math.max(...lista14Dias.map(d => d.cantidad), 1);
+      const maxActividadPulso = Math.max(...lista20Dias.map(d => d.cantidad), 1);
 
       // Rendimiento analítico de Ofensores
       const topOfensoresList = Object.keys(conteoPorInsumo)
@@ -142,7 +142,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         topOfensores: topOfensoresList,
         efectividadPrimerContacto,
         listaOperarios,
-        pulsoSemanas: lista14Dias,
+        pulsoSemanas: lista20Dias,
         maxActividadPulso
       };
     }, [reclamos, insumos]);
@@ -368,10 +368,24 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
           
-          <div className="flex gap-6 border-b border-slate-200 mb-6">
-            <button onClick={() => setAuditoriaTab('abiertos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'abiertos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>En Curso</button>
-            <button onClick={() => setAuditoriaTab('resueltos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'resueltos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Resueltos</button>
-            {currentUser.rol === 'owner' && <button onClick={() => setAuditoriaTab('kpis')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 ${auditoriaTab === 'kpis' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Tablero KPIs</button>}
+          {/* CABECERA CON PESTAÑAS Y BOTONES DE REPORTE INTEGRADOS */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 mb-6 pb-2 gap-4">
+            <div className="flex gap-6">
+              <button onClick={() => setAuditoriaTab('abiertos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 -mb-[2px] ${auditoriaTab === 'abiertos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>En Curso</button>
+              <button onClick={() => setAuditoriaTab('resueltos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 -mb-[2px] ${auditoriaTab === 'resueltos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Resueltos</button>
+              {currentUser.rol === 'owner' && <button onClick={() => setAuditoriaTab('kpis')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 -mb-[2px] ${auditoriaTab === 'kpis' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Tablero KPIs</button>}
+            </div>
+
+            {auditoriaTab === 'kpis' && currentUser.rol === 'owner' && (
+              <div className="flex gap-3 mb-2 sm:mb-0">
+                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
+                   <FileText size={14} /> Exportar Reporte PDF
+                </button>
+                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
+                   <Mail size={14} /> Generar y Enviar Reporte
+                </button>
+              </div>
+            )}
           </div>
 
           {(auditoriaTab === 'abiertos' || auditoriaTab === 'resueltos') && (
@@ -605,16 +619,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               
-              <div className="flex flex-col sm:flex-row justify-end gap-3 border-b border-slate-200 pb-4">
-                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
-                   <FileText size={14} /> Exportar Reporte PDF
-                </button>
-                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
-                   <Mail size={14} /> Generar y Enviar Reporte
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -687,33 +692,39 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     </p>
                   </div>
                 </div>
+
+                {/* ESPACIO RESERVADO PARA 5TA TARJETA */}
+                <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-5 text-center min-h-[140px]">
+                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                     <Plus size={16} className="text-slate-400" />
+                   </div>
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nuevo Indicador</span>
+                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Espacio Reservado</span>
+                </div>
               </div>
 
-              {/* GRÁFICO DE PULSO DEL EQUIPO - 14 DÍAS CALENDARIO (NUEVO BLOQUE DE ALTA DENSIDAD) */}
+              {/* GRÁFICO DE PULSO DEL EQUIPO - 20 DÍAS CALENDARIO CON SCROLL HORIZONTAL */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full">
                 <div className="flex items-center gap-2 mb-6">
                   <History size={20} className="text-slate-800"/>
                   <div>
                     <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Pulso del Equipo (Frecuencia Diaria)</h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen de interacciones en los últimos 14 días calendario</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen de interacciones en los últimos 20 días calendario</p>
                   </div>
                 </div>
                 
-                <div className="flex items-end justify-between gap-1.5 sm:gap-3 h-48 pt-6 overflow-x-auto scrollbar-none w-full border-b border-slate-100 px-2">
+                <div className="flex items-end gap-2 sm:gap-4 h-48 pt-6 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent w-full border-b border-slate-100 px-2 pb-2">
                   {kpiData.pulsoSemanas.map((dia, idx) => {
                     const pctAltura = Math.max(8, Math.round((dia.cantidad / kpiData.maxActividadPulso) * 100));
                     return (
-                      <div key={idx} className="flex-1 min-w-[32px] flex flex-col items-center group relative h-full justify-end">
+                      <div key={idx} className="flex-1 min-w-[40px] max-w-[60px] flex flex-col items-center group relative h-full justify-end shrink-0">
                         
-                        {/* Indicador flotante sobre la barra al pasar el cursor */}
                         <div className="absolute -top-3 opacity-0 group-hover:opacity-100 bg-slate-900 text-white font-black text-[9px] px-1.5 py-0.5 rounded transition-all shadow-md z-30 pointer-events-none">
                           {dia.cantidad}
                         </div>
                         
-                        {/* Cantidad estática superior */}
                         <span className="text-[10px] font-black text-slate-700 mb-1 leading-none">{dia.cantidad}</span>
                         
-                        {/* Barra vertical de Tailwind CSS */}
                         <div 
                           style={{ height: `${pctAltura}%` }} 
                           className={`w-full rounded-t-lg transition-all duration-300 shadow-xs ${
@@ -723,7 +734,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                           }`}
                         ></div>
                         
-                        {/* Fecha inferior DD/MM */}
                         <span className="text-[8px] font-black text-slate-400 uppercase mt-2 tracking-tighter whitespace-nowrap">{dia.label}</span>
                       </div>
                     );
