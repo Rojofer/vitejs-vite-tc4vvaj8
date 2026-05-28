@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users, Copy, Plus } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users, Copy, Package } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -15,6 +15,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [ordenTabla, setOrdenTabla] = useState('recientes');
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null);
+    
+    // NUEVO ESTADO: Filtro Interactivo de KPIs
+    const [operarioEnfoque, setOperarioEnfoque] = useState(null);
 
     // CEREBRO CLASIFICADOR: Deduce la etiqueta visual con su número, texto y color
     const getTipoReclamo = (asunto) => {
@@ -27,95 +30,13 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (NUEVO MOTOR ANALÍTICO) ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES INTERACTIVOS ---
     const kpiData = useMemo(() => {
-      const validos = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
-
-      const hoy = new Date();
-      const mesActual = hoy.getMonth();
-      const anioActual = hoy.getFullYear();
-
-      // 1. TASA DE EVACUACIÓN (Clearance Rate)
-      const abiertosEsteMes = validos.filter(r => {
-        const f = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
-        return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
-      });
-      const cerradosEsteMes = validos.filter(r => {
-        if (r.estado !== 'CERRADO' || !r.fechaCierre) return false;
-        const f = r.fechaCierre?.seconds ? new Date(r.fechaCierre.seconds * 1000) : new Date(r.fechaCierre);
-        return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
-      });
-      const tasaResolucion = abiertosEsteMes.length > 0 ? Math.round((cerradosEsteMes.length / abiertosEsteMes.length) * 100) : (cerradosEsteMes.length > 0 ? 100 : 0);
-
-      // 2. LEAD TIME PROMEDIO (Días)
-      const resueltos = validos.filter(r => r.estado === 'CERRADO' && r.fecha && r.fechaCierre);
-      let totalDias = 0;
-      resueltos.forEach(r => {
-         const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
-         const fFin = r.fechaCierre?.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
-        totalDias += Math.max(0, (fFin - fInicio) / 86400);
-      });
-      const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
-
-      // 3. EFICIENCIA DE CONTACTO (Sin hilos de insistencia)
-      const conteoPorInsumo = {};
-      validos.forEach(r => {
-         conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1;
-      });
-      let hilosUnicos = 0;
-      let hilosMultiples = 0;
-      Object.values(conteoPorInsumo).forEach(cant => {
-        if (cant === 1) hilosUnicos++;
-        else if (cant > 1) hilosMultiples++;
-      });
-      const totalHilos = hilosUnicos + hilosMultiples;
-      const efectividadPrimerContacto = totalHilos > 0 ? Math.round((hilosUnicos / totalHilos) * 100) : 100;
-
-      // 4. BACKLOG OPERATIVO Y CRÍTICO (Tickets > 7 Días)
-      const activosBacklog = validos.filter(r => r.estado === 'ABIERTO');
-      const activosCriticos = activosBacklog.filter(r => {
-        const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
-        const ahora = Date.now() / 1000;
-        return ((ahora - fInicio) / 86400) > 7; 
-      });
-
-      // --- GRÁFICO DE PULSO LOGÍSTICO: ÚLTIMOS 20 DÍAS CALENDARIO ---
-      const lista20Dias = [];
-      for (let i = 19; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        d.setHours(0,0,0,0);
-        
-        // Formato visual compacto DD/MM
-        const diaStr = String(d.getDate()).padStart(2, '0');
-        const mesStr = String(d.getMonth() + 1).padStart(2, '0');
-        
-        // Contamos cuántas interacciones cayeron exactas en este día calendario
-        const totalAlertasDia = validos.filter(r => {
-          const fRec = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
-          if (!fRec || isNaN(fRec.getTime())) return false;
-          const target = new Date(fRec).setHours(0,0,0,0);
-          return target === d.getTime();
-        }).length;
-
-        lista20Dias.push({
-          label: `${diaStr}/${mesStr}`,
-          cantidad: totalAlertasDia
-        });
-      }
-
-      // Máximo volumen para el cálculo de porcentaje de la barra Tailwind
-      const maxActividadPulso = Math.max(...lista20Dias.map(d => d.cantidad), 1);
-
-      // Rendimiento analítico de Ofensores
-      const topOfensoresList = Object.keys(conteoPorInsumo)
-        .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
-        .filter(obj => obj.insumo)
-        .sort((a,b) => b.cantidad - a.cantidad)
-        .slice(0, 5);
+      // 1. Matriz Global (Siempre calcula a todos los operarios para la tabla de ranking)
+      const validosGlobal = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
 
       const rankingOperarios = {};
-      validos.forEach(r => {
+      validosGlobal.forEach(r => {
         const op = r.operario || "Sin Nombre";
         if (!rankingOperarios[op]) {
           rankingOperarios[op] = { total: 0, cerrados: 0 };
@@ -135,6 +56,105 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         };
       }).sort((a, b) => b.total - a.total);
 
+      // 2. Matriz de Enfoque (Filtra todo el tablero si hay un operario seleccionado)
+      const validos = operarioEnfoque ? validosGlobal.filter(r => r.operario === operarioEnfoque) : validosGlobal;
+
+      const hoy = new Date();
+      const mesActual = hoy.getMonth();
+      const anioActual = hoy.getFullYear();
+
+      // TASA DE EVACUACIÓN (Clearance Rate)
+      const abiertosEsteMes = validos.filter(r => {
+        const f = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
+        return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
+      });
+      const cerradosEsteMes = validos.filter(r => {
+        if (r.estado !== 'CERRADO' || !r.fechaCierre) return false;
+        const f = r.fechaCierre?.seconds ? new Date(r.fechaCierre.seconds * 1000) : new Date(r.fechaCierre);
+        return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
+      });
+      const tasaResolucion = abiertosEsteMes.length > 0 ? Math.round((cerradosEsteMes.length / abiertosEsteMes.length) * 100) : (cerradosEsteMes.length > 0 ? 100 : 0);
+
+      // LEAD TIME PROMEDIO (Días)
+      const resueltos = validos.filter(r => r.estado === 'CERRADO' && r.fecha && r.fechaCierre);
+      let totalDias = 0;
+      resueltos.forEach(r => {
+         const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
+         const fFin = r.fechaCierre?.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
+        totalDias += Math.max(0, (fFin - fInicio) / 86400);
+      });
+      const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
+
+      // EFICIENCIA DE CONTACTO
+      const conteoPorInsumo = {};
+      validos.forEach(r => {
+         conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1;
+      });
+      let hilosUnicos = 0;
+      let hilosMultiples = 0;
+      Object.values(conteoPorInsumo).forEach(cant => {
+        if (cant === 1) hilosUnicos++;
+        else if (cant > 1) hilosMultiples++;
+      });
+      const totalHilos = hilosUnicos + hilosMultiples;
+      const efectividadPrimerContacto = totalHilos > 0 ? Math.round((hilosUnicos / totalHilos) * 100) : 100;
+
+      // BACKLOG OPERATIVO Y CRÍTICO
+      const activosBacklog = validos.filter(r => r.estado === 'ABIERTO');
+      const activosCriticos = activosBacklog.filter(r => {
+        const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
+        const ahora = Date.now() / 1000;
+        return ((ahora - fInicio) / 86400) > 7; 
+      });
+
+      // GRÁFICO DE PULSO LOGÍSTICO: ÚLTIMOS 20 DÍAS CALENDARIO
+      const lista20Dias = [];
+      for (let i = 19; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        d.setHours(0,0,0,0);
+        
+        const diaStr = String(d.getDate()).padStart(2, '0');
+        const mesStr = String(d.getMonth() + 1).padStart(2, '0');
+        
+        const totalAlertasDia = validos.filter(r => {
+          const fRec = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
+          if (!fRec || isNaN(fRec.getTime())) return false;
+          const target = new Date(fRec).setHours(0,0,0,0);
+          return target === d.getTime();
+        }).length;
+
+        lista20Dias.push({
+          label: `${diaStr}/${mesStr}`,
+          cantidad: totalAlertasDia
+        });
+      }
+      const maxActividadPulso = Math.max(...lista20Dias.map(d => d.cantidad), 1);
+
+      // PARETO DE OFENSORES
+      const topOfensoresList = Object.keys(conteoPorInsumo)
+        .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
+        .filter(obj => obj.insumo)
+        .sort((a,b) => b.cantidad - a.cantidad)
+        .slice(0, 5);
+
+      // NUEVO KPI: GRUPO MÁS PROBLEMÁTICO
+      const conteoGrupos = {};
+      validos.forEach(r => {
+        const ins = insumos.find(i => i.id === r.insumoId);
+        const grupoStr = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
+        conteoGrupos[grupoStr] = (conteoGrupos[grupoStr] || 0) + 1;
+      });
+
+      let topGrupoNombre = "N/A";
+      let topGrupoCantidad = 0;
+      Object.entries(conteoGrupos).forEach(([g, c]) => {
+        if (c > topGrupoCantidad) {
+          topGrupoCantidad = c;
+          topGrupoNombre = g;
+        }
+      });
+
       return {
         tasaResolucion, abiertosEsteMes: abiertosEsteMes.length, cerradosEsteMes: cerradosEsteMes.length,
         leadTime,
@@ -143,9 +163,11 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         efectividadPrimerContacto,
         listaOperarios,
         pulsoSemanas: lista20Dias,
-        maxActividadPulso
+        maxActividadPulso,
+        topGrupoNombre,
+        topGrupoCantidad
       };
-    }, [reclamos, insumos]);
+    }, [reclamos, insumos, operarioEnfoque]);
 
     // --- ACCIONES DE REPORTE KPI ---
     const enviarReporteEmail = () => {
@@ -171,7 +193,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           ['Evacuación Mensual', `${kpiData.tasaResolucion}%`, `${kpiData.cerradosEsteMes} cerrados vs ${kpiData.abiertosEsteMes} nuevos`],
           ['Lead Time Promedio', `${kpiData.leadTime} Días`, 'Tiempo neto de resolución'],
           ['Eficiencia de Contacto', `${kpiData.efectividadPrimerContacto}%`, 'Resueltos en el primer aviso'],
-          ['Backlog Activo', `${kpiData.activosBacklog} Tickets`, `${kpiData.activosCriticos} tickets con demora crítica (>7 días)`]
+          ['Backlog Activo', `${kpiData.activosBacklog} Tickets`, `${kpiData.activosCriticos} tickets con demora crítica (>7 días)`],
+          ['Top Grupo Problemático', kpiData.topGrupoNombre, `${kpiData.topGrupoCantidad} reclamos históricos`]
         ],
         theme: 'grid',
         headStyles: { fillColor: [15, 23, 42] }
@@ -347,7 +370,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         } 
       }); 
       
-      // MOTOR DE ORDENAMIENTO DE LA TABLA
       h.sort((a, b) => {
         if (ordenTabla === 'recientes') {
           return (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0);
@@ -368,7 +390,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
           
-          {/* CABECERA CON PESTAÑAS Y BOTONES DE REPORTE INTEGRADOS */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 mb-6 pb-2 gap-4">
             <div className="flex gap-6">
               <button onClick={() => setAuditoriaTab('abiertos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 -mb-[2px] ${auditoriaTab === 'abiertos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>En Curso</button>
@@ -619,6 +640,15 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               
+              <div className="flex flex-col sm:flex-row justify-end gap-3 border-b border-slate-200 pb-4">
+                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
+                   <FileText size={14} /> Exportar Reporte PDF
+                </button>
+                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
+                   <Mail size={14} /> Generar y Enviar Reporte
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
@@ -693,13 +723,21 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   </div>
                 </div>
 
-                {/* ESPACIO RESERVADO PARA 5TA TARJETA */}
-                <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-5 text-center min-h-[140px]">
-                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                     <Plus size={16} className="text-slate-400" />
-                   </div>
-                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nuevo Indicador</span>
-                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Espacio Reservado</span>
+                {/* 5TA TARJETA: GRUPO MÁS RECLAMADO */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grupo más Problemático</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Top Categoría SAP</p>
+                    </div>
+                    <div className="p-2 bg-sky-50 rounded-xl"><Package size={16} className="text-sky-500"/></div>
+                  </div>
+                  <div>
+                    <div className="flex items-end gap-2 mb-2">
+                      <span className="text-lg font-black text-slate-800 leading-none line-clamp-2" title={kpiData.topGrupoNombre}>{kpiData.topGrupoNombre}</span>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{kpiData.topGrupoCantidad} RECLAMOS ACUMULADOS</p>
+                  </div>
                 </div>
               </div>
 
@@ -708,7 +746,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 <div className="flex items-center gap-2 mb-6">
                   <History size={20} className="text-slate-800"/>
                   <div>
-                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Pulso del Equipo (Frecuencia Diaria)</h3>
+                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">
+                      Pulso del Equipo {operarioEnfoque ? `(Filtro Activo: ${operarioEnfoque})` : '(Frecuencia Diaria)'}
+                    </h3>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen de interacciones en los últimos 20 días calendario</p>
                   </div>
                 </div>
@@ -745,7 +785,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-6">
                     <BarChart2 size={20} className="text-slate-800"/>
-                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Top Ofensores (Pareto de Reclamos)</h3>
+                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">
+                      Top Ofensores {operarioEnfoque ? `(${operarioEnfoque})` : '(Pareto de Reclamos)'}
+                    </h3>
                   </div>
                   
                   {kpiData.topOfensores.length === 0 ? (
@@ -777,7 +819,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-6">
                     <Users size={20} className="text-slate-800"/>
-                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Control de Alertas por Operario</h3>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Control de Alertas por Operario</h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Clickeá un operario para filtrar su rendimiento</p>
+                    </div>
                   </div>
                   
                   {kpiData.listaOperarios.length === 0 ? (
@@ -787,17 +832,24 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                       <table className="w-full text-left whitespace-nowrap text-xs font-bold">
                         <thead>
                           <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            <th className="pb-3">Nombre Operario</th>
-                            <th className="pb-3 text-center">Alertas Emitidas</th>
-                            <th className="pb-3 text-right">Efectividad de Cierre</th>
+                            <th className="pb-3 px-3">Nombre Operario</th>
+                            <th className="pb-3 px-3 text-center">Alertas Emitidas</th>
+                            <th className="pb-3 px-3 text-right">Efectividad de Cierre</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {kpiData.listaOperarios.map((op) => (
-                            <tr key={op.nombre} className="text-slate-700">
-                              <td className="py-3 uppercase text-slate-800 font-black">{op.nombre}</td>
-                              <td className="py-3 text-center text-slate-600">{op.total} alertas</td>
-                              <td className="py-3 text-right">
+                            <tr 
+                              key={op.nombre} 
+                              onClick={() => setOperarioEnfoque(operarioEnfoque === op.nombre ? null : op.nombre)}
+                              className={`text-slate-700 cursor-pointer transition-colors ${operarioEnfoque === op.nombre ? 'bg-sky-50/80 border-l-4 border-sky-500' : 'hover:bg-slate-50 border-l-4 border-transparent'}`}
+                            >
+                              <td className="py-3 px-3 uppercase text-slate-800 font-black flex items-center gap-2">
+                                {op.nombre}
+                                {operarioEnfoque === op.nombre && <span className="text-[8px] bg-sky-500 text-white px-1.5 py-0.5 rounded shadow-sm">FILTRANDO</span>}
+                              </td>
+                              <td className="py-3 px-3 text-center text-slate-600">{op.total} alertas</td>
+                              <td className="py-3 px-3 text-right">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-black ${op.efectividad >= 80 ? 'bg-emerald-50 text-emerald-700' : op.efectividad >= 40 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
                                   {op.efectividad}% resuelto
                                 </span>
