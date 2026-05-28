@@ -12,7 +12,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [filtroOperario, setFiltroOperario] = useState("TODOS");
     const [busquedaAuditoria, setBusquedaAuditoria] = useState("");
     const [auditoriaTab, setAuditoriaTab] = useState('abiertos');
-    const [ordenTabla, setOrdenTabla] = useState('recientes'); // NUEVO ESTADO PARA ORDENAR LA TABLA
+    const [ordenTabla, setOrdenTabla] = useState('recientes');
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null);
 
@@ -27,7 +27,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (NUEVO MOTOR) ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (NUEVO MOTOR ANALÍTICO) ---
     const kpiData = useMemo(() => {
       const validos = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
 
@@ -45,7 +45,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         const f = r.fechaCierre?.seconds ? new Date(r.fechaCierre.seconds * 1000) : new Date(r.fechaCierre);
         return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
       });
-      // Si cerrás más de lo que se abre, da > 100% (Limpieza de backlog)
       const tasaResolucion = abiertosEsteMes.length > 0 ? Math.round((cerradosEsteMes.length / abiertosEsteMes.length) * 100) : (cerradosEsteMes.length > 0 ? 100 : 0);
 
       // 2. LEAD TIME PROMEDIO (Días)
@@ -80,7 +79,35 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return ((ahora - fInicio) / 86400) > 7; 
       });
 
-      // Rendimiento analítico
+      // --- GRÁFICO DE PULSO LOGÍSTICO: ÚLTIMOS 14 DÍAS CALENDARIO (NUEVO) ---
+      const lista14Dias = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        d.setHours(0,0,0,0);
+        
+        // Formato visual compacto DD/MM
+        const diaStr = String(d.getDate()).padStart(2, '0');
+        const mesStr = String(d.getMonth() + 1).padStart(2, '0');
+        
+        // Contamos cuántas interacciones cayeron exactas en este día calendario
+        const totalAlertasDia = validos.filter(r => {
+          const fRec = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
+          if (!fRec || isNaN(fRec.getTime())) return false;
+          const target = new Date(fRec).setHours(0,0,0,0);
+          return target === d.getTime();
+        }).length;
+
+        lista14Dias.push({
+          label: `${diaStr}/${mesStr}`,
+          cantidad: totalAlertasDia
+        });
+      }
+
+      // Máximo volumen para el cálculo de porcentaje de la barra Tailwind
+      const maxActividadPulso = Math.max(...lista14Dias.map(d => d.cantidad), 1);
+
+      // Rendimiento analítico de Ofensores
       const topOfensoresList = Object.keys(conteoPorInsumo)
         .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
         .filter(obj => obj.insumo)
@@ -114,7 +141,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         activosBacklog: activosBacklog.length, activosCriticos: activosCriticos.length,
         topOfensores: topOfensoresList,
         efectividadPrimerContacto,
-        listaOperarios
+        listaOperarios,
+        pulsoSemanas: lista14Dias,
+        maxActividadPulso
       };
     }, [reclamos, insumos]);
 
@@ -322,8 +351,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       h.sort((a, b) => {
         if (ordenTabla === 'recientes') {
           return (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0);
-        } else if (ordenTabla === 'criticos' || ordenTabla === 'antiguos') {
-          // Ordena los más viejos primero (mayor demora en planta)
+        } else if (ordenTabla === 'criticos') {
           return (a.fecha?.seconds || 0) - (b.fecha?.seconds || 0);
         } else if (ordenTabla === 'insumo') {
           const insA = insumos.find(i => i.id === a.insumoId)?.nombre || '';
@@ -355,7 +383,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <input type="text" placeholder="Buscar código, insumo o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
                 </div>
        
-                {/* SELECT DE ORDENAMIENTO (NUEVO) */}
                 <select value={ordenTabla} onChange={e => setOrdenTabla(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
                   <option value="recientes">Más recientes</option>
                   <option value="criticos">Mayor demora</option>
@@ -384,7 +411,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
 
-                {/* BOTÓN DESCARGA COMPACTO SAAS STYLE */}
                 <button onClick={() => descargarExcelAuditoria(filtrados)} className="p-3 bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 hover:text-emerald-700 rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0" title="Descargar XLS">
                   <FileSpreadsheet size={18}/>
                 </button>
@@ -426,7 +452,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                         const isExpanded = expandedRow === h.insumoId;
                         const insumoAsociado = insumos.find(i => i.id === h.insumoId) || {};
                         
-                        // Cálculo de días activo para el badge (Basado en días calendario para evitar el salto de 24hs)
                         const fInicio = h.fecha?.seconds ? h.fecha.seconds * 1000 : new Date(h.fecha).getTime();
                         const fInicioDia = new Date(fInicio).setHours(0,0,0,0);
                         const hoyDia = new Date().setHours(0,0,0,0);
@@ -443,7 +468,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   </button>
                                 ) : ( <span className="w-6 inline-block"></span> )}
                               </td>
-                              {/* CELDA: NRO DE TICKET CON COPIADO RÁPIDO */}
                               <td className="py-4 px-4 text-center align-middle">
                                 {insumoAsociado.ticketReclamo ? (
                                   <div className="flex items-center justify-center gap-1.5 group/ticket">
@@ -471,7 +495,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               </td>
                               <td className="py-4 px-4">
                                 <div className="flex flex-col">
-                                  {/* TIPOGRAFÍA UNIFICADA: Eliminado el font-mono */}
                                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CÓDIGO: {insumoAsociado.codigo || 'S/C'}</span>
                                   <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
                                     {insumoAsociado.nombre || 'GENERAL'}
@@ -479,7 +502,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   </span>
                                 </div>
                               </td>
-                              {/* COLUMNA CENTRALIZADA ÚLTIMA ACT. */}
                               <td className="py-4 px-4 text-center">
                                 <div className="flex flex-col gap-1.5 items-center">
                                   <span className="text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</span>
@@ -490,7 +512,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   )}
                                 </div>
                               </td>
-
                               <td className="py-4 px-4 text-center">
                                 {(() => {
                                   const tipo = getTipoReclamo(h.mensaje);
@@ -668,7 +689,48 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
-              {/* CONTENEDOR DE DISTRIBUCIÓN ANALÍTICA */}
+              {/* GRÁFICO DE PULSO DEL EQUIPO - 14 DÍAS CALENDARIO (NUEVO BLOQUE DE ALTA DENSIDAD) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full">
+                <div className="flex items-center gap-2 mb-6">
+                  <History size={20} className="text-slate-800"/>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Pulso del Equipo (Frecuencia Diaria)</h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen de interacciones en los últimos 14 días calendario</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-end justify-between gap-1.5 sm:gap-3 h-48 pt-6 overflow-x-auto scrollbar-none w-full border-b border-slate-100 px-2">
+                  {kpiData.pulsoSemanas.map((dia, idx) => {
+                    const pctAltura = Math.max(8, Math.round((dia.cantidad / kpiData.maxActividadPulso) * 100));
+                    return (
+                      <div key={idx} className="flex-1 min-w-[32px] flex flex-col items-center group relative h-full justify-end">
+                        
+                        {/* Indicador flotante sobre la barra al pasar el cursor */}
+                        <div className="absolute -top-3 opacity-0 group-hover:opacity-100 bg-slate-900 text-white font-black text-[9px] px-1.5 py-0.5 rounded transition-all shadow-md z-30 pointer-events-none">
+                          {dia.cantidad}
+                        </div>
+                        
+                        {/* Cantidad estática superior */}
+                        <span className="text-[10px] font-black text-slate-700 mb-1 leading-none">{dia.cantidad}</span>
+                        
+                        {/* Barra vertical de Tailwind CSS */}
+                        <div 
+                          style={{ height: `${pctAltura}%` }} 
+                          className={`w-full rounded-t-lg transition-all duration-300 shadow-xs ${
+                            dia.cantidad > 0 
+                              ? 'bg-gradient-to-t from-indigo-500 to-indigo-400 group-hover:from-indigo-600 group-hover:to-indigo-500' 
+                              : 'bg-slate-100'
+                          }`}
+                        ></div>
+                        
+                        {/* Fecha inferior DD/MM */}
+                        <span className="text-[8px] font-black text-slate-400 uppercase mt-2 tracking-tighter whitespace-nowrap">{dia.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-6">
@@ -702,7 +764,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   )}
                 </div>
 
-                {/* MONITOR ANALÍTICO POR OPERARIO */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-6">
                     <Users size={20} className="text-slate-800"/>
