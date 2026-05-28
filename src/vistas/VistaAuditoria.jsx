@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users,Copy } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, Clock, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, Target, Zap, BarChart2, ShieldCheck, Timer, Users, Copy } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -26,39 +26,42 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (NUEVO MOTOR) ---
     const kpiData = useMemo(() => {
       const validos = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
 
       const hoy = new Date();
       const mesActual = hoy.getMonth();
       const anioActual = hoy.getFullYear();
-      const reclamosMes = validos.filter(r => {
+
+      // 1. TASA DE EVACUACIÓN (Clearance Rate)
+      const abiertosEsteMes = validos.filter(r => {
         const f = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
         return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
       });
-      const cerradosMes = reclamosMes.filter(r => r.estado === 'CERRADO');
-      const tasaResolucion = reclamosMes.length > 0 ? Math.round((cerradosMes.length / reclamosMes.length) * 100) : 100;
+      const cerradosEsteMes = validos.filter(r => {
+        if (r.estado !== 'CERRADO' || !r.fechaCierre) return false;
+        const f = r.fechaCierre?.seconds ? new Date(r.fechaCierre.seconds * 1000) : new Date(r.fechaCierre);
+        return f && !isNaN(f.getTime()) && f.getMonth() === mesActual && f.getFullYear() === anioActual;
+      });
+      // Si cerrás más de lo que se abre, da > 100% (Limpieza de backlog)
+      const tasaResolucion = abiertosEsteMes.length > 0 ? Math.round((cerradosEsteMes.length / abiertosEsteMes.length) * 100) : (cerradosEsteMes.length > 0 ? 100 : 0);
 
+      // 2. LEAD TIME PROMEDIO (Días)
       const resueltos = validos.filter(r => r.estado === 'CERRADO' && r.fecha && r.fechaCierre);
       let totalDias = 0;
       resueltos.forEach(r => {
-        const fInicio = r.fecha.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
-        const fFin = r.fechaCierre.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
+         const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
+         const fFin = r.fechaCierre?.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
         totalDias += Math.max(0, (fFin - fInicio) / 86400);
       });
       const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
 
+      // 3. EFICIENCIA DE CONTACTO (Sin hilos de insistencia)
       const conteoPorInsumo = {};
       validos.forEach(r => {
          conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1;
       });
-      const topOfensoresList = Object.keys(conteoPorInsumo)
-        .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
-        .filter(obj => obj.insumo)
-        .sort((a,b) => b.cantidad - a.cantidad)
-        .slice(0, 5);
-
       let hilosUnicos = 0;
       let hilosMultiples = 0;
       Object.values(conteoPorInsumo).forEach(cant => {
@@ -68,7 +71,21 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const totalHilos = hilosUnicos + hilosMultiples;
       const efectividadPrimerContacto = totalHilos > 0 ? Math.round((hilosUnicos / totalHilos) * 100) : 100;
 
-      // Rendimiento analítico por Operario Almacén
+      // 4. BACKLOG OPERATIVO Y CRÍTICO (Tickets > 7 Días)
+      const activosBacklog = validos.filter(r => r.estado === 'ABIERTO');
+      const activosCriticos = activosBacklog.filter(r => {
+        const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
+        const ahora = Date.now() / 1000;
+        return ((ahora - fInicio) / 86400) > 7; 
+      });
+
+      // Rendimiento analítico
+      const topOfensoresList = Object.keys(conteoPorInsumo)
+        .map(id => ({ id, cantidad: conteoPorInsumo[id], insumo: insumos.find(i => i.id === id) }))
+        .filter(obj => obj.insumo)
+        .sort((a,b) => b.cantidad - a.cantidad)
+        .slice(0, 5);
+
       const rankingOperarios = {};
       validos.forEach(r => {
         const op = r.operario || "Sin Nombre";
@@ -91,14 +108,49 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }).sort((a, b) => b.total - a.total);
 
       return {
-        tasaResolucion, reclamosMes: reclamosMes.length, cerradosMes: cerradosMes.length,
+        tasaResolucion, abiertosEsteMes: abiertosEsteMes.length, cerradosEsteMes: cerradosEsteMes.length,
         leadTime,
+        activosBacklog: activosBacklog.length, activosCriticos: activosCriticos.length,
         topOfensores: topOfensoresList,
         efectividadPrimerContacto,
-        totalGestionados: validos.length,
         listaOperarios
       };
     }, [reclamos, insumos]);
+
+    // --- ACCIONES DE REPORTE KPI ---
+    const enviarReporteEmail = () => {
+      const body = `REPORTE SEMANAL DE KPIs - PLANTA DEVESA\n\n1. EVACUACIÓN MENSUAL (Clearance Rate): ${kpiData.tasaResolucion}%\n- Cerrados este mes: ${kpiData.cerradosEsteMes}\n- Abiertos este mes: ${kpiData.abiertosEsteMes}\n\n2. BACKLOG ACTIVO: ${kpiData.activosBacklog} tickets en curso\n- Demora Crítica (>7 días sin respuesta): ${kpiData.activosCriticos}\n\n3. LEAD TIME PROMEDIO: ${kpiData.leadTime} días (Tiempo neto de resolución)\n\n4. EFICIENCIA DE CONTACTO: ${kpiData.efectividadPrimerContacto}% (Resueltos sin hilos de insistencia)\n\n---\nGenerado automáticamente desde ERP Planta.`;
+      window.open(`mailto:fachaval@devesa.com?subject=Reporte Semanal KPIs - ERP Planta&body=${encodeURIComponent(body)}`, '_blank');
+    };
+
+    const exportarKpiPDF = () => {
+      const docPdf = new jsPDF();
+      docPdf.setFontSize(16);
+      docPdf.setFont("helvetica", "bold");
+      docPdf.text("TABLERO DE KPIs GERENCIALES - PLANTA DEVESA", 14, 20);
+      
+      docPdf.setFontSize(9);
+      docPdf.setFont("helvetica", "normal");
+      docPdf.setTextColor(100);
+      docPdf.text(`Fecha de emisión: ${new Date().toLocaleString('es-AR')}`, 14, 28); 
+      
+      autoTable(docPdf, {
+        startY: 35,
+        head: [['Indicador', 'Valor', 'Detalle']],
+        body: [
+          ['Evacuación Mensual', `${kpiData.tasaResolucion}%`, `${kpiData.cerradosEsteMes} cerrados vs ${kpiData.abiertosEsteMes} nuevos`],
+          ['Lead Time Promedio', `${kpiData.leadTime} Días`, 'Tiempo neto de resolución'],
+          ['Eficiencia de Contacto', `${kpiData.efectividadPrimerContacto}%`, 'Resueltos en el primer aviso'],
+          ['Backlog Activo', `${kpiData.activosBacklog} Tickets`, `${kpiData.activosCriticos} tickets con demora crítica (>7 días)`]
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42] }
+      });
+      
+      docPdf.save(`Reporte_KPIs_${new Date().toISOString().split('T')[0]}.pdf`);
+      setToastMsg("✅ Reporte PDF generado exitosamente.");
+      setTimeout(() => setToastMsg(null), 3000);
+    };
 
     // --- FUNCIÓN LOGÍSTICA: CIERRE MASIVO EN BLOQUE ---
     const ejecutarCierreMasivoEnBloque = async (insumoId) => {
@@ -349,6 +401,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                         const threadItems = h.subReclamos ? [...h.subReclamos].sort((a,b) => (b.fecha?.seconds||0) - (a.fecha?.seconds||0)) : [];
                         const isExpanded = expandedRow === h.insumoId;
                         const insumoAsociado = insumos.find(i => i.id === h.insumoId) || {};
+                        
+                        // Cálculo de días activo para el badge
+                        const fInicio = h.fecha?.seconds ? h.fecha.seconds : new Date(h.fecha).getTime() / 1000;
+                        const ahora = Date.now() / 1000;
+                        const diasActivo = Math.floor((ahora - fInicio) / 86400);
+                        const esCritico = diasActivo > 7;
 
                         return (
                           <React.Fragment key={h.insumoId || idx}>
@@ -395,7 +453,16 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                   </span>
                                 </div>
                               </td>
-                              <td className="py-4 px-4 text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</td>
+                              <td className="py-4 px-4">
+                                <div className="flex flex-col gap-1.5 items-start">
+                                  <span className="text-[10px] font-bold text-slate-500">{formatearFecha(h.fecha)}</span>
+                                  {h.estado === 'ABIERTO' && (
+                                    <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm ${esCritico ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>
+                                      🕒 {diasActivo} {diasActivo === 1 ? 'DÍA' : 'DÍAS'} ACTIVO
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
 
                               <td className="py-4 px-4 text-center">
                                 {(() => {
@@ -417,8 +484,20 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               <td className="py-4 px-4 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                   {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
-                                    <button onClick={(e) => { e.stopPropagation(); setDialogoConfirmacion({ titulo: "Cerrar Ticket Completo", mensaje: `¿Confirmás que querés liquidar y cerrar el ticket completo de "${insumoAsociado?.nombre || 'este material'}"? Esto procesará todas las iteraciones en bloque.`, textoConfirmar: "Sí, Cerrar Todo", colorBoton: "bg-emerald-500 hover:bg-emerald-600", onConfirm: () => ejecutarCierreMasivoEnBloque(h.insumoId) }); }} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest hover:border-slate-400 hover:text-slate-800 transition-all shadow-sm flex items-center gap-1">
-                                      <X size={10} /> Cerrar Ticket
+                                    <button 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        setDialogoConfirmacion({ 
+                                          titulo: "Finalizar Ticket Completo", 
+                                          mensaje: `¿Confirmás que querés liquidar y cerrar el ticket completo de "${insumoAsociado?.nombre || 'este material'}"? Esto procesará todas las iteraciones en bloque.`, 
+                                          textoConfirmar: "Sí, Finalizar", 
+                                          colorBoton: "bg-rose-500 hover:bg-rose-600", 
+                                          onConfirm: () => ejecutarCierreMasivoEnBloque(h.insumoId) 
+                                        }); 
+                                      }} 
+                                      className="px-2 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded text-[9px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all shadow-sm flex items-center gap-1"
+                                    >
+                                      <X size={10} /> Finalizar
                                     </button>
                                   )}
                                   {currentUser.rol === 'owner' && (
@@ -477,12 +556,22 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {/* TABLERO DE KPIs GERENCIALES */}
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              
+              <div className="flex flex-col sm:flex-row justify-end gap-3 border-b border-slate-200 pb-4">
+                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
+                   <FileText size={14} /> Exportar Reporte PDF
+                </button>
+                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
+                   <Mail size={14} /> Generar y Enviar Reporte
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tasa de Resolución</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Mes Actual</p>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Evacuación Mensual</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Clearance Rate</p>
                     </div>
                     <div className="p-2 bg-emerald-50 rounded-xl"><Target size={16} className="text-emerald-500"/></div>
                   </div>
@@ -491,9 +580,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                       <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.tasaResolucion}%</span>
                     </div>
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500" style={{width: `${kpiData.tasaResolucion}%`}}></div>
+                      <div className={`h-full ${kpiData.tasaResolucion >= 100 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{width: `${Math.min(kpiData.tasaResolucion, 100)}%`}}></div>
                     </div>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{kpiData.cerradosMes} CERRADOS DE {kpiData.reclamosMes} ABIERTOS</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{kpiData.cerradosEsteMes} CERRADOS VS {kpiData.abiertosEsteMes} NUEVOS</p>
                   </div>
                 </div>
 
@@ -536,16 +625,18 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Volumen Histórico</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Total de gestiones</p>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Backlog Activo</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Tickets en Planta</p>
                     </div>
-                    <div className="p-2 bg-orange-50 rounded-xl"><ShieldCheck size={16} className="text-orange-500"/></div>
+                    <div className="p-2 bg-rose-50 rounded-xl"><AlertCircle size={16} className="text-rose-500"/></div>
                   </div>
                   <div>
                     <div className="flex items-end gap-2 mb-2">
-                      <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.totalGestionados}</span>
+                      <span className="text-3xl font-black text-slate-800 leading-none">{kpiData.activosBacklog}</span>
                     </div>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">TICKETS OPERADOS</p>
+                    <p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${kpiData.activosCriticos > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                      {kpiData.activosCriticos > 0 ? `⚠️ ${kpiData.activosCriticos} CON DEMORA CRÍTICA (>7 DÍAS)` : '0 TICKETS VENCIDOS'}
+                    </p>
                   </div>
                 </div>
               </div>
