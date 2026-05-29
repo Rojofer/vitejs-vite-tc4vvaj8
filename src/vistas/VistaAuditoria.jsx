@@ -69,11 +69,13 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const validosInteracciones = reclamos.filter(r => {
         if (!r.insumoId || r.insumoId === "BROADCAST" || r.estado === "INICIALIZADO" || r.tipo === 'equipo') return false;
         
+        // BUSCADOR KPI (Ahora busca por nombre, código, cuerpo y TICKET)
         if (busquedaKpi.trim()) {
             const ins = insumos.find(i => i.id === r.insumoId);
             const term = busquedaKpi.toLowerCase();
             return (ins?.nombre || "").toLowerCase().includes(term) || 
                    (ins?.codigo || "").toLowerCase().includes(term) ||
+                   (ins?.ticketReclamo || "").toLowerCase().includes(term) ||
                    (r.cuerpoOriginal || "").toLowerCase().includes(term);
         }
         return true;
@@ -152,8 +154,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         nombre, total: data.total, efectividad: Math.round((data.cerrados / data.total) * 100)
       })).sort((a,b) => b.total - a.total);
 
-      // --- TABLA DINÁMICA DE OPERARIOS (DIRECTORIO FILTRADO) ---
-      // Ahora SÍ reacciona a los filtros de Grupo, Comprador y Día.
+      // --- TABLA DINÁMICA DE OPERARIOS (DIRECTORIO FILTRADO A-Z) ---
       const ticketsParaOperarios = ticketsMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -172,7 +173,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const listaOperarios = Object.keys(rankingOperarios).map(name => {
         return { nombre: name, total: rankingOperarios[name].total, efectividad: Math.round((rankingOperarios[name].cerrados / rankingOperarios[name].total) * 100) };
-      }).sort((a, b) => a.nombre.localeCompare(b.nombre)); // Orden Alfabético (Directorio, no ranking)
+      }).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
       // --- ESTRUCTURA MATRIZ DASHBOARD ---
       const ticketsDashboard = ticketsMes.filter(r => {
@@ -315,7 +316,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
     };
 
-    // FUNCIÓN DE BORRADO FÍSICO PERMANENTE DE TICKETS INDIVIDUALES
     const ejecutarEliminacionTicket = async (insumoId) => {
       try {
         const batch = writeBatch(db);
@@ -388,16 +388,23 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       if (filtroTipo === "TIPO_5") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("ADELANTAR"));
       if (filtroTipo === "OTRO") filtrados = filtrados.filter(r => !/SOLPED|AUTORIZAR|APROBADA DEMORADA|QUIEBRE|ADELANTAR/.test((r.mensaje || "").toUpperCase()));
     }
-    if (auditoriaTab === 'abiertos') filtrados = filtrados.filter(r => r.estado === 'ABIERTO' || r.tipo === "APROBACION GERENCIA");
-    else if (auditoriaTab === 'resueltos') filtrados = filtrados.filter(r => r.estado === 'CERRADO' && r.tipo !== "APROBACION GERENCIA");
     
+    // BUSCADOR PRINCIPAL (Ahora busca también por TICKET)
     if (busquedaAuditoria) { 
       const term = busquedaAuditoria.toLowerCase();
       filtrados = filtrados.filter(r => { 
         const ins = insumos.find(i => i.id === r.insumoId); 
-        return r.mensaje.toLowerCase().includes(term) || (ins?.nombre || "").toLowerCase().includes(term) || (ins?.codigo || "").toLowerCase().includes(term) || extraerComprador(r.cuerpoOriginal).toLowerCase().includes(term); 
+        return r.mensaje.toLowerCase().includes(term) || 
+               (ins?.nombre || "").toLowerCase().includes(term) || 
+               (ins?.codigo || "").toLowerCase().includes(term) || 
+               (ins?.ticketReclamo || "").toLowerCase().includes(term) ||
+               extraerComprador(r.cuerpoOriginal).toLowerCase().includes(term); 
       });
     }
+
+    if (auditoriaTab === 'abiertos') filtrados = filtrados.filter(r => r.estado === 'ABIERTO' || r.tipo === "APROBACION GERENCIA");
+    else if (auditoriaTab === 'resueltos') filtrados = filtrados.filter(r => r.estado === 'CERRADO' && r.tipo !== "APROBACION GERENCIA");
+    
     if (auditoriaFiltroInsumo) filtrados = filtrados.filter(r => r.insumoId === auditoriaFiltroInsumo);
 
     const hilos = useMemo(() => { 
@@ -433,10 +440,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input 
                     type="text" 
-                    placeholder="Buscar material en KPIs..." 
+                    placeholder="Buscar material o TICKET..." 
                     value={busquedaKpi} 
                     onChange={e => setBusquedaKpi(e.target.value)} 
-                    className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-48"
+                    className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-56"
                   />
                 </div>
                 <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-700 hover:bg-slate-100 transition-colors">
@@ -459,7 +466,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
               <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-6">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" placeholder="Buscar código, insumo o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
+                  <input type="text" placeholder="Buscar código, ticket o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
                 </div>
        
                 <select value={ordenTabla} onChange={e => setOrdenTabla(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-600">
