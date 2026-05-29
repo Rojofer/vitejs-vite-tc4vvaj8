@@ -69,7 +69,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const validosInteracciones = reclamos.filter(r => {
         if (!r.insumoId || r.insumoId === "BROADCAST" || r.estado === "INICIALIZADO" || r.tipo === 'equipo') return false;
         
-        // BUSCADOR KPI (Ahora busca por nombre, código, cuerpo y TICKET)
         if (busquedaKpi.trim()) {
             const ins = insumos.find(i => i.id === r.insumoId);
             const term = busquedaKpi.toLowerCase();
@@ -81,7 +80,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return true;
       });
       
-      // FILTRO DE DÍA SELECCIONADO (PULSO INTERACTIVO)
       let insumosActivosEnDia = null;
       if (diaEnfoque) {
           const activosDia = validosInteracciones.filter(r => {
@@ -94,7 +92,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
       const cumpleDia = (insumoId) => !insumosActivosEnDia || insumosActivosEnDia.has(insumoId);
 
-      // Mapeo unificado para obtener 1 Ticket Único por Insumo
       const mapaTickets = {};
       validosInteracciones.forEach(r => {
         if (!mapaTickets[r.insumoId]) {
@@ -122,7 +119,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const validosTickets = Object.values(mapaTickets);
       const ticketsMes = filtroMes === "TODOS" ? validosTickets : validosTickets.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
 
-      // --- RANKING DE GRUPOS ---
       const ticketsParaGrupos = ticketsMes.filter(r => {
           const comp = extraerComprador(r.cuerpoOriginal);
           return (!operarioEnfoque || r.operario === operarioEnfoque) && (!compradorEnfoque || comp === compradorEnfoque) && cumpleDia(r.insumoId);
@@ -135,7 +131,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const listaGrupos = Object.entries(conteoGrupos).map(([nombre, cantidad]) => ({nombre, cantidad})).sort((a,b) => b.cantidad - a.cantidad);
 
-      // --- RANKING DE COMPRADORES ---
       const ticketsParaCompradores = ticketsMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -154,7 +149,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         nombre, total: data.total, efectividad: Math.round((data.cerrados / data.total) * 100)
       })).sort((a,b) => b.total - a.total);
 
-      // --- TABLA DINÁMICA DE OPERARIOS (DIRECTORIO FILTRADO A-Z) ---
       const ticketsParaOperarios = ticketsMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -175,7 +169,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return { nombre: name, total: rankingOperarios[name].total, efectividad: Math.round((rankingOperarios[name].cerrados / rankingOperarios[name].total) * 100) };
       }).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-      // --- ESTRUCTURA MATRIZ DASHBOARD ---
       const ticketsDashboard = ticketsMes.filter(r => {
          const ins = insumos.find(i => i.id === r.insumoId);
          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -208,7 +201,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
       const pendientesGerencia = ticketsDashboard.filter(r => (getTipoReclamo(r.mensaje).num === "2" || r.tipo === 'APROBACION GERENCIA') && r.estado === 'ABIERTO').length;
 
-      // --- MÉTRICAS DE TIEMPO REAL ---
       const ticketsTiempoReal = validosTickets.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -222,7 +214,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return ((Date.now() / 1000 - fInicio) / 86400) > 7; 
       });
 
-      // PULSO SEMANAL EVALÚA TOTAL DE ENVIOS (INTERACCIONES)
       const interaccionesTiempoReal = validosInteracciones.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -389,7 +380,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       if (filtroTipo === "OTRO") filtrados = filtrados.filter(r => !/SOLPED|AUTORIZAR|APROBADA DEMORADA|QUIEBRE|ADELANTAR/.test((r.mensaje || "").toUpperCase()));
     }
     
-    // BUSCADOR PRINCIPAL (Ahora busca también por TICKET)
     if (busquedaAuditoria) { 
       const term = busquedaAuditoria.toLowerCase();
       filtrados = filtrados.filter(r => { 
@@ -437,7 +427,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
             {auditoriaTab === 'kpis' && currentUser.rol === 'owner' && (
               <div className="flex items-center gap-3 mb-2 sm:mb-0">
                 
-                {/* TARJETA DINÁMICA DE TOTALES */}
+                {/* TARJETA DINÁMICA DE TOTALES KPIs */}
                 <div className="flex items-center gap-2 bg-slate-900 px-3 py-2.5 rounded-xl shadow-sm border border-slate-800 shrink-0">
                   <Package size={14} className="text-sky-400" />
                   <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Activos:</span>
@@ -454,12 +444,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-28 sm:w-36"
                   />
                 </div>
-                
                 <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-700 hover:bg-slate-100 transition-colors">
                   <option value="TODOS">Mes: Total</option>
                   {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-
                 <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all hidden md:flex">
                    <FileText size={14} /> PDF
                 </button>
@@ -474,6 +462,16 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               
               <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-6">
+                
+                {/* TARJETA DINÁMICA DE TOTALES (TABLAS PRINCIPALES) */}
+                <div className="flex items-center gap-2 bg-slate-900 px-4 py-3 rounded-xl shadow-sm border border-slate-800 shrink-0">
+                  <FileText size={16} className={auditoriaTab === 'abiertos' ? "text-sky-400" : "text-emerald-400"} />
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                    {auditoriaTab === 'abiertos' ? 'En Curso:' : 'Resueltos:'}
+                  </span>
+                  <span className="text-[12px] font-black text-white">{hilos.length}</span>
+                </div>
+
                 <div className="relative flex-1 min-w-[200px]">
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input type="text" placeholder="Buscar código, ticket o asunto..." value={busquedaAuditoria} onChange={e => setBusquedaAuditoria(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-sky-500 transition-all shadow-sm" />
