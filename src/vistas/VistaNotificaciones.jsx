@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, CheckCircle, Clock, Megaphone, Send, X, Search, FileText } from 'lucide-react';
 import { doc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
