@@ -33,28 +33,27 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES (CATÁLOGO OFICIAL G03-G10)
+    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES INFALIBLE
     const extraerComprador = (cuerpo) => {
       if (!cuerpo) return 'SIN ASIGNAR';
-      // Corta si encuentra un salto de línea, un guión o una barra vertical (|)
-      const match = cuerpo.match(/Resp:\s*([^\n|-]+)/i);
-      if (!match) return 'SIN ASIGNAR';
+      const txt = cuerpo.toUpperCase();
+      
+      if (!txt.includes("RESP:")) return 'SIN ASIGNAR';
+      const rawPart = txt.split("RESP:")[1];
 
-      let rawName = match[1].trim().toUpperCase();
+      if (rawPart.includes('ARGÜERO') || rawPart.includes('ARGUERO') || rawPart.includes('HERNÁN')) return 'HERNÁN ARGÜERO (G03)';
+      if (rawPart.includes('LILIAN') || rawPart.includes('SAMANIEGO')) return 'LILIAN SAMANIEGO (G04)';
+      if (rawPart.includes('JOANNY') || rawPart.includes('ROMERO')) return 'JOANNY G. ROMERO (G05)';
+      if (rawPart.includes('ROBERTO') || rawPart.includes('SOSA')) return 'ROBERTO SOSA (G06)';
+      if (rawPart.includes('EZEQUIEL') || rawPart.includes('ZANON')) return 'EZEQUIEL ZANON (G07)';
+      if (rawPart.includes('MARTÍN') || rawPart.includes('MARTIN') || rawPart.includes('ESTREBOU')) return 'MARTÍN ESTREBOU (G08)';
+      if (rawPart.includes('NAHUEL') || rawPart.includes('JUMILL')) return 'NAHUEL JOSE JUMILLA (G09)';
+      if (rawPart.includes('LUCAS') || rawPart.includes('JIMENEZ') || rawPart.includes('JIMÉNEZ')) return 'LUCAS A. JIMENEZ (G10)';
 
-      if (rawName.includes('ARGÜERO') || rawName.includes('ARGUERO') || rawName.includes('HERNÁN')) return 'HERNÁN ARGÜERO (G03)';
-      if (rawName.includes('LILIAN') || rawName.includes('SAMANIEGO')) return 'LILIAN SAMANIEGO (G04)';
-      if (rawName.includes('JOANNY') || rawName.includes('ROMERO')) return 'JOANNY G. ROMERO (G05)';
-      if (rawName.includes('ROBERTO') || rawName.includes('SOSA')) return 'ROBERTO SOSA (G06)';
-      if (rawName.includes('EZEQUIEL') || rawName.includes('ZANON')) return 'EZEQUIEL ZANON (G07)';
-      if (rawName.includes('MARTÍN') || rawName.includes('MARTIN') || rawName.includes('ESTREBOU')) return 'MARTÍN ESTREBOU (G08)';
-      if (rawName.includes('NAHUEL') || rawName.includes('JUMILL')) return 'NAHUEL JOSE JUMILLA (G09)';
-      if (rawName.includes('LUCAS') || rawName.includes('JIMENEZ') || rawName.includes('JIMÉNEZ')) return 'LUCAS A. JIMENEZ (G10)';
-
-      return rawName;
+      const fallbackMatch = rawPart.match(/\s*([A-ZÁÉÍÓÚÑ]+)/);
+      return fallbackMatch ? fallbackMatch[1].trim() : 'SIN ASIGNAR';
     };
 
-    // MESES DISPONIBLES GLOBALES
     const mesesDisponibles = useMemo(() => { 
       const validos = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO");
       return Array.from(new Set(validos.map(r => obtenerMesAnio(r.fecha)))).sort((a, b) => { 
@@ -64,9 +63,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }); 
     }, [reclamos]);
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (FILTRO CRUZADO DINÁMICO) ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
     const kpiData = useMemo(() => {
-      const validosGlobal = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
+      // INCLUYE LOS TICKETS DE GERENCIA PARA QUE LAS MÉTRICAS NO SE ROMPAN
+      const validosGlobal = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo');
       
       const validosMes = filtroMes === "TODOS" ? validosGlobal : validosGlobal.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
 
@@ -83,7 +83,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const listaGrupos = Object.entries(conteoGrupos).map(([nombre, cantidad]) => ({nombre, cantidad})).sort((a,b) => b.cantidad - a.cantidad);
 
-      // --- 2. RANKING DE COMPRADORES (EXCLUYENDO GERENCIA) ---
+      // --- 2. RANKING DE COMPRADORES (EXCLUYE TOTALMENTE LOS TICKETS DE GERENCIA/AUTORIZACIÓN) ---
       const validosParaCompradores = validosMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -92,7 +92,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const rankingComps = {};
       validosParaCompradores.forEach(r => {
         const tipo = getTipoReclamo(r.mensaje);
-        if (tipo.num === "2") return; // EXCLUIMOS "AUTORIZAR OC" DEL RENDIMIENTO DEL COMPRADOR
+        if (tipo.num === "2" || r.tipo === 'APROBACION GERENCIA') return; // PROTECCIÓN: IGNORA TICKETS DE GERENCIA
         
         const comp = extraerComprador(r.cuerpoOriginal);
         if (!rankingComps[comp]) rankingComps[comp] = { total: 0, cerrados: 0 };
@@ -154,10 +154,14 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       Object.values(conteoPorInsumo).forEach(cant => { if (cant === 1) hilosUnicos++; else if (cant > 1) hilosMultiples++; });
       const efectividadPrimerContacto = (hilosUnicos + hilosMultiples) > 0 ? Math.round((hilosUnicos / (hilosUnicos + hilosMultiples)) * 100) : 100;
 
-      // INDICADOR GERENCIA (Autorizar O/C)
-      const pendientesGerencia = validosDashboard.filter(r => getTipoReclamo(r.mensaje).num === "2" && r.estado === 'ABIERTO').length;
+      // INDICADOR GERENCIA (Autorizar O/C) - Cuenta insumos únicos frenados
+      const insumosPendientesGerencia = new Set(
+        validosDashboard
+          .filter(r => (getTipoReclamo(r.mensaje).num === "2" || r.tipo === 'APROBACION GERENCIA') && r.estado === 'ABIERTO')
+          .map(r => r.insumoId)
+      );
+      const pendientesGerencia = insumosPendientesGerencia.size;
 
-      // BACKLOG Y PULSO TIEMPO REAL
       const validosTiempoReal = validosGlobal.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -606,7 +610,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   </div>
                 </div>
 
-                {/* 5TA TARJETA: FIRMAS DE GERENCIA (AUTORIZAR OC) */}
+                {/* 5TA TARJETA: FIRMAS DE GERENCIA */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
