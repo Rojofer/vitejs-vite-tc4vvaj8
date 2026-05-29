@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2 } from 'lucide-react';
+import { History, addDoc, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -331,6 +331,65 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
     };
 
+    const ejecutarRescateDeTickets = async () => {
+      // 1. Aquí están los 20 tickets recuperados exactos de tu CSV
+      const backupTickets = [
+        { fecha_str: "27/05/26 13:54", estado: "ABIERTO", codigo: "1500100313", mensaje: "1500100313-CAMISA BEIGE MANGA CORTA 38 | O/C APROBADA DEMORADA [TK-9112]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 12:00", estado: "ABIERTO", codigo: "1500200111", mensaje: "1500200111-GUANTE DE NITRILO VERDE LARGO TALLE 8 | URGENTE: RIESGO DE QUIEBRE:  [TK-1360]", operario: "YESICA" },
+        { fecha_str: "27/05/26 12:00", estado: "ABIERTO", codigo: "1400100039", mensaje: "1400100039-CAJÓN PLÁSTICO APILABLE 21CM | SOLPED SIN OC [TK-1517]", operario: "Dueño VIP" },
+        { fecha_str: "27/05/26 11:23", estado: "ABIERTO", codigo: "1500300060", mensaje: "1500300060-CUCHILLO CARNICERO CABO VERDE 8\" | O/C APROBADA DEMORADA [TK-5365]", operario: "Dueño VIP" },
+        { fecha_str: "27/05/26 10:09", estado: "ABIERTO", codigo: "801400700", mensaje: "801400700-CINTA EMBALAR 72 X 100 (común) | O/C APROBADA DEMORADA [TK-2230]", operario: "Dueño VIP" },
+        { fecha_str: "27/05/26 10:02", estado: "ABIERTO", codigo: "1200100107", mensaje: "1200100107-DISPENSER PARA JABON Y ALCOHOL A GRANEL | SOLPED SIN OC [TK-2684]", operario: "Dueño VIP" },
+        { fecha_str: "27/05/26 09:27", estado: "ABIERTO", codigo: "801200070", mensaje: "801200070-STRETCH MANUAL SIN BUJE | AUTORIZAR OC [TK-2988]", operario: "FER" },
+        { fecha_str: "27/05/26 08:51", estado: "ABIERTO", codigo: "1500100227", mensaje: "1500100227-CHALECO DE FRIO AZUL L | AUTORIZAR OC [TK-3604]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 08:50", estado: "ABIERTO", codigo: "1500100214", mensaje: "1500100214-CAMPERAS VERDES P/CORRALEROS XL | AUTORIZAR OC [TK-1261]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 08:45", estado: "ABIERTO", codigo: "1500100213", mensaje: "1500100213-CAMPERAS VERDES P/CORRALEROS L | AUTORIZAR OC [TK-1799]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 08:44", estado: "ABIERTO", codigo: "1500100241", mensaje: "1500100241-BOTA BLANCA C/ PUNTERA ACERO 43 | AUTORIZAR OC [TK-8589]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 08:14", estado: "ABIERTO", codigo: "1500100240", mensaje: "1500100240-BOTA BLANCA C/ PUNTERA ACERO 42 | AUTORIZAR OC [TK-8353]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 06:41", estado: "ABIERTO", codigo: "1500200022", mensaje: "1500200022-GUANTES ANTICORTE TEJIDO T 8(2541) | AUTORIZAR OC [TK-4088]", operario: "YESICA" },
+        { fecha_str: "27/05/26 06:19", estado: "ABIERTO", codigo: "801200024", mensaje: "801200024-BOLSA DE RED 36X70 VERDE KOSHER | SOLPED SIN OC [TK-3181]", operario: "Dueño VIP" },
+        { fecha_str: "26/05/26 14:10", estado: "ABIERTO", codigo: "1600100161", mensaje: "1600100161-REPUESTO HOJA DE METAL CUTTER MARTOR | AUTORIZAR OC [TK-8161]", operario: "ALEJANDRO" },
+        { fecha_str: "26/05/26 14:08", estado: "ABIERTO", codigo: "1600100061", mensaje: "1600100061-Cutter Martor secupro 625 | AUTORIZAR OC [TK-6801]", operario: "ALEJANDRO" },
+        { fecha_str: "26/05/26 13:57", estado: "ABIERTO", codigo: "1500100416", mensaje: "1500100416-AMBO COLOR GRIS TOPO ML TALLE L | URGENTE: RIESGO DE QUIEBRE:  [TK-4964]", operario: "GUILLE" },
+        { fecha_str: "26/05/26 13:48", estado: "ABIERTO", codigo: "1500100219", mensaje: "1500100219-CAMPERA DE FRIO AZUL L | URGENTE: RIESGO DE QUIEBRE:  [TK-9607]", operario: "GUILLE" },
+        { fecha_str: "26/05/26 13:46", estado: "ABIERTO", codigo: "1500100341", mensaje: "1500100341-CAMPERA BEIGE T.L | URGENTE: RIESGO DE QUIEBRE:  [TK-7164]", operario: "GUILLE" },
+        { fecha_str: "26/05/26 13:27", estado: "ABIERTO", codigo: "1200100270", mensaje: "1200100270-DETERGENTE EXTRA CLIP(Cuchillos) | AUTORIZAR OC [TK-1610]", operario: "MONICA" }
+      ];
+
+      try {
+        setToastMsg("⏳ Restaurando tickets...");
+        
+        for (const bk of backupTickets) {
+          // Buscamos el insumo real en tu base actual usando el código
+          const insumoAsociado = insumos.find(i => i.codigo === bk.codigo);
+          if (!insumoAsociado) continue; // Si el insumo no existe, lo saltamos
+          
+          // Reconstruimos la fecha
+          const [dia, mes, resto] = bk.fecha_str.split('/');
+          const [anioStr, horaStr] = resto.split(' ');
+          // En JS los meses empiezan de 0, por eso mes - 1
+          const fechaRestaurada = new Date(`20${anioStr}`, parseInt(mes) - 1, dia, ...horaStr.split(':'));
+
+          // Inyectamos el registro de nuevo en Firebase
+          await addDoc(collection(db, "reclamos"), {
+            insumoId: insumoAsociado.id,
+            fecha: fechaRestaurada,
+            operario: bk.operario,
+            estado: bk.estado,
+            tipo: "RESTAURADO", // Para que no se pise si había lógicas de "equipo", pero se lee igual en el tablero
+            mensaje: bk.mensaje,
+            cuerpoOriginal: bk.mensaje, // Restauramos el cuerpo base
+            leidoPor: []
+          });
+        }
+        
+        setToastMsg("✅ ¡Los 20 tickets fueron restaurados con éxito!");
+      } catch (error) {
+        console.error(error);
+        setToastMsg("⚠️ Ocurrió un error en la restauración.");
+      }
+    };
+
     const exportarDossierPDF = (hiloActivo) => {
       const docPdf = new jsPDF();
       const insumo = insumos.find(i => i.id === hiloActivo.insumoId) || {};
@@ -414,6 +473,15 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     return (
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
+            
+            {currentUser.rol === 'owner' && (
+          <button 
+            onClick={ejecutarRescateDeTickets} 
+            className="w-full bg-red-600 text-white font-black py-5 rounded-2xl shadow-xl mb-6 hover:bg-red-700 uppercase tracking-widest text-xs animate-pulse z-[9999]"
+          >
+            🚨 EJECUTAR RESCATE: VOLVER A INYECTAR LOS TICKETS DEL CSV BORRADOS 🚨
+          </button>
+        )}
           
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 mb-6 pb-2 gap-4">
             <div className="flex gap-6">
