@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -21,6 +21,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [operarioEnfoque, setOperarioEnfoque] = useState(null);
     const [grupoEnfoque, setGrupoEnfoque] = useState(null);
     const [compradorEnfoque, setCompradorEnfoque] = useState(null);
+    const [diaEnfoque, setDiaEnfoque] = useState(null); 
+    const [busquedaKpi, setBusquedaKpi] = useState("");
 
     // CEREBRO CLASIFICADOR
     const getTipoReclamo = (asunto) => {
@@ -62,10 +64,36 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }); 
     }, [reclamos]);
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (SEPARACIÓN TICKETS ÚNICOS VS INTERACCIONES) ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
     const kpiData = useMemo(() => {
-      const validosInteracciones = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo');
+      // 0. APLICAR BUSCADOR GLOBAL DE INSUMOS
+      const validosInteracciones = reclamos.filter(r => {
+        if (!r.insumoId || r.insumoId === "BROADCAST" || r.estado === "INICIALIZADO" || r.tipo === 'equipo') return false;
+        
+        if (busquedaKpi.trim()) {
+            const ins = insumos.find(i => i.id === r.insumoId);
+            const term = busquedaKpi.toLowerCase();
+            const match = (ins?.nombre || "").toLowerCase().includes(term) || 
+                          (ins?.codigo || "").toLowerCase().includes(term) ||
+                          (r.cuerpoOriginal || "").toLowerCase().includes(term);
+            if (!match) return false;
+        }
+        return true;
+      });
       
+      // FILTRO DE DÍA (PULSO)
+      let insumosActivosEnDia = null;
+      if (diaEnfoque) {
+          const activosDia = validosInteracciones.filter(r => {
+              const f = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
+              if (!f || isNaN(f.getTime())) return false;
+              const dStr = `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}`;
+              return dStr === diaEnfoque;
+          });
+          insumosActivosEnDia = new Set(activosDia.map(a => a.insumoId));
+      }
+      const cumpleDia = (insumoId) => !insumosActivosEnDia || insumosActivosEnDia.has(insumoId);
+
       // 1. COMPRESIÓN DE HILOS: Mapear para obtener 1 Ticket Único por Insumo
       const mapaTickets = {};
       validosInteracciones.forEach(r => {
@@ -76,12 +104,11 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           const tActual = r.fecha?.seconds || 0;
           const tGuardado = mapaTickets[r.insumoId].fecha?.seconds || 0;
           
-          if (r.estado === 'ABIERTO') mapaTickets[r.insumoId].estado = 'ABIERTO'; // Prevalece abierto
+          if (r.estado === 'ABIERTO') mapaTickets[r.insumoId].estado = 'ABIERTO'; 
           if (tActual < (mapaTickets[r.insumoId].fechaInicioReal?.seconds || Infinity)) {
-             mapaTickets[r.insumoId].fechaInicioReal = r.fecha; // Guardamos el origen para LeadTime/Críticos
+             mapaTickets[r.insumoId].fechaInicioReal = r.fecha; 
           }
           if (tActual > tGuardado) {
-             // Absorber los metadatos de la iteración más reciente
              mapaTickets[r.insumoId].cuerpoOriginal = r.cuerpoOriginal;
              mapaTickets[r.insumoId].mensaje = r.mensaje;
              mapaTickets[r.insumoId].tipo = r.tipo;
@@ -93,14 +120,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
 
       const validosTickets = Object.values(mapaTickets);
-      
-      // Aplicamos el filtro mensual sobre los Tickets Únicos
       const ticketsMes = filtroMes === "TODOS" ? validosTickets : validosTickets.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
 
       // --- RANKING DE GRUPOS ---
       const ticketsParaGrupos = ticketsMes.filter(r => {
           const comp = extraerComprador(r.cuerpoOriginal);
-          return (!operarioEnfoque || r.operario === operarioEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
+          return (!operarioEnfoque || r.operario === operarioEnfoque) && (!compradorEnfoque || comp === compradorEnfoque) && cumpleDia(r.insumoId);
       });
       const conteoGrupos = {};
       ticketsParaGrupos.forEach(r => {
@@ -114,13 +139,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const ticketsParaCompradores = ticketsMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
-          return (!grupoEnfoque || g === grupoEnfoque) && (!operarioEnfoque || r.operario === operarioEnfoque);
+          return (!grupoEnfoque || g === grupoEnfoque) && (!operarioEnfoque || r.operario === operarioEnfoque) && cumpleDia(r.insumoId);
       });
       const rankingComps = {};
       ticketsParaCompradores.forEach(r => {
         const tipo = getTipoReclamo(r.mensaje);
         if (tipo.num === "2" || r.tipo === 'APROBACION GERENCIA') return; 
-        
         const comp = extraerComprador(r.cuerpoOriginal);
         if (!rankingComps[comp]) rankingComps[comp] = { total: 0, cerrados: 0 };
         rankingComps[comp].total++;
@@ -130,13 +154,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         nombre, total: data.total, efectividad: Math.round((data.cerrados / data.total) * 100)
       })).sort((a,b) => b.total - a.total);
 
-      // --- RANKING DE OPERARIOS (VOLUMEN NETO) ---
-      const ticketsParaOperarios = ticketsMes.filter(r => {
-          const ins = insumos.find(i => i.id === r.insumoId);
-          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
-          const comp = extraerComprador(r.cuerpoOriginal);
-          return (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
-      });
+      // --- RANKING DE OPERARIOS (VOLUMEN NETO) - TODOS SÍ O SÍ ---
+      // Ignora los filtros cruzados para mantener siempre a la vista a todos los operarios del mes
+      const ticketsParaOperarios = ticketsMes; 
       const rankingOperarios = {};
       ticketsParaOperarios.forEach(r => {
         const op = r.operario || "Sin Nombre";
@@ -148,12 +168,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return { nombre: name, total: rankingOperarios[name].total, efectividad: Math.round((rankingOperarios[name].cerrados / rankingOperarios[name].total) * 100) };
       }).sort((a, b) => b.total - a.total);
 
-      // --- MATRIZ CENTRAL ---
+      // --- MATRIZ CENTRAL (KPI TOP CARDS) ---
       const ticketsDashboard = ticketsMes.filter(r => {
          const ins = insumos.find(i => i.id === r.insumoId);
          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
          const comp = extraerComprador(r.cuerpoOriginal);
-         return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
+         return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque) && cumpleDia(r.insumoId);
       });
 
       const determinarSiEsDelMes = (f) => {
@@ -175,7 +195,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
 
-      // Eficiencia revisa cuántos tickets únicos se resolvieron con 1 solo mensaje
       let hilosUnicos = 0; let hilosMultiples = 0;
       ticketsDashboard.forEach(t => { if (t.interaccionesTotal === 1) hilosUnicos++; else if (t.interaccionesTotal > 1) hilosMultiples++; });
       const efectividadPrimerContacto = (hilosUnicos + hilosMultiples) > 0 ? Math.round((hilosUnicos / (hilosUnicos + hilosMultiples)) * 100) : 100;
@@ -187,7 +206,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
         const comp = extraerComprador(r.cuerpoOriginal);
-        return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
+        return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque) && cumpleDia(r.insumoId);
       });
 
       const activosBacklog = ticketsTiempoReal.filter(r => r.estado === 'ABIERTO');
@@ -196,7 +215,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return ((Date.now() / 1000 - fInicio) / 86400) > 7; 
       });
 
-      // EL PULSO CUENTA INTERACCIONES (ESFUERZO DIARIO), NO TICKETS
       const interaccionesTiempoReal = validosInteracciones.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -215,13 +233,31 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
       const maxActividadPulso = Math.max(...lista20Dias.map(d => d.cantidad), 1);
 
+      // NUEVO: LISTA DE INSUMOS DINÁMICA
+      const listaInsumos = ticketsDashboard.map(t => {
+          const ins = insumos.find(i => i.id === t.insumoId) || {};
+          const comp = extraerComprador(t.cuerpoOriginal);
+          const g = ins.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
+          return {
+              insumoId: t.insumoId,
+              nombre: ins.nombre || 'GENERAL',
+              codigo: ins.codigo || 'S/C',
+              grupo: g,
+              comprador: comp,
+              estado: t.estado,
+              operario: t.operario,
+              interacciones: t.interaccionesTotal,
+              insumoAsociado: ins
+          };
+      }).sort((a, b) => b.interacciones - a.interacciones); 
+
       return {
         tasaResolucion, abiertosEsteMes: abiertosEnElPeriodo.length, cerradosEsteMes: cerradosEnElPeriodo.length,
         leadTime, activosBacklog: activosBacklog.length, activosCriticos: activosCriticos.length, pendientesGerencia,
-        efectividadPrimerContacto, listaOperarios, listaGrupos, listaCompradores,
+        efectividadPrimerContacto, listaOperarios, listaGrupos, listaCompradores, listaInsumos,
         pulsoSemanas: lista20Dias, maxActividadPulso
       };
-    }, [reclamos, insumos, operarioEnfoque, grupoEnfoque, compradorEnfoque, filtroMes]);
+    }, [reclamos, insumos, operarioEnfoque, grupoEnfoque, compradorEnfoque, diaEnfoque, filtroMes, busquedaKpi]);
 
     // --- ACCIONES ---
     const enviarReporteEmail = () => {
@@ -244,6 +280,17 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       docPdf.save(`Reporte_KPIs_${new Date().toISOString().split('T')[0]}.pdf`);
       setToastMsg("✅ Reporte PDF generado exitosamente."); setTimeout(() => setToastMsg(null), 3000);
+    };
+
+    const descargarExcelInsumosKpi = () => {
+      let csv = "Codigo,Insumo,Grupo,Comprador,Operario,Estado,Interacciones\n";
+      kpiData.listaInsumos.forEach(item => { 
+        csv += `"${item.codigo}","${item.nombre}","${item.grupo}","${item.comprador}","${item.operario}","${item.estado}","${item.interacciones}"\n`; 
+      });
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+      link.download = `Reporte_Materiales_KPI_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
+      setToastMsg("✅ Excel generado con éxito."); setTimeout(() => setToastMsg(null), 3000);
     };
 
     const ejecutarCierreMasivoEnBloque = async (insumoId) => {
@@ -340,7 +387,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
     }, [filtrados, insumos, ordenTabla]);
 
-    const filtrosActivosText = [operarioEnfoque, grupoEnfoque, compradorEnfoque].filter(Boolean).join(' | ');
+    const filtrosActivosText = [operarioEnfoque, grupoEnfoque, compradorEnfoque, diaEnfoque ? `Día: ${diaEnfoque}` : null].filter(Boolean).join(' | ');
 
     return (
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
@@ -355,6 +402,16 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
             {auditoriaTab === 'kpis' && currentUser.rol === 'owner' && (
               <div className="flex items-center gap-3 mb-2 sm:mb-0">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar material en KPIs..." 
+                    value={busquedaKpi} 
+                    onChange={e => setBusquedaKpi(e.target.value)} 
+                    className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-48"
+                  />
+                </div>
                 <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-700 hover:bg-slate-100 transition-colors">
                   <option value="TODOS">Mes: Histórico Total</option>
                   {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
@@ -662,11 +719,11 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     <History size={20} className="text-slate-800"/>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Pulso de Actividad Reciente <span className="text-sky-600 font-bold ml-2 text-xs">{filtrosActivosText && `(Filtros: ${filtrosActivosText})`}</span></h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen en los últimos 20 días (Tiempo Real)</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen en los últimos 20 días (Clickeá una barra para ver detalles del día)</p>
                     </div>
                   </div>
-                  {(operarioEnfoque || grupoEnfoque || compradorEnfoque) && (
-                    <button onClick={() => { setOperarioEnfoque(null); setGrupoEnfoque(null); setCompradorEnfoque(null); }} className="text-[9px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors">Limpiar Filtros</button>
+                  {(operarioEnfoque || grupoEnfoque || compradorEnfoque || diaEnfoque) && (
+                    <button onClick={() => { setOperarioEnfoque(null); setGrupoEnfoque(null); setCompradorEnfoque(null); setDiaEnfoque(null); }} className="text-[9px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors">Limpiar Filtros</button>
                   )}
                 </div>
                 
@@ -674,11 +731,15 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   {kpiData.pulsoSemanas.map((dia, idx) => {
                     const pctAltura = Math.max(8, Math.round((dia.cantidad / kpiData.maxActividadPulso) * 100));
                     return (
-                      <div key={idx} className="flex-1 min-w-[40px] max-w-[60px] flex flex-col items-center group relative h-full justify-end shrink-0">
+                      <div 
+                        key={idx} 
+                        onClick={() => setDiaEnfoque(diaEnfoque === dia.label ? null : dia.label)}
+                        className={`flex-1 min-w-[40px] max-w-[60px] flex flex-col items-center group relative h-full justify-end shrink-0 cursor-pointer transition-all ${diaEnfoque === dia.label ? 'bg-sky-50 ring-1 ring-sky-200 rounded-lg' : 'hover:bg-slate-50'}`}
+                      >
                         <div className="absolute -top-3 opacity-0 group-hover:opacity-100 bg-slate-900 text-white font-black text-[9px] px-1.5 py-0.5 rounded transition-all shadow-md z-30 pointer-events-none">{dia.cantidad}</div>
-                        <span className="text-[10px] font-black text-slate-700 mb-1 leading-none">{dia.cantidad}</span>
-                        <div style={{ height: `${pctAltura}%` }} className={`w-full rounded-t-lg transition-all duration-300 shadow-xs ${dia.cantidad > 0 ? 'bg-gradient-to-t from-indigo-500 to-indigo-400 group-hover:from-indigo-600 group-hover:to-indigo-500' : 'bg-slate-100'}`}></div>
-                        <span className="text-[8px] font-black text-slate-400 uppercase mt-2 tracking-tighter whitespace-nowrap">{dia.label}</span>
+                        <span className={`text-[10px] font-black mb-1 leading-none ${diaEnfoque === dia.label ? 'text-sky-700' : 'text-slate-700'}`}>{dia.cantidad}</span>
+                        <div style={{ height: `${pctAltura}%` }} className={`w-full rounded-t-lg transition-all duration-300 shadow-xs ${dia.cantidad > 0 ? (diaEnfoque === dia.label ? 'bg-sky-500' : 'bg-gradient-to-t from-indigo-500 to-indigo-400 group-hover:from-indigo-600') : 'bg-slate-100'}`}></div>
+                        <span className={`text-[8px] font-black uppercase mt-2 tracking-tighter whitespace-nowrap ${diaEnfoque === dia.label ? 'text-sky-600' : 'text-slate-400'}`}>{dia.label}</span>
                       </div>
                     );
                   })}
@@ -765,7 +826,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     <Users size={20} className="text-slate-800"/>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Alertas por Operario</h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Clickeá un operario para filtrar</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Clickeá para filtrar el tablero</p>
                     </div>
                   </div>
                   
@@ -794,7 +855,73 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     </div>
                   )}
                 </div>
-                
+              </div>
+
+              {/* 4. TABLA DINÁMICA DE INSUMOS (NUEVO) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full mt-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                  <div className="flex items-center gap-2">
+                    <FileText size={20} className="text-slate-800"/>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Detalle de Materiales Activos en las Métricas</h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Hacé clic en un insumo para abrir su ficha completa en el panel derecho</p>
+                    </div>
+                  </div>
+                  
+                  {kpiData.listaInsumos.length > 0 && (
+                    <button onClick={descargarExcelInsumosKpi} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm">
+                      <Download size={14} /> Descargar Reporte Excel
+                    </button>
+                  )}
+                </div>
+
+                {kpiData.listaInsumos.length === 0 ? (
+                  <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">Sin registros activos con los filtros actuales</div>
+                ) : (
+                  <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 max-h-[400px]">
+                    <table className="w-full text-left whitespace-nowrap text-xs font-bold">
+                      <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                        <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          <th className="py-4 px-4 bg-white">Código / Insumo</th>
+                          <th className="py-4 px-4 bg-white text-center">Grupo</th>
+                          <th className="py-4 px-4 bg-white text-left">Abastecimiento</th>
+                          <th className="py-4 px-4 bg-white text-center">Operario</th>
+                          <th className="py-4 px-4 bg-white text-center">Estado</th>
+                          <th className="py-4 px-4 bg-white text-right">Interacciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {kpiData.listaInsumos.map((item) => (
+                          <tr 
+                            key={item.insumoId} 
+                            onClick={() => setActiveInsumo(item.insumoAsociado)}
+                            className="text-slate-700 hover:bg-sky-50/50 cursor-pointer transition-colors"
+                          >
+                            <td className="py-3 px-4">
+                               <div className="flex flex-col">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CÓDIGO: {item.codigo}</span>
+                                  <span className="text-xs font-black text-slate-800 uppercase">{item.nombre}</span>
+                               </div>
+                            </td>
+                            <td className="py-3 px-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">{item.grupo}</td>
+                            <td className="py-3 px-4 text-[10px] font-black uppercase text-slate-600">{item.comprador}</td>
+                            <td className="py-3 px-4 text-center text-[10px] font-black uppercase text-slate-600">{item.operario}</td>
+                            <td className="py-3 px-4 text-center">
+                               <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase ${item.estado === 'ABIERTO' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                 {item.estado}
+                               </span>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                               <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-[10px] font-black shadow-sm">
+                                 {item.interacciones} MSJS
+                               </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
