@@ -152,8 +152,17 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         nombre, total: data.total, efectividad: Math.round((data.cerrados / data.total) * 100)
       })).sort((a,b) => b.total - a.total);
 
-      // --- RANKING DE OPERARIOS ---
-      const ticketsParaOperarios = ticketsMes; 
+      // --- TABLA DINÁMICA DE OPERARIOS (DIRECTORIO FILTRADO) ---
+      // Ahora SÍ reacciona a los filtros de Grupo, Comprador y Día.
+      const ticketsParaOperarios = ticketsMes.filter(r => {
+          const ins = insumos.find(i => i.id === r.insumoId);
+          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
+          const comp = extraerComprador(r.cuerpoOriginal);
+          return (!grupoEnfoque || g === grupoEnfoque) && 
+                 (!compradorEnfoque || comp === compradorEnfoque) && 
+                 cumpleDia(r.insumoId);
+      });
+      
       const rankingOperarios = {};
       ticketsParaOperarios.forEach(r => {
         const op = r.operario || "Sin Nombre";
@@ -163,7 +172,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const listaOperarios = Object.keys(rankingOperarios).map(name => {
         return { nombre: name, total: rankingOperarios[name].total, efectividad: Math.round((rankingOperarios[name].cerrados / rankingOperarios[name].total) * 100) };
-      }).sort((a, b) => b.total - a.total);
+      }).sort((a, b) => a.nombre.localeCompare(b.nombre)); // Orden Alfabético (Directorio, no ranking)
 
       // --- ESTRUCTURA MATRIZ DASHBOARD ---
       const ticketsDashboard = ticketsMes.filter(r => {
@@ -212,6 +221,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return ((Date.now() / 1000 - fInicio) / 86400) > 7; 
       });
 
+      // PULSO SEMANAL EVALÚA TOTAL DE ENVIOS (INTERACCIONES)
       const interaccionesTiempoReal = validosInteracciones.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -305,6 +315,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
     };
 
+    // FUNCIÓN DE BORRADO FÍSICO PERMANENTE DE TICKETS INDIVIDUALES
     const ejecutarEliminacionTicket = async (insumoId) => {
       try {
         const batch = writeBatch(db);
@@ -865,12 +876,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     <Users size={20} className="text-slate-800"/>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Alertas por Operario</h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Catálogo unificado del período</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Catálogo filtrado por la selección</p>
                     </div>
                   </div>
                   
                   {kpiData.listaOperarios.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">Sin registros</div>
+                    <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">Sin registros bajo estos filtros</div>
                   ) : (
                     <div className="overflow-x-auto max-h-[300px] scrollbar-thin scrollbar-thumb-slate-200 flex-1">
                       <table className="w-full text-left whitespace-nowrap text-xs font-bold">
