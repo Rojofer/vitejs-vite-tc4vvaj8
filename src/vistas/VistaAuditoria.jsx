@@ -2,9 +2,9 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2, RefreshCw } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2 } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp, addDoc } from 'firebase/firestore';
+import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, setDialogoConfirmacion, setActiveInsumo, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo }) => {
     const [filtroMes, setFiltroMes] = useState("TODOS");
@@ -326,67 +326,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         setToastMsg("⚠️ Error al intentar eliminar el ticket."); 
         setTimeout(() => setToastMsg(null), 4000);
       }
-    };
-
-    // BOTÓN FIJO DE RESCATE: FUNCIÓN ADMINISTRADORA DE REINYECCIÓN AUTOMÁTICA DESDE RESPALDO CSV
-    const ejecutarRescateDeTickets = async () => {
-      const backupTickets = [
-        { fecha_str: "27/05/26 13:54", estado: "ABIERTO", codigo: "1500100313", mensaje: "1500100313-CAMISA BEIGE MANGA CORTA 38 | O/C APROBADA DEMORADA [TK-9112]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 12:00", estado: "ABIERTO", codigo: "1500200111", mensaje: "1500200111-GUANTE DE NITRILO VERDE LARGO TALLE 8 | URGENTE: RIESGO DE QUIEBRE:  [TK-1360]", operario: "YESICA" },
-        { fecha_str: "27/05/26 12:00", estado: "ABIERTO", codigo: "1400100039", mensaje: "1400100039-CAJÓN PLÁSTICO APILABLE 21CM | SOLPED SIN OC [TK-1517]", operario: "Dueño VIP" },
-        { fecha_str: "27/05/26 11:23", estado: "ABIERTO", codigo: "1500300060", mensaje: "1500300060-CUCHILLO CARNICERO CABO VERDE 8\" | O/C APROBADA DEMORADA [TK-5365]", operario: "Dueño VIP" },
-        { fecha_str: "27/05/26 10:09", estado: "ABIERTO", codigo: "801400700", mensaje: "801400700-CINTA EMBALAR 72 X 100 (común) | O/C APROBADA DEMORADA [TK-2230]", operario: "Dueño VIP" },
-        { fecha_str: "27/05/26 10:02", estado: "ABIERTO", codigo: "1200100107", mensaje: "1200100107-DISPENSER PARA JABON Y ALCOHOL A GRANEL | SOLPED SIN OC [TK-2684]", operario: "Dueño VIP" },
-        { fecha_str: "27/05/26 09:27", estado: "ABIERTO", codigo: "801200070", mensaje: "801200070-STRETCH MANUAL SIN BUJE | AUTORIZAR OC [TK-2988]", operario: "FER" },
-        { fecha_str: "27/05/26 08:51", estado: "ABIERTO", codigo: "1500100227", mensaje: "1500100227-CHALECO DE FRIO AZUL L | AUTORIZAR OC [TK-3604]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 08:50", estado: "ABIERTO", codigo: "1500100214", mensaje: "1500100214-CAMPERAS VERDES P/CORRALEROS XL | AUTORIZAR OC [TK-1261]", operario: "GUILLE" },
-        { fecha_str: "26/05/26 14:10", estado: "ABIERTO", codigo: "1600100161", mensaje: "1600100161-REPUESTO HOJA DE METAL CUTTER MARTOR | AUTORIZAR OC [TK-8161]", operario: "ALEJANDRO" },
-        { fecha_str: "26/05/26 14:08", estado: "ABIERTO", codigo: "1600100061", mensaje: "1600100061-Cutter Martor secupro 625 | AUTORIZAR OC [TK-6801]", operario: "ALEJANDRO" },
-        { fecha_str: "26/05/26 13:57", estado: "ABIERTO", codigo: "1500100416", mensaje: "1500100416-AMBO COLOR GRIS TOPO ML TALLE L | URGENTE: RIESGO DE QUIEBRE:  [TK-4964]", operario: "GUILLE" },
-        { fecha_str: "26/05/26 13:48", estado: "ABIERTO", codigo: "1500100219", mensaje: "1500100219-CAMPERA DE FRIO AZUL L | URGENTE: RIESGO DE QUIEBRE:  [TK-9607]", operario: "GUILLE" },
-        { fecha_str: "26/05/26 13:46", estado: "ABIERTO", codigo: "1500100341", mensaje: "1500100341-CAMPERA BEIGE T.L | URGENTE: RIESGO DE QUIEBRE:  [TK-7164]", operario: "GUILLE" },
-        { fecha_str: "26/05/26 13:27", estado: "ABIERTO", codigo: "1200100270", mensaje: "1200100270-DETERGENTE EXTRA CLIP(Cuchillos) | AUTORIZAR OC [TK-1610]", operario: "MONICA" },
-        { fecha_str: "27/05/26 08:45", estado: "ABIERTO", codigo: "1500100213", mensaje: "1500100213-CAMPERAS VERDES P/CORRALEROS L | AUTORIZAR OC [TK-1799]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 08:44", estado: "ABIERTO", codigo: "1500100241", mensaje: "1500100241-BOTA BLANCA C/ PUNTERA ACERO 43 | AUTORIZAR OC [TK-8589]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 08:14", estado: "ABIERTO", codigo: "1500100240", mensaje: "1500100240-BOTA BLANCA C/ PUNTERA ACERO 42 | AUTORIZAR OC [TK-8353]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 06:41", estado: "ABIERTO", codigo: "1500200022", mensaje: "1500200022-GUANTES ANTICORTE TEJIDO T 8(2541) | AUTORIZAR OC [TK-4088]", operario: "YESICA" },
-        { fecha_str: "27/05/26 06:19", estado: "ABIERTO", codigo: "801200024", mensaje: "801200024-BOLSA DE RED 36X70 VERDE KOSHER | SOLPED SIN OC [TK-3181]", operario: "Dueño VIP" }
-      ];
-
-      setDialogoConfirmacion({
-         titulo: "Rescate del Sistema",
-         mensaje: `¿Confirmás la reinyección en bloque de los 20 tickets históricos procedentes del respaldo CSV? Esto restaurará la integridad total del tablero analítico.`,
-         textoConfirmar: "Sí, Inyectar Bloque",
-         colorBoton: "bg-indigo-600 hover:bg-indigo-700",
-         onConfirm: async () => {
-            try {
-              setToastMsg("⏳ Restaurando base de datos...");
-              for (const bk of backupTickets) {
-                const insumoAsociado = insumos.find(i => i.codigo === bk.codigo);
-                if (!insumoAsociado) continue;
-                
-                const [dia, mes, resto] = bk.fecha_str.split('/');
-                const [anioStr, horaStr] = resto.split(' ');
-                const fechaRestaurada = new Date(`20${anioStr}`, parseInt(mes) - 1, dia, ...horaStr.split(':'));
-
-                await addDoc(collection(db, "reclamos"), {
-                  insumoId: insumoAsociado.id,
-                  fecha: fechaRestaurada,
-                  operario: bk.operario,
-                  estado: bk.estado,
-                  tipo: "RESTAURADO",
-                  mensaje: bk.mensaje,
-                  cuerpoOriginal: bk.mensaje,
-                  leidoPor: []
-                });
-              }
-              setToastMsg("✅ ¡Los 20 tickets históricos fueron restablecidos!");
-            } catch (error) {
-              console.error(error);
-              setToastMsg("⚠️ Error al inyectar bloque.");
-            }
-         }
-      });
     };
 
     const exportarDossierPDF = (hiloActivo) => {
@@ -724,25 +663,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {/* TABLERO DE KPIs GERENCIALES INTERACTIVOS */}
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              
-              {/* PANEL DE CONTROL DE HERRAMIENTAS EXCLUSIVAS (SOLO VISIBLE PARA OWNER) */}
-              {currentUser.rol === 'owner' && (
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400"><RefreshCw size={18} className="animate-spin-slow" /></div>
-                    <div>
-                      <h4 className="text-xs font-black text-white uppercase tracking-wider">Módulo de Rescate Crítico de Datos</h4>
-                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">Utilidad permanente para restablecer la integridad de los 20 hilos históricos del CSV.</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={ejecutarRescateDeTickets} 
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 py-3 rounded-xl shadow-md uppercase tracking-widest text-[10px] transition-all flex items-center gap-2 shrink-0 border border-indigo-500"
-                  >
-                    🚀 Reinyectar Respaldo CSV
-                  </button>
-                </div>
-              )}
 
               {filtroMes !== "TODOS" && (
                 <div className="bg-orange-50 border border-orange-200 text-orange-800 px-4 py-3 rounded-xl flex items-center gap-3">
