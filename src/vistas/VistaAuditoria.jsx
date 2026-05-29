@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Plus, Package, ShoppingCart } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -17,7 +17,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null);
     
-    // ESTADOS DE INTERACTIVIDAD DEL DASHBOARD KPI (FILTRO CRUZADO DE 3 VÍAS)
+    // ESTADOS DE INTERACTIVIDAD DEL DASHBOARD KPI
     const [operarioEnfoque, setOperarioEnfoque] = useState(null);
     const [grupoEnfoque, setGrupoEnfoque] = useState(null);
     const [compradorEnfoque, setCompradorEnfoque] = useState(null);
@@ -33,18 +33,23 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES (MACHEO INTELIGENTE)
+    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES (CATÁLOGO OFICIAL G03-G10)
     const extraerComprador = (cuerpo) => {
       if (!cuerpo) return 'SIN ASIGNAR';
-      const match = cuerpo.match(/Resp:\s*([^\n]+)/i);
+      // Corta si encuentra un salto de línea, un guión o una barra vertical (|)
+      const match = cuerpo.match(/Resp:\s*([^\n|-]+)/i);
       if (!match) return 'SIN ASIGNAR';
 
       let rawName = match[1].trim().toUpperCase();
 
       if (rawName.includes('ARGÜERO') || rawName.includes('ARGUERO') || rawName.includes('HERNÁN')) return 'HERNÁN ARGÜERO (G03)';
       if (rawName.includes('LILIAN') || rawName.includes('SAMANIEGO')) return 'LILIAN SAMANIEGO (G04)';
-      if (rawName.includes('JUMILLA')) return 'JUMILLA';
-      if (rawName.includes('NAHUEL')) return 'NAHUEL';
+      if (rawName.includes('JOANNY') || rawName.includes('ROMERO')) return 'JOANNY G. ROMERO (G05)';
+      if (rawName.includes('ROBERTO') || rawName.includes('SOSA')) return 'ROBERTO SOSA (G06)';
+      if (rawName.includes('EZEQUIEL') || rawName.includes('ZANON')) return 'EZEQUIEL ZANON (G07)';
+      if (rawName.includes('MARTÍN') || rawName.includes('MARTIN') || rawName.includes('ESTREBOU')) return 'MARTÍN ESTREBOU (G08)';
+      if (rawName.includes('NAHUEL') || rawName.includes('JUMILL')) return 'NAHUEL JOSE JUMILLA (G09)';
+      if (rawName.includes('LUCAS') || rawName.includes('JIMENEZ') || rawName.includes('JIMÉNEZ')) return 'LUCAS A. JIMENEZ (G10)';
 
       return rawName;
     };
@@ -63,10 +68,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const kpiData = useMemo(() => {
       const validosGlobal = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo' && r.tipo !== 'APROBACION GERENCIA' && r.tipo !== 'RECHAZO GERENCIA');
       
-      // Matriz base filtrada por mes
       const validosMes = filtroMes === "TODOS" ? validosGlobal : validosGlobal.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
 
-      // --- 1. RANKING DE GRUPOS (Filtrado por Operario y Comprador) ---
+      // --- 1. RANKING DE GRUPOS ---
       const validosParaGrupos = validosMes.filter(r => {
           const comp = extraerComprador(r.cuerpoOriginal);
           return (!operarioEnfoque || r.operario === operarioEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
@@ -79,7 +83,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const listaGrupos = Object.entries(conteoGrupos).map(([nombre, cantidad]) => ({nombre, cantidad})).sort((a,b) => b.cantidad - a.cantidad);
 
-      // --- 2. RANKING DE COMPRADORES (Filtrado por Grupo y Operario) ---
+      // --- 2. RANKING DE COMPRADORES (EXCLUYENDO GERENCIA) ---
       const validosParaCompradores = validosMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -87,14 +91,19 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const rankingComps = {};
       validosParaCompradores.forEach(r => {
+        const tipo = getTipoReclamo(r.mensaje);
+        if (tipo.num === "2") return; // EXCLUIMOS "AUTORIZAR OC" DEL RENDIMIENTO DEL COMPRADOR
+        
         const comp = extraerComprador(r.cuerpoOriginal);
-        if (!rankingComps[comp]) rankingComps[comp] = { total: 0, aAutorizar: 0 };
+        if (!rankingComps[comp]) rankingComps[comp] = { total: 0, cerrados: 0 };
         rankingComps[comp].total++;
-        if (getTipoReclamo(r.mensaje).num === "2") rankingComps[comp].aAutorizar++;
+        if (r.estado === 'CERRADO') rankingComps[comp].cerrados++;
       });
-      const listaCompradores = Object.entries(rankingComps).map(([nombre, data]) => ({nombre, ...data})).sort((a,b) => b.total - a.total);
+      const listaCompradores = Object.entries(rankingComps).map(([nombre, data]) => ({
+        nombre, total: data.total, efectividad: Math.round((data.cerrados / data.total) * 100)
+      })).sort((a,b) => b.total - a.total);
 
-      // --- 3. RANKING DE OPERARIOS (Filtrado por Grupo y Comprador) ---
+      // --- 3. RANKING DE OPERARIOS ---
       const validosParaOperarios = validosMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -112,7 +121,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return { nombre: name, total: rankingOperarios[name].total, efectividad: Math.round((rankingOperarios[name].cerrados / rankingOperarios[name].total) * 100) };
       }).sort((a, b) => b.total - a.total);
 
-      // --- MATRIZ DEL DASHBOARD (Aplica TODOS los filtros juntos para las tarjetas top) ---
+      // --- MATRIZ DEL DASHBOARD CENTRAL ---
       const validosDashboard = validosMes.filter(r => {
          const ins = insumos.find(i => i.id === r.insumoId);
          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -120,7 +129,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
          return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
       });
 
-      // TASA DE EVACUACIÓN (Basada en Dashboard)
       const determinarSiEsDelMes = (f) => {
          if (!f || isNaN(f.getTime())) return false;
          if (filtroMes !== "TODOS") return obtenerMesAnio(f) === filtroMes;
@@ -131,7 +139,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const cerradosEnElPeriodo = validosDashboard.filter(r => r.estado === 'CERRADO' && r.fechaCierre && determinarSiEsDelMes(new Date(r.fechaCierre.seconds ? r.fechaCierre.seconds * 1000 : r.fechaCierre)));
       const tasaResolucion = abiertosEnElPeriodo.length > 0 ? Math.round((cerradosEnElPeriodo.length / abiertosEnElPeriodo.length) * 100) : (cerradosEnElPeriodo.length > 0 ? 100 : 0);
 
-      // LEAD TIME PROMEDIO
       const resueltos = validosDashboard.filter(r => r.estado === 'CERRADO' && r.fecha && r.fechaCierre);
       let totalDias = 0;
       resueltos.forEach(r => {
@@ -141,14 +148,16 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
 
-      // EFICIENCIA DE CONTACTO
       const conteoPorInsumo = {};
       validosDashboard.forEach(r => conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1);
       let hilosUnicos = 0; let hilosMultiples = 0;
       Object.values(conteoPorInsumo).forEach(cant => { if (cant === 1) hilosUnicos++; else if (cant > 1) hilosMultiples++; });
       const efectividadPrimerContacto = (hilosUnicos + hilosMultiples) > 0 ? Math.round((hilosUnicos / (hilosUnicos + hilosMultiples)) * 100) : 100;
 
-      // BACKLOG Y PULSO (Siempre operan en "Tiempo Real" sobre validosGlobal, ignorando filtroMes, pero aplicando los Enfoques)
+      // INDICADOR GERENCIA (Autorizar O/C)
+      const pendientesGerencia = validosDashboard.filter(r => getTipoReclamo(r.mensaje).num === "2" && r.estado === 'ABIERTO').length;
+
+      // BACKLOG Y PULSO TIEMPO REAL
       const validosTiempoReal = validosGlobal.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -175,13 +184,13 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
       return {
         tasaResolucion, abiertosEsteMes: abiertosEnElPeriodo.length, cerradosEsteMes: cerradosEnElPeriodo.length,
-        leadTime, activosBacklog: activosBacklog.length, activosCriticos: activosCriticos.length,
+        leadTime, activosBacklog: activosBacklog.length, activosCriticos: activosCriticos.length, pendientesGerencia,
         efectividadPrimerContacto, listaOperarios, listaGrupos, listaCompradores,
         pulsoSemanas: lista20Dias, maxActividadPulso
       };
     }, [reclamos, insumos, operarioEnfoque, grupoEnfoque, compradorEnfoque, filtroMes]);
 
-    // --- ACCIONES DE REPORTE ---
+    // --- ACCIONES ---
     const enviarReporteEmail = () => {
       const body = `REPORTE SEMANAL DE KPIs - PLANTA DEVESA\n\n1. EVACUACIÓN MENSUAL: ${kpiData.tasaResolucion}%\n2. BACKLOG ACTIVO: ${kpiData.activosBacklog} tickets\n3. LEAD TIME PROMEDIO: ${kpiData.leadTime} días\n4. EFICIENCIA DE CONTACTO: ${kpiData.efectividadPrimerContacto}%\n\nGenerado desde ERP Planta.`;
       window.open(`mailto:fachaval@devesa.com?subject=Reporte Semanal KPIs - ERP Planta&body=${encodeURIComponent(body)}`, '_blank');
@@ -298,14 +307,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
     }, [filtrados, insumos, ordenTabla]);
 
-    // Generador de texto para filtros activos
     const filtrosActivosText = [operarioEnfoque, grupoEnfoque, compradorEnfoque].filter(Boolean).join(' | ');
 
     return (
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
           
-          {/* CABECERA CON PESTAÑAS Y CONTROLES DEL DASHBOARD */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 mb-6 pb-2 gap-4">
             <div className="flex gap-6">
               <button onClick={() => setAuditoriaTab('abiertos')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 -mb-[2px] ${auditoriaTab === 'abiertos' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>En Curso</button>
@@ -315,7 +322,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
             {auditoriaTab === 'kpis' && currentUser.rol === 'owner' && (
               <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                {/* NUEVO: FILTRO DE MESES EN EL TABLERO KPI */}
                 <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-700 hover:bg-slate-100 transition-colors">
                   <option value="TODOS">Mes: Histórico Total</option>
                   {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
@@ -330,7 +336,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
             )}
           </div>
 
-          {/* VISTAS DE TABLAS (EN CURSO / RESUELTOS) */}
           {(auditoriaTab === 'abiertos' || auditoriaTab === 'resueltos') && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               
@@ -601,10 +606,21 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   </div>
                 </div>
 
-                <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-5 text-center min-h-[140px]">
-                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mb-3"><Plus size={16} className="text-slate-400" /></div>
-                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nuevo Indicador</span>
-                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Espacio Reservado</span>
+                {/* 5TA TARJETA: FIRMAS DE GERENCIA (AUTORIZAR OC) */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Firmas Gerencia</h3>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">O/C por Autorizar</p>
+                    </div>
+                    <div className="p-2 bg-indigo-50 rounded-xl"><CheckSquare size={16} className="text-indigo-500"/></div>
+                  </div>
+                  <div>
+                    <div className="flex items-end gap-2 mb-2"><span className="text-3xl font-black text-slate-800 leading-none">{kpiData.pendientesGerencia}</span></div>
+                    <p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${kpiData.pendientesGerencia > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
+                      {kpiData.pendientesGerencia > 0 ? 'TICKETS ESPERANDO FIRMA' : 'TODO AL DÍA'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -640,7 +656,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
               {/* GRILLA DE RANKINGS CRUZADOS DE 3 VÍAS */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* 1. RANKING DE GRUPOS */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                   <div className="flex items-center gap-2 mb-6">
                     <Package size={20} className="text-slate-800"/>
@@ -675,13 +690,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   )}
                 </div>
 
-                {/* 2. RANKING DE COMPRADORES */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                   <div className="flex items-center gap-2 mb-6">
                     <ShoppingCart size={20} className="text-slate-800"/>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Abastecimiento</h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Tickets por Comprador</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Tickets (Excluye Gerencia)</p>
                     </div>
                   </div>
                   
@@ -693,8 +707,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                         <thead className="sticky top-0 bg-white z-10">
                           <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             <th className="pb-3 px-3">Comprador</th>
-                            <th className="pb-3 px-3 text-center">Total</th>
-                            <th className="pb-3 px-3 text-center">Autorizar</th>
+                            <th className="pb-3 px-3 text-center">Netos</th>
+                            <th className="pb-3 px-3 text-right">% Resolución</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -704,7 +718,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                             <tr key={comp.nombre} onClick={() => setCompradorEnfoque(isSelected ? null : comp.nombre)} className={`text-slate-700 cursor-pointer transition-colors ${isSelected ? 'bg-sky-50/80 border-l-4 border-sky-500' : 'hover:bg-slate-50 border-l-4 border-transparent'}`}>
                               <td className="py-3 px-3 uppercase text-slate-800 font-black flex items-center gap-2">{comp.nombre}{isSelected && <span className="text-[8px] bg-sky-500 text-white px-1.5 py-0.5 rounded shadow-sm">ACTIVO</span>}</td>
                               <td className="py-3 px-3 text-center text-slate-600">{comp.total}</td>
-                              <td className="py-3 px-3 text-center">{comp.aAutorizar > 0 ? <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-black">{comp.aAutorizar} PENDIENTES</span> : <span className="text-slate-400">-</span>}</td>
+                              <td className="py-3 px-3 text-right"><span className={`px-2 py-0.5 rounded text-[10px] font-black ${comp.efectividad >= 80 ? 'bg-emerald-50 text-emerald-700' : comp.efectividad >= 40 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>{comp.efectividad}%</span></td>
                             </tr>
                             )
                           })}
@@ -714,7 +728,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   )}
                 </div>
 
-                {/* 3. RANKING DE OPERARIOS */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                   <div className="flex items-center gap-2 mb-6">
                     <Users size={20} className="text-slate-800"/>
