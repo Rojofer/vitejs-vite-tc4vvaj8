@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Bell, CheckCircle, Clock, Megaphone, Send, X, Search, FileText } from 'lucide-react';
-import { doc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { Bell, CheckCircle, Clock, Megaphone, Send, X, Search, FileText, Trash2 } from 'lucide-react';
+import { doc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -72,6 +72,21 @@ const VistaNotificaciones = ({
       } catch (error) {
         console.error("Error marcando como leido", error);
         if (setToastMsg) setToastMsg("⚠️ Firebase bloqueó la acción: Ajustar permisos (Rules) a true.");
+      }
+    }
+  };
+
+  // NUEVO: Función de Borrado Físico (Solo Owner)
+  const eliminarNotificacion = async (id, e) => {
+    e.stopPropagation(); // Evita que el clic marque como leída la notificación
+    
+    if (window.confirm("⚠️ ¿Estás seguro de ELIMINAR FÍSICAMENTE este registro de la base de datos? Esta acción es irreversible.")) {
+      try {
+        await deleteDoc(doc(db, "reclamos", id));
+        if (setToastMsg) setToastMsg("🗑️ Registro eliminado de raíz exitosamente.");
+      } catch (error) {
+        console.error("Error al eliminar", error);
+        if (setToastMsg) setToastMsg("⚠️ Ocurrió un error al intentar eliminar el registro.");
       }
     }
   };
@@ -275,10 +290,23 @@ const VistaNotificaciones = ({
                           Emitido por: <span className="text-slate-600">{noti.operario}</span>
                         </p>
                         
-                        {currentUser.rol === 'owner' && noti.leidoPor?.length > 0 && (
-                          <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
-                            Visto por: {noti.leidoPor.join(', ')}
-                          </p>
+                        {/* CONTROLES EXCLUSIVOS OWNER: LECTURAS Y BORRADO */}
+                        {currentUser.rol === 'owner' && (
+                          <div className="flex items-center gap-3">
+                            {noti.leidoPor?.length > 0 && (
+                              <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
+                                Visto por: {noti.leidoPor.join(', ')}
+                              </p>
+                            )}
+                            
+                            <button 
+                              onClick={(e) => eliminarNotificacion(noti.id, e)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-100"
+                              title="Eliminar registro de la base de datos"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -292,7 +320,7 @@ const VistaNotificaciones = ({
                 {busqueda ? <Search size={28} className="text-slate-300" /> : <Bell size={28} className="text-slate-300" />}
               </div>
               <h3 className="text-lg font-black text-slate-700 mb-1">{busqueda ? 'Sin resultados' : 'Bandeja al día'}</h3>
-              <p className="text-sm text-slate-400 font-bold">{busqueda ? 'No se encontraron avisos con esa palabra.' : 'No tenés notificaciones pendientes.'}</p>
+              <p className="text-sm text-slate-400 font-bold">{busqueda ? 'No se encontraron registros con esa palabra.' : 'No tenés notificaciones ni tickets pendientes.'}</p>
             </div>
           )}
         </div>
