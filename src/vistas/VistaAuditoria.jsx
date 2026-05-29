@@ -436,25 +436,35 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
             {auditoriaTab === 'kpis' && currentUser.rol === 'owner' && (
               <div className="flex items-center gap-3 mb-2 sm:mb-0">
+                
+                {/* TARJETA DINÁMICA DE TOTALES */}
+                <div className="flex items-center gap-2 bg-slate-900 px-3 py-2.5 rounded-xl shadow-sm border border-slate-800 shrink-0">
+                  <Package size={14} className="text-sky-400" />
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Activos:</span>
+                  <span className="text-[11px] font-black text-white">{kpiData.listaInsumos.length}</span>
+                </div>
+
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input 
                     type="text" 
-                    placeholder="Buscar material o TICKET..." 
+                    placeholder="Buscar..." 
                     value={busquedaKpi} 
                     onChange={e => setBusquedaKpi(e.target.value)} 
-                    className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-56"
+                    className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-28 sm:w-36"
                   />
                 </div>
+                
                 <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-700 hover:bg-slate-100 transition-colors">
-                  <option value="TODOS">Mes: Histórico Total</option>
+                  <option value="TODOS">Mes: Total</option>
                   {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
-                   <FileText size={14} /> Exportar PDF
+
+                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all hidden md:flex">
+                   <FileText size={14} /> PDF
                 </button>
-                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all">
-                   <Mail size={14} /> Generar Reporte
+                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all hidden md:flex">
+                   <Mail size={14} /> Reporte
                 </button>
               </div>
             )}
