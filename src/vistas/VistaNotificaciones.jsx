@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Bell, CheckCircle, Clock, Megaphone, Send, X } from 'lucide-react';
-import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const VistaNotificaciones = ({
@@ -36,12 +36,12 @@ const VistaNotificaciones = ({
   const marcarComoLeido = async (noti) => {
     if (!noti.leidoPor?.includes(currentUser.nombre)) {
       try {
-        const nuevosLeidos = [...(noti.leidoPor || []), currentUser.nombre];
         await updateDoc(doc(db, "reclamos", noti.id), {
-          leidoPor: nuevosLeidos
+          leidoPor: arrayUnion(currentUser.nombre)
         });
       } catch (error) {
         console.error("Error marcando como leido", error);
+        if (setToastMsg) setToastMsg("⚠️ Firebase bloqueó la acción: Revisá los permisos de edición (Rules).");
       }
     }
   };
