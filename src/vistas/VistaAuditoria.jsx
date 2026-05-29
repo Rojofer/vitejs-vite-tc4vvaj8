@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -309,6 +309,28 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
     };
 
+    const ejecutarEliminacionTicket = async (insumoId) => {
+      try {
+        const batch = writeBatch(db);
+        const qReclamos = query(collection(db, "reclamos"), where("insumoId", "==", insumoId), where("estado", "==", "ABIERTO"));
+        const snapshot = await getDocs(qReclamos);
+        
+        snapshot.docs.forEach((docSnap) => {
+          batch.delete(doc(db, "reclamos", docSnap.id)); // Borrado físico total
+        });
+        
+        batch.update(doc(db, "insumos", insumoId), { ticketReclamo: null });
+        
+        await batch.commit();
+        setExpandedRow(null); 
+        setToastMsg("🗑️ Ticket eliminado de raíz. Métricas purgadas."); 
+        setTimeout(() => setToastMsg(null), 4000);
+      } catch (error) {
+        setToastMsg("⚠️ Error al intentar eliminar el ticket."); 
+        setTimeout(() => setToastMsg(null), 4000);
+      }
+    };
+
     const exportarDossierPDF = (hiloActivo) => {
       const docPdf = new jsPDF();
       const insumo = insumos.find(i => i.id === hiloActivo.insumoId) || {};
@@ -573,9 +595,36 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               <td className="py-4 px-4 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                   {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
-                                    <button onClick={(e) => { e.stopPropagation(); setDialogoConfirmacion({ titulo: "Finalizar Ticket", mensaje: `¿Confirmás el cierre del ticket de "${insumoAsociado?.nombre}"?`, textoConfirmar: "Sí, Finalizar", colorBoton: "bg-rose-500 hover:bg-rose-600", onConfirm: () => ejecutarCierreMasivoEnBloque(h.insumoId) }); }} className="px-2 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded text-[9px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all shadow-sm flex items-center gap-1"><X size={10} /> Finalizar</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setDialogoConfirmacion({ titulo: "Finalizar Ticket", mensaje: `¿Confirmás el cierre del ticket de "${insumoAsociado?.nombre}"? Se guardará en el historial.`, textoConfirmar: "Sí, Finalizar", colorBoton: "bg-rose-500 hover:bg-rose-600", onConfirm: () => ejecutarCierreMasivoEnBloque(h.insumoId) }); }} className="px-2 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded text-[9px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all shadow-sm flex items-center gap-1"><X size={10} /> Finalizar</button>
                                   )}
-                                  {currentUser.rol === 'owner' && <button onClick={(e) => { e.stopPropagation(); exportarDossierPDF(h); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"><FileText size={16} /></button>}
+                                  
+                                  {/* BOTONES EXCLUSIVOS OWNER */}
+                                  {currentUser.rol === 'owner' && (
+                                    <>
+                                      <button onClick={(e) => { e.stopPropagation(); exportarDossierPDF(h); }} className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded transition-all" title="Exportar Trazabilidad">
+                                        <FileText size={16} />
+                                      </button>
+                                      
+                                      {h.estado === 'ABIERTO' && (
+                                        <button 
+                                          onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            setDialogoConfirmacion({ 
+                                              titulo: "Eliminar Error", 
+                                              mensaje: `¿Vas a ELIMINAR DE RAÍZ el ticket de "${insumoAsociado?.nombre}"? Esto borrará físicamente el registro para no afectar los KPIs.`, 
+                                              textoConfirmar: "Sí, Eliminar Físicamente", 
+                                              colorBoton: "bg-red-600 hover:bg-red-700", 
+                                              onConfirm: () => ejecutarEliminacionTicket(h.insumoId) 
+                                            }); 
+                                          }} 
+                                          className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded transition-all" 
+                                          title="Eliminar por Error (Hard Delete)"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
                               </td>
                             </tr>
