@@ -9,7 +9,8 @@ const VistaNotificaciones = ({
   reclamos,
   formatearFecha,
   contactos = [],
-  setToastMsg
+  setToastMsg,
+  setDialogoConfirmacion // <-- NUEVO: Recibimos el control del modal corporativo
 }) => {
   // Estados para el megáfono y UI
   const [modoRedaccion, setModoRedaccion] = useState(false);
@@ -76,19 +77,25 @@ const VistaNotificaciones = ({
     }
   };
 
-  // NUEVO: Función de Borrado Físico (Solo Owner)
-  const eliminarNotificacion = async (id, e) => {
+  // NUEVO: Función de Borrado Físico usando el Modal SaaS
+  const eliminarNotificacion = (id, e) => {
     e.stopPropagation(); // Evita que el clic marque como leída la notificación
     
-    if (window.confirm("⚠️ ¿Estás seguro de ELIMINAR FÍSICAMENTE este registro de la base de datos? Esta acción es irreversible.")) {
-      try {
-        await deleteDoc(doc(db, "reclamos", id));
-        if (setToastMsg) setToastMsg("🗑️ Registro eliminado de raíz exitosamente.");
-      } catch (error) {
-        console.error("Error al eliminar", error);
-        if (setToastMsg) setToastMsg("⚠️ Ocurrió un error al intentar eliminar el registro.");
+    setDialogoConfirmacion({
+      titulo: "Eliminar Registro",
+      mensaje: "¿Estás seguro de ELIMINAR FÍSICAMENTE este registro de la base de datos? Esta acción es irreversible y desaparecerá de la bandeja de toda la planta.",
+      textoConfirmar: "Sí, Eliminar Físicamente",
+      colorBoton: "bg-red-600 hover:bg-red-700",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, "reclamos", id));
+          if (setToastMsg) setToastMsg("🗑️ Registro eliminado de raíz exitosamente.");
+        } catch (error) {
+          console.error("Error al eliminar", error);
+          if (setToastMsg) setToastMsg("⚠️ Ocurrió un error al intentar eliminar el registro.");
+        }
       }
-    }
+    });
   };
 
   const enviarAviso = async () => {
@@ -299,13 +306,16 @@ const VistaNotificaciones = ({
                               </p>
                             )}
                             
-                            <button 
-                              onClick={(e) => eliminarNotificacion(noti.id, e)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-100"
-                              title="Eliminar registro de la base de datos"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            {/* LA PAPELERA AHORA SOLO APARECE SI ES UN AVISO DE GERENCIA, NUNCA EN UN TICKET */}
+                            {!esTicket && (
+                              <button 
+                                onClick={(e) => eliminarNotificacion(noti.id, e)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-100"
+                                title="Eliminar Aviso de la base de datos"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
