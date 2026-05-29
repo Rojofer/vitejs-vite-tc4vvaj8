@@ -33,11 +33,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES INFALIBLE
+    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES
     const extraerComprador = (cuerpo) => {
       if (!cuerpo) return 'SIN ASIGNAR';
       const txt = cuerpo.toUpperCase();
-      
       if (!txt.includes("RESP:")) return 'SIN ASIGNAR';
       const rawPart = txt.split("RESP:")[1];
 
@@ -63,36 +62,64 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }); 
     }, [reclamos]);
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (SEPARACIÓN TICKETS ÚNICOS VS INTERACCIONES) ---
     const kpiData = useMemo(() => {
-      // INCLUYE LOS TICKETS DE GERENCIA PARA QUE LAS MÉTRICAS NO SE ROMPAN
-      const validosGlobal = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo');
+      const validosInteracciones = reclamos.filter(r => r.insumoId && r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO" && r.tipo !== 'equipo');
       
-      const validosMes = filtroMes === "TODOS" ? validosGlobal : validosGlobal.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
+      // 1. COMPRESIÓN DE HILOS: Mapear para obtener 1 Ticket Único por Insumo
+      const mapaTickets = {};
+      validosInteracciones.forEach(r => {
+        if (!mapaTickets[r.insumoId]) {
+          mapaTickets[r.insumoId] = { ...r, interaccionesTotal: 1, fechaInicioReal: r.fecha };
+        } else {
+          mapaTickets[r.insumoId].interaccionesTotal += 1;
+          const tActual = r.fecha?.seconds || 0;
+          const tGuardado = mapaTickets[r.insumoId].fecha?.seconds || 0;
+          
+          if (r.estado === 'ABIERTO') mapaTickets[r.insumoId].estado = 'ABIERTO'; // Prevalece abierto
+          if (tActual < (mapaTickets[r.insumoId].fechaInicioReal?.seconds || Infinity)) {
+             mapaTickets[r.insumoId].fechaInicioReal = r.fecha; // Guardamos el origen para LeadTime/Críticos
+          }
+          if (tActual > tGuardado) {
+             // Absorber los metadatos de la iteración más reciente
+             mapaTickets[r.insumoId].cuerpoOriginal = r.cuerpoOriginal;
+             mapaTickets[r.insumoId].mensaje = r.mensaje;
+             mapaTickets[r.insumoId].tipo = r.tipo;
+             mapaTickets[r.insumoId].operario = r.operario;
+             mapaTickets[r.insumoId].fechaCierre = r.fechaCierre; 
+             mapaTickets[r.insumoId].fecha = r.fecha; 
+          }
+        }
+      });
 
-      // --- 1. RANKING DE GRUPOS ---
-      const validosParaGrupos = validosMes.filter(r => {
+      const validosTickets = Object.values(mapaTickets);
+      
+      // Aplicamos el filtro mensual sobre los Tickets Únicos
+      const ticketsMes = filtroMes === "TODOS" ? validosTickets : validosTickets.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
+
+      // --- RANKING DE GRUPOS ---
+      const ticketsParaGrupos = ticketsMes.filter(r => {
           const comp = extraerComprador(r.cuerpoOriginal);
           return (!operarioEnfoque || r.operario === operarioEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
       });
       const conteoGrupos = {};
-      validosParaGrupos.forEach(r => {
+      ticketsParaGrupos.forEach(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
           conteoGrupos[g] = (conteoGrupos[g] || 0) + 1;
       });
       const listaGrupos = Object.entries(conteoGrupos).map(([nombre, cantidad]) => ({nombre, cantidad})).sort((a,b) => b.cantidad - a.cantidad);
 
-      // --- 2. RANKING DE COMPRADORES (EXCLUYE TOTALMENTE LOS TICKETS DE GERENCIA/AUTORIZACIÓN) ---
-      const validosParaCompradores = validosMes.filter(r => {
+      // --- RANKING DE COMPRADORES (VOLUMEN NETO) ---
+      const ticketsParaCompradores = ticketsMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
           return (!grupoEnfoque || g === grupoEnfoque) && (!operarioEnfoque || r.operario === operarioEnfoque);
       });
       const rankingComps = {};
-      validosParaCompradores.forEach(r => {
+      ticketsParaCompradores.forEach(r => {
         const tipo = getTipoReclamo(r.mensaje);
-        if (tipo.num === "2" || r.tipo === 'APROBACION GERENCIA') return; // PROTECCIÓN: IGNORA TICKETS DE GERENCIA
+        if (tipo.num === "2" || r.tipo === 'APROBACION GERENCIA') return; 
         
         const comp = extraerComprador(r.cuerpoOriginal);
         if (!rankingComps[comp]) rankingComps[comp] = { total: 0, cerrados: 0 };
@@ -103,15 +130,15 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         nombre, total: data.total, efectividad: Math.round((data.cerrados / data.total) * 100)
       })).sort((a,b) => b.total - a.total);
 
-      // --- 3. RANKING DE OPERARIOS ---
-      const validosParaOperarios = validosMes.filter(r => {
+      // --- RANKING DE OPERARIOS (VOLUMEN NETO) ---
+      const ticketsParaOperarios = ticketsMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
           const comp = extraerComprador(r.cuerpoOriginal);
           return (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
       });
       const rankingOperarios = {};
-      validosParaOperarios.forEach(r => {
+      ticketsParaOperarios.forEach(r => {
         const op = r.operario || "Sin Nombre";
         if (!rankingOperarios[op]) rankingOperarios[op] = { total: 0, cerrados: 0 };
         rankingOperarios[op].total++;
@@ -121,8 +148,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return { nombre: name, total: rankingOperarios[name].total, efectividad: Math.round((rankingOperarios[name].cerrados / rankingOperarios[name].total) * 100) };
       }).sort((a, b) => b.total - a.total);
 
-      // --- MATRIZ DEL DASHBOARD CENTRAL ---
-      const validosDashboard = validosMes.filter(r => {
+      // --- MATRIZ CENTRAL ---
+      const ticketsDashboard = ticketsMes.filter(r => {
          const ins = insumos.find(i => i.id === r.insumoId);
          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
          const comp = extraerComprador(r.cuerpoOriginal);
@@ -135,50 +162,52 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
          return f.getMonth() === new Date().getMonth() && f.getFullYear() === new Date().getFullYear();
       };
       
-      const abiertosEnElPeriodo = validosDashboard.filter(r => r.fecha && determinarSiEsDelMes(new Date(r.fecha.seconds ? r.fecha.seconds * 1000 : r.fecha)));
-      const cerradosEnElPeriodo = validosDashboard.filter(r => r.estado === 'CERRADO' && r.fechaCierre && determinarSiEsDelMes(new Date(r.fechaCierre.seconds ? r.fechaCierre.seconds * 1000 : r.fechaCierre)));
+      const abiertosEnElPeriodo = ticketsDashboard.filter(r => r.fechaInicioReal && determinarSiEsDelMes(new Date(r.fechaInicioReal.seconds ? r.fechaInicioReal.seconds * 1000 : r.fechaInicioReal)));
+      const cerradosEnElPeriodo = ticketsDashboard.filter(r => r.estado === 'CERRADO' && r.fechaCierre && determinarSiEsDelMes(new Date(r.fechaCierre.seconds ? r.fechaCierre.seconds * 1000 : r.fechaCierre)));
       const tasaResolucion = abiertosEnElPeriodo.length > 0 ? Math.round((cerradosEnElPeriodo.length / abiertosEnElPeriodo.length) * 100) : (cerradosEnElPeriodo.length > 0 ? 100 : 0);
 
-      const resueltos = validosDashboard.filter(r => r.estado === 'CERRADO' && r.fecha && r.fechaCierre);
+      const resueltos = ticketsDashboard.filter(r => r.estado === 'CERRADO' && r.fechaInicioReal && r.fechaCierre);
       let totalDias = 0;
       resueltos.forEach(r => {
-         const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
+         const fInicio = r.fechaInicioReal?.seconds ? r.fechaInicioReal.seconds : new Date(r.fechaInicioReal).getTime() / 1000;
          const fFin = r.fechaCierre?.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
         totalDias += Math.max(0, (fFin - fInicio) / 86400);
       });
       const leadTime = resueltos.length > 0 ? (totalDias / resueltos.length).toFixed(1) : 0;
 
-      const conteoPorInsumo = {};
-      validosDashboard.forEach(r => conteoPorInsumo[r.insumoId] = (conteoPorInsumo[r.insumoId] || 0) + 1);
+      // Eficiencia revisa cuántos tickets únicos se resolvieron con 1 solo mensaje
       let hilosUnicos = 0; let hilosMultiples = 0;
-      Object.values(conteoPorInsumo).forEach(cant => { if (cant === 1) hilosUnicos++; else if (cant > 1) hilosMultiples++; });
+      ticketsDashboard.forEach(t => { if (t.interaccionesTotal === 1) hilosUnicos++; else if (t.interaccionesTotal > 1) hilosMultiples++; });
       const efectividadPrimerContacto = (hilosUnicos + hilosMultiples) > 0 ? Math.round((hilosUnicos / (hilosUnicos + hilosMultiples)) * 100) : 100;
 
-      // INDICADOR GERENCIA (Autorizar O/C) - Cuenta insumos únicos frenados
-      const insumosPendientesGerencia = new Set(
-        validosDashboard
-          .filter(r => (getTipoReclamo(r.mensaje).num === "2" || r.tipo === 'APROBACION GERENCIA') && r.estado === 'ABIERTO')
-          .map(r => r.insumoId)
-      );
-      const pendientesGerencia = insumosPendientesGerencia.size;
+      const pendientesGerencia = ticketsDashboard.filter(r => (getTipoReclamo(r.mensaje).num === "2" || r.tipo === 'APROBACION GERENCIA') && r.estado === 'ABIERTO').length;
 
-      const validosTiempoReal = validosGlobal.filter(r => {
+      // --- MÉTRICAS DE TIEMPO REAL (BACKLOG Y PULSO) ---
+      const ticketsTiempoReal = validosTickets.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
         const comp = extraerComprador(r.cuerpoOriginal);
         return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
       });
 
-      const activosBacklog = validosTiempoReal.filter(r => r.estado === 'ABIERTO');
+      const activosBacklog = ticketsTiempoReal.filter(r => r.estado === 'ABIERTO');
       const activosCriticos = activosBacklog.filter(r => {
-        const fInicio = r.fecha?.seconds ? r.fecha.seconds : new Date(r.fecha).getTime() / 1000;
+        const fInicio = r.fechaInicioReal?.seconds ? r.fechaInicioReal.seconds : new Date(r.fechaInicioReal).getTime() / 1000;
         return ((Date.now() / 1000 - fInicio) / 86400) > 7; 
+      });
+
+      // EL PULSO CUENTA INTERACCIONES (ESFUERZO DIARIO), NO TICKETS
+      const interaccionesTiempoReal = validosInteracciones.filter(r => {
+        const ins = insumos.find(i => i.id === r.insumoId);
+        const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
+        const comp = extraerComprador(r.cuerpoOriginal);
+        return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
       });
 
       const lista20Dias = [];
       for (let i = 19; i >= 0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0,0,0,0);
-        const totalAlertasDia = validosTiempoReal.filter(r => {
+        const totalAlertasDia = interaccionesTiempoReal.filter(r => {
           const fRec = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
           return fRec && !isNaN(fRec.getTime()) && new Date(fRec).setHours(0,0,0,0) === d.getTime();
         }).length;
@@ -610,7 +639,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   </div>
                 </div>
 
-                {/* 5TA TARJETA: FIRMAS DE GERENCIA */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
                     <div>
