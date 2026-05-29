@@ -35,12 +35,22 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES
-    const extraerComprador = (cuerpo) => {
-      if (!cuerpo) return 'SIN ASIGNAR';
-      const txt = cuerpo.toUpperCase();
-      if (!txt.includes("RESP:")) return 'SIN ASIGNAR';
-      const rawPart = txt.split("RESP:")[1];
+    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES (CON RESPALDO AL MAESTRO DE INSUMOS)
+    const extraerComprador = (cuerpo, insumoId = null) => {
+      let rawPart = null;
+      const txt = (cuerpo || "").toUpperCase();
+      
+      if (txt.includes("RESP:")) {
+        rawPart = txt.split("RESP:")[1];
+      } else if (insumoId) {
+        // Fallback: Si no está en el cuerpo, busca al dueño directamente en la ficha del Insumo
+        const ins = insumos.find(i => i.id === insumoId);
+        if (ins && (ins.comprador || ins.responsable || ins.asignado || ins.responsableCompras)) {
+           rawPart = String(ins.comprador || ins.responsable || ins.asignado || ins.responsableCompras).toUpperCase();
+        }
+      }
+
+      if (!rawPart) return 'SIN ASIGNAR';
 
       if (rawPart.includes('ARGÜERO') || rawPart.includes('ARGUERO') || rawPart.includes('HERNÁN')) return 'HERNÁN ARGÜERO (G03)';
       if (rawPart.includes('LILIAN') || rawPart.includes('SAMANIEGO')) return 'LILIAN SAMANIEGO (G04)';
@@ -64,7 +74,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }); 
     }, [reclamos]);
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (COMPRESIÓN DE HILOS Y UNIFICACIÓN) ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
     const kpiData = useMemo(() => {
       const validosInteracciones = reclamos.filter(r => {
         if (!r.insumoId || r.insumoId === "BROADCAST" || r.estado === "INICIALIZADO" || r.tipo === 'equipo') return false;
@@ -122,7 +132,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
       // --- RANKING DE GRUPOS ---
       const ticketsParaGrupos = ticketsMes.filter(r => {
-          const comp = extraerComprador(r.cuerpoOriginal);
+          const comp = extraerComprador(r.cuerpoOriginal, r.insumoId);
           return (!operarioEnfoque || r.operario === operarioEnfoque) && (!compradorEnfoque || comp === compradorEnfoque) && cumpleDia(r.insumoId);
       });
       const conteoGrupos = {};
@@ -143,7 +153,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       ticketsParaCompradores.forEach(r => {
         const tipo = getTipoReclamo(r.mensaje);
         if (tipo.num === "2" || r.tipo === 'APROBACION GERENCIA') return; 
-        const comp = extraerComprador(r.cuerpoOriginal);
+        const comp = extraerComprador(r.cuerpoOriginal, r.insumoId);
         if (!rankingComps[comp]) rankingComps[comp] = { total: 0, cerrados: 0 };
         rankingComps[comp].total++;
         if (r.estado === 'CERRADO') rankingComps[comp].cerrados++;
@@ -169,7 +179,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const ticketsDashboard = ticketsMes.filter(r => {
          const ins = insumos.find(i => i.id === r.insumoId);
          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
-         const comp = extraerComprador(r.cuerpoOriginal);
+         const comp = extraerComprador(r.cuerpoOriginal, r.insumoId);
          return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque) && cumpleDia(r.insumoId);
       });
 
@@ -202,7 +212,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const ticketsTiempoReal = validosTickets.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
-        const comp = extraerComprador(r.cuerpoOriginal);
+        const comp = extraerComprador(r.cuerpoOriginal, r.insumoId);
         return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque) && cumpleDia(r.insumoId);
       });
 
@@ -216,7 +226,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const interaccionesTiempoReal = validosInteracciones.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
-        const comp = extraerComprador(r.cuerpoOriginal);
+        const comp = extraerComprador(r.cuerpoOriginal, r.insumoId);
         return (!operarioEnfoque || r.operario === operarioEnfoque) && (!grupoEnfoque || g === grupoEnfoque) && (!compradorEnfoque || comp === compradorEnfoque);
       });
 
@@ -233,7 +243,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
       const listaInsumos = ticketsDashboard.map(t => {
           const ins = insumos.find(i => i.id === t.insumoId) || {};
-          const comp = extraerComprador(t.cuerpoOriginal);
+          const comp = extraerComprador(t.cuerpoOriginal, t.insumoId);
           const g = ins.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
           return {
               insumoId: t.insumoId,
@@ -350,7 +360,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       filtrados.forEach(r => { 
         const ins = insumos.find(i => i.id === r.insumoId)?.nombre || 'Eliminado'; 
         const tipoDef = getTipoReclamo(r.mensaje);
-        const comp = extraerComprador(r.cuerpoOriginal);
+        const comp = extraerComprador(r.cuerpoOriginal, r.insumoId);
         csv += `"${formatearFecha(r.fecha)}","${r.estado}","[${tipoDef.num}] ${tipoDef.label}","${ins}","${comp}","${r.mensaje}","${r.operario}"\n`; 
       });
       const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
@@ -362,14 +372,14 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO");
     
     const operariosUnicos = useMemo(() => [...new Set(filtrados.map(r => r.operario).filter(Boolean))].sort(), [filtrados]);
-    const responsablesUnicos = useMemo(() => [...new Set(filtrados.map(r => extraerComprador(r.cuerpoOriginal)).filter(r => r !== 'SIN ASIGNAR'))].sort(), [filtrados]);
+    const responsablesUnicos = useMemo(() => [...new Set(filtrados.map(r => extraerComprador(r.cuerpoOriginal, r.insumoId)).filter(r => r !== 'SIN ASIGNAR'))].sort(), [filtrados]);
 
     if (currentUser.rol !== 'owner') {
       filtrados = filtrados.filter(r => r.operario === currentUser.nombre || (r.operario && r.operario.includes(currentUser.nombre)));
     } else {
       if (filtroOperario !== "TODOS") filtrados = filtrados.filter(r => r.operario === filtroOperario);
     }
-    if (filtroResponsable !== "TODOS") filtrados = filtrados.filter(r => extraerComprador(r.cuerpoOriginal) === filtroResponsable);
+    if (filtroResponsable !== "TODOS") filtrados = filtrados.filter(r => extraerComprador(r.cuerpoOriginal, r.insumoId) === filtroResponsable);
     if (filtroMes !== "TODOS") filtrados = filtrados.filter(r => obtenerMesAnio(r.fecha) === filtroMes);
     if (filtroTipo !== "TODOS") {
       if (filtroTipo === "TIPO_1") filtrados = filtrados.filter(r => (r.mensaje || "").toUpperCase().includes("SOLPED"));
@@ -386,7 +396,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       const term = busquedaAuditoria.toLowerCase();
       filtrados = filtrados.filter(r => { 
         const ins = insumos.find(i => i.id === r.insumoId); 
-        return r.mensaje.toLowerCase().includes(term) || (ins?.nombre || "").toLowerCase().includes(term) || (ins?.codigo || "").toLowerCase().includes(term) || extraerComprador(r.cuerpoOriginal).toLowerCase().includes(term); 
+        return r.mensaje.toLowerCase().includes(term) || (ins?.nombre || "").toLowerCase().includes(term) || (ins?.codigo || "").toLowerCase().includes(term) || extraerComprador(r.cuerpoOriginal, r.insumoId).toLowerCase().includes(term); 
       });
     }
     if (auditoriaFiltroInsumo) filtrados = filtrados.filter(r => r.insumoId === auditoriaFiltroInsumo);
@@ -578,7 +588,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                 })()}
                               </td>
                               <td className="py-4 px-4 text-[10px] font-black text-slate-600 uppercase tracking-wider text-left">
-                                 {extraerComprador(h.cuerpoOriginal)}
+                                 {extraerComprador(h.cuerpoOriginal, h.insumoId)}
                               </td>
                               <td className="py-4 px-4 text-center">
                                 <button onClick={(e) => { e.stopPropagation(); setModalMensaje(h); }} className="group relative inline-flex items-center justify-center bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-200 px-3 py-1.5 rounded-lg transition-all" title="Leer Asunto">
@@ -635,7 +645,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                       <span className={`text-[8px] font-black border px-1.5 py-0.5 rounded flex items-center gap-1 mx-auto w-max shadow-xs ${tipoSub.style}`}><span className="bg-white text-current rounded-sm px-1 py-0.1 shadow-xs">{tipoSub.num}</span> {tipoSub.label}</span>
                                     </td>
                                     <td className="py-3 px-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-left">
-                                      {extraerComprador(item.cuerpoOriginal)}
+                                      {extraerComprador(item.cuerpoOriginal, item.insumoId)}
                                     </td>
                                     <td className="py-3 px-4 text-center">
                                       <button onClick={(e) => { e.stopPropagation(); setModalMensaje(item); }} className="group relative inline-flex items-center justify-center bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-200 px-3 py-1.5 rounded-lg transition-all" title="Leer Asunto">
