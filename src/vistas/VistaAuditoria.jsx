@@ -2,9 +2,9 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, addDoc, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2 } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2, RefreshCw } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp, addDoc } from 'firebase/firestore';
 
 const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, setDialogoConfirmacion, setActiveInsumo, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo }) => {
     const [filtroMes, setFiltroMes] = useState("TODOS");
@@ -64,24 +64,22 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }); 
     }, [reclamos]);
 
-    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
+    // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES (COMPRESIÓN DE HILOS Y UNIFICACIÓN) ---
     const kpiData = useMemo(() => {
-      // 0. APLICAR BUSCADOR GLOBAL DE INSUMOS
       const validosInteracciones = reclamos.filter(r => {
         if (!r.insumoId || r.insumoId === "BROADCAST" || r.estado === "INICIALIZADO" || r.tipo === 'equipo') return false;
         
         if (busquedaKpi.trim()) {
             const ins = insumos.find(i => i.id === r.insumoId);
             const term = busquedaKpi.toLowerCase();
-            const match = (ins?.nombre || "").toLowerCase().includes(term) || 
-                          (ins?.codigo || "").toLowerCase().includes(term) ||
-                          (r.cuerpoOriginal || "").toLowerCase().includes(term);
-            if (!match) return false;
+            return (ins?.nombre || "").toLowerCase().includes(term) || 
+                   (ins?.codigo || "").toLowerCase().includes(term) ||
+                   (r.cuerpoOriginal || "").toLowerCase().includes(term);
         }
         return true;
       });
       
-      // FILTRO DE DÍA (PULSO)
+      // FILTRO DE DÍA SELECCIONADO (PULSO INTERACTIVO)
       let insumosActivosEnDia = null;
       if (diaEnfoque) {
           const activosDia = validosInteracciones.filter(r => {
@@ -94,7 +92,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
       const cumpleDia = (insumoId) => !insumosActivosEnDia || insumosActivosEnDia.has(insumoId);
 
-      // 1. COMPRESIÓN DE HILOS: Mapear para obtener 1 Ticket Único por Insumo
+      // Mapeo unificado para obtener 1 Ticket Único por Insumo
       const mapaTickets = {};
       validosInteracciones.forEach(r => {
         if (!mapaTickets[r.insumoId]) {
@@ -135,7 +133,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       });
       const listaGrupos = Object.entries(conteoGrupos).map(([nombre, cantidad]) => ({nombre, cantidad})).sort((a,b) => b.cantidad - a.cantidad);
 
-      // --- RANKING DE COMPRADORES (VOLUMEN NETO) ---
+      // --- RANKING DE COMPRADORES (EXCLUYE TOTALMENTE GERENCIA) ---
       const ticketsParaCompradores = ticketsMes.filter(r => {
           const ins = insumos.find(i => i.id === r.insumoId);
           const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -154,8 +152,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         nombre, total: data.total, efectividad: Math.round((data.cerrados / data.total) * 100)
       })).sort((a,b) => b.total - a.total);
 
-      // --- RANKING DE OPERARIOS (VOLUMEN NETO) - TODOS SÍ O SÍ ---
-      // Ignora los filtros cruzados para mantener siempre a la vista a todos los operarios del mes
+      // --- RANKING DE OPERARIOS (VISUALIZACIÓN COMPLETA OBLIGATORIA) ---
       const ticketsParaOperarios = ticketsMes; 
       const rankingOperarios = {};
       ticketsParaOperarios.forEach(r => {
@@ -168,7 +165,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return { nombre: name, total: rankingOperarios[name].total, efectividad: Math.round((rankingOperarios[name].cerrados / rankingOperarios[name].total) * 100) };
       }).sort((a, b) => b.total - a.total);
 
-      // --- MATRIZ CENTRAL (KPI TOP CARDS) ---
+      // --- ESTRUCTURA MATRIZ DASHBOARD ---
       const ticketsDashboard = ticketsMes.filter(r => {
          const ins = insumos.find(i => i.id === r.insumoId);
          const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -201,7 +198,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
 
       const pendientesGerencia = ticketsDashboard.filter(r => (getTipoReclamo(r.mensaje).num === "2" || r.tipo === 'APROBACION GERENCIA') && r.estado === 'ABIERTO').length;
 
-      // --- MÉTRICAS DE TIEMPO REAL (BACKLOG Y PULSO) ---
+      // --- MÉTRICAS DE TIEMPO REAL ---
       const ticketsTiempoReal = validosTickets.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -215,6 +212,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return ((Date.now() / 1000 - fInicio) / 86400) > 7; 
       });
 
+      // PULSO SEMANAL EVALÚA TOTAL DE ENVIOS (INTERACCIONES)
       const interaccionesTiempoReal = validosInteracciones.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
         const g = ins?.grupo && ins.grupo.trim() !== "" ? ins.grupo.toUpperCase() : 'SIN CLASIFICAR';
@@ -233,7 +231,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
       const maxActividadPulso = Math.max(...lista20Dias.map(d => d.cantidad), 1);
 
-      // NUEVO: LISTA DE INSUMOS DINÁMICA
       const listaInsumos = ticketsDashboard.map(t => {
           const ins = insumos.find(i => i.id === t.insumoId) || {};
           const comp = extraerComprador(t.cuerpoOriginal);
@@ -259,7 +256,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       };
     }, [reclamos, insumos, operarioEnfoque, grupoEnfoque, compradorEnfoque, diaEnfoque, filtroMes, busquedaKpi]);
 
-    // --- ACCIONES ---
+    // --- ACCIONES CORE ---
     const enviarReporteEmail = () => {
       const body = `REPORTE SEMANAL DE KPIs - PLANTA DEVESA\n\n1. EVACUACIÓN MENSUAL: ${kpiData.tasaResolucion}%\n2. BACKLOG ACTIVO: ${kpiData.activosBacklog} tickets\n3. LEAD TIME PROMEDIO: ${kpiData.leadTime} días\n4. EFICIENCIA DE CONTACTO: ${kpiData.efectividadPrimerContacto}%\n\nGenerado desde ERP Planta.`;
       window.open(`mailto:fachaval@devesa.com?subject=Reporte Semanal KPIs - ERP Planta&body=${encodeURIComponent(body)}`, '_blank');
@@ -309,6 +306,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
     };
 
+    // FUNCIÓN DE BORRADO FÍSICO PERMANENTE DE TICKETS INDIVIDUALES
     const ejecutarEliminacionTicket = async (insumoId) => {
       try {
         const batch = writeBatch(db);
@@ -316,11 +314,10 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         const snapshot = await getDocs(qReclamos);
         
         snapshot.docs.forEach((docSnap) => {
-          batch.delete(doc(db, "reclamos", docSnap.id)); // Borrado físico total
+          batch.delete(doc(db, "reclamos", docSnap.id)); 
         });
         
         batch.update(doc(db, "insumos", insumoId), { ticketReclamo: null });
-        
         await batch.commit();
         setExpandedRow(null); 
         setToastMsg("🗑️ Ticket eliminado de raíz. Métricas purgadas."); 
@@ -331,8 +328,8 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       }
     };
 
+    // BOTÓN FIJO DE RESCATE: FUNCIÓN ADMINISTRADORA DE REINYECCIÓN AUTOMÁTICA DESDE RESPALDO CSV
     const ejecutarRescateDeTickets = async () => {
-      // 1. Aquí están los 20 tickets recuperados exactos de tu CSV
       const backupTickets = [
         { fecha_str: "27/05/26 13:54", estado: "ABIERTO", codigo: "1500100313", mensaje: "1500100313-CAMISA BEIGE MANGA CORTA 38 | O/C APROBADA DEMORADA [TK-9112]", operario: "GUILLE" },
         { fecha_str: "27/05/26 12:00", estado: "ABIERTO", codigo: "1500200111", mensaje: "1500200111-GUANTE DE NITRILO VERDE LARGO TALLE 8 | URGENTE: RIESGO DE QUIEBRE:  [TK-1360]", operario: "YESICA" },
@@ -343,51 +340,53 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         { fecha_str: "27/05/26 09:27", estado: "ABIERTO", codigo: "801200070", mensaje: "801200070-STRETCH MANUAL SIN BUJE | AUTORIZAR OC [TK-2988]", operario: "FER" },
         { fecha_str: "27/05/26 08:51", estado: "ABIERTO", codigo: "1500100227", mensaje: "1500100227-CHALECO DE FRIO AZUL L | AUTORIZAR OC [TK-3604]", operario: "GUILLE" },
         { fecha_str: "27/05/26 08:50", estado: "ABIERTO", codigo: "1500100214", mensaje: "1500100214-CAMPERAS VERDES P/CORRALEROS XL | AUTORIZAR OC [TK-1261]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 08:45", estado: "ABIERTO", codigo: "1500100213", mensaje: "1500100213-CAMPERAS VERDES P/CORRALEROS L | AUTORIZAR OC [TK-1799]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 08:44", estado: "ABIERTO", codigo: "1500100241", mensaje: "1500100241-BOTA BLANCA C/ PUNTERA ACERO 43 | AUTORIZAR OC [TK-8589]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 08:14", estado: "ABIERTO", codigo: "1500100240", mensaje: "1500100240-BOTA BLANCA C/ PUNTERA ACERO 42 | AUTORIZAR OC [TK-8353]", operario: "GUILLE" },
-        { fecha_str: "27/05/26 06:41", estado: "ABIERTO", codigo: "1500200022", mensaje: "1500200022-GUANTES ANTICORTE TEJIDO T 8(2541) | AUTORIZAR OC [TK-4088]", operario: "YESICA" },
-        { fecha_str: "27/05/26 06:19", estado: "ABIERTO", codigo: "801200024", mensaje: "801200024-BOLSA DE RED 36X70 VERDE KOSHER | SOLPED SIN OC [TK-3181]", operario: "Dueño VIP" },
         { fecha_str: "26/05/26 14:10", estado: "ABIERTO", codigo: "1600100161", mensaje: "1600100161-REPUESTO HOJA DE METAL CUTTER MARTOR | AUTORIZAR OC [TK-8161]", operario: "ALEJANDRO" },
         { fecha_str: "26/05/26 14:08", estado: "ABIERTO", codigo: "1600100061", mensaje: "1600100061-Cutter Martor secupro 625 | AUTORIZAR OC [TK-6801]", operario: "ALEJANDRO" },
         { fecha_str: "26/05/26 13:57", estado: "ABIERTO", codigo: "1500100416", mensaje: "1500100416-AMBO COLOR GRIS TOPO ML TALLE L | URGENTE: RIESGO DE QUIEBRE:  [TK-4964]", operario: "GUILLE" },
         { fecha_str: "26/05/26 13:48", estado: "ABIERTO", codigo: "1500100219", mensaje: "1500100219-CAMPERA DE FRIO AZUL L | URGENTE: RIESGO DE QUIEBRE:  [TK-9607]", operario: "GUILLE" },
         { fecha_str: "26/05/26 13:46", estado: "ABIERTO", codigo: "1500100341", mensaje: "1500100341-CAMPERA BEIGE T.L | URGENTE: RIESGO DE QUIEBRE:  [TK-7164]", operario: "GUILLE" },
-        { fecha_str: "26/05/26 13:27", estado: "ABIERTO", codigo: "1200100270", mensaje: "1200100270-DETERGENTE EXTRA CLIP(Cuchillos) | AUTORIZAR OC [TK-1610]", operario: "MONICA" }
+        { fecha_str: "26/05/26 13:27", estado: "ABIERTO", codigo: "1200100270", mensaje: "1200100270-DETERGENTE EXTRA CLIP(Cuchillos) | AUTORIZAR OC [TK-1610]", operario: "MONICA" },
+        { fecha_str: "27/05/26 08:45", estado: "ABIERTO", codigo: "1500100213", mensaje: "1500100213-CAMPERAS VERDES P/CORRALEROS L | AUTORIZAR OC [TK-1799]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 08:44", estado: "ABIERTO", codigo: "1500100241", mensaje: "1500100241-BOTA BLANCA C/ PUNTERA ACERO 43 | AUTORIZAR OC [TK-8589]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 08:14", estado: "ABIERTO", codigo: "1500100240", mensaje: "1500100240-BOTA BLANCA C/ PUNTERA ACERO 42 | AUTORIZAR OC [TK-8353]", operario: "GUILLE" },
+        { fecha_str: "27/05/26 06:41", estado: "ABIERTO", codigo: "1500200022", mensaje: "1500200022-GUANTES ANTICORTE TEJIDO T 8(2541) | AUTORIZAR OC [TK-4088]", operario: "YESICA" },
+        { fecha_str: "27/05/26 06:19", estado: "ABIERTO", codigo: "801200024", mensaje: "801200024-BOLSA DE RED 36X70 VERDE KOSHER | SOLPED SIN OC [TK-3181]", operario: "Dueño VIP" }
       ];
 
-      try {
-        setToastMsg("⏳ Restaurando tickets...");
-        
-        for (const bk of backupTickets) {
-          // Buscamos el insumo real en tu base actual usando el código
-          const insumoAsociado = insumos.find(i => i.codigo === bk.codigo);
-          if (!insumoAsociado) continue; // Si el insumo no existe, lo saltamos
-          
-          // Reconstruimos la fecha
-          const [dia, mes, resto] = bk.fecha_str.split('/');
-          const [anioStr, horaStr] = resto.split(' ');
-          // En JS los meses empiezan de 0, por eso mes - 1
-          const fechaRestaurada = new Date(`20${anioStr}`, parseInt(mes) - 1, dia, ...horaStr.split(':'));
+      setDialogoConfirmacion({
+         titulo: "Rescate del Sistema",
+         mensaje: `¿Confirmás la reinyección en bloque de los 20 tickets históricos procedentes del respaldo CSV? Esto restaurará la integridad total del tablero analítico.`,
+         textoConfirmar: "Sí, Inyectar Bloque",
+         colorBoton: "bg-indigo-600 hover:bg-indigo-700",
+         onConfirm: async () => {
+            try {
+              setToastMsg("⏳ Restaurando base de datos...");
+              for (const bk of backupTickets) {
+                const insumoAsociado = insumos.find(i => i.codigo === bk.codigo);
+                if (!insumoAsociado) continue;
+                
+                const [dia, mes, resto] = bk.fecha_str.split('/');
+                const [anioStr, horaStr] = resto.split(' ');
+                const fechaRestaurada = new Date(`20${anioStr}`, parseInt(mes) - 1, dia, ...horaStr.split(':'));
 
-          // Inyectamos el registro de nuevo en Firebase
-          await addDoc(collection(db, "reclamos"), {
-            insumoId: insumoAsociado.id,
-            fecha: fechaRestaurada,
-            operario: bk.operario,
-            estado: bk.estado,
-            tipo: "RESTAURADO", // Para que no se pise si había lógicas de "equipo", pero se lee igual en el tablero
-            mensaje: bk.mensaje,
-            cuerpoOriginal: bk.mensaje, // Restauramos el cuerpo base
-            leidoPor: []
-          });
-        }
-        
-        setToastMsg("✅ ¡Los 20 tickets fueron restaurados con éxito!");
-      } catch (error) {
-        console.error(error);
-        setToastMsg("⚠️ Ocurrió un error en la restauración.");
-      }
+                await addDoc(collection(db, "reclamos"), {
+                  insumoId: insumoAsociado.id,
+                  fecha: fechaRestaurada,
+                  operario: bk.operario,
+                  estado: bk.estado,
+                  tipo: "RESTAURADO",
+                  mensaje: bk.mensaje,
+                  cuerpoOriginal: bk.mensaje,
+                  leidoPor: []
+                });
+              }
+              setToastMsg("✅ ¡Los 20 tickets históricos fueron restablecidos!");
+            } catch (error) {
+              console.error(error);
+              setToastMsg("⚠️ Error al inyectar bloque.");
+            }
+         }
+      });
     };
 
     const exportarDossierPDF = (hiloActivo) => {
@@ -420,13 +419,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       link.download = `Auditoria_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
     };
 
-    // --- LÓGICA DE FILTRADO DE LA TABLA PRINCIPAL ---
+    // --- FILTRADO DE LA HOJA DE SEGUIMIENTO (TABLAS ABIERTOS / RESUELTOS) ---
     let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO");
     
     const operariosUnicos = useMemo(() => [...new Set(filtrados.map(r => r.operario).filter(Boolean))].sort(), [filtrados]);
     const responsablesUnicos = useMemo(() => [...new Set(filtrados.map(r => extraerComprador(r.cuerpoOriginal)).filter(r => r !== 'SIN ASIGNAR'))].sort(), [filtrados]);
 
-    // Aplicación de Filtros a la Tabla
     if (currentUser.rol !== 'owner') {
       filtrados = filtrados.filter(r => r.operario === currentUser.nombre || (r.operario && r.operario.includes(currentUser.nombre)));
     } else {
@@ -473,15 +471,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     return (
       <div className="p-4 md:p-6 h-full w-full relative flex justify-center">
         <div className="w-full max-w-full">
-            
-            {currentUser.rol === 'owner' && (
-          <button 
-            onClick={ejecutarRescateDeTickets} 
-            className="w-full bg-red-600 text-white font-black py-5 rounded-2xl shadow-xl mb-6 hover:bg-red-700 uppercase tracking-widest text-xs animate-pulse z-[9999]"
-          >
-            🚨 EJECUTAR RESCATE: VOLVER A INYECTAR LOS TICKETS DEL CSV BORRADOS 🚨
-          </button>
-        )}
           
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 mb-6 pb-2 gap-4">
             <div className="flex gap-6">
@@ -663,16 +652,12 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                               <td className="py-4 px-4 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                   {h.estado === 'ABIERTO' && (currentUser.rol === 'owner' || h.operario?.trim().toLowerCase() === currentUser.nombre?.trim().toLowerCase() || h.operario?.trim().toLowerCase() === currentUser.aliasMatch?.trim().toLowerCase()) && (
-                                    <button onClick={(e) => { e.stopPropagation(); setDialogoConfirmacion({ titulo: "Finalizar Ticket", mensaje: `¿Confirmás el cierre del ticket de "${insumoAsociado?.nombre}"? Se guardará en el historial.`, textoConfirmar: "Sí, Finalizar", colorBoton: "bg-rose-500 hover:bg-rose-600", onConfirm: () => ejecutarCierreMasivoEnBloque(h.insumoId) }); }} className="px-2 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded text-[9px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all shadow-sm flex items-center gap-1"><X size={10} /> Finalizar</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setDialogoConfirmacion({ titulo: "Finalizar Ticket", mensaje: `¿Confirmás el cierre del ticket de "${insumoAsociado?.nombre}"? Se guardará en el histórico.`, textoConfirmar: "Sí, Finalizar", colorBoton: "bg-rose-500 hover:bg-rose-600", onConfirm: () => ejecutarCierreMasivoEnBloque(h.insumoId) }); }} className="px-2 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded text-[9px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all shadow-sm flex items-center gap-1"><X size={10} /> Finalizar</button>
                                   )}
                                   
-                                  {/* BOTONES EXCLUSIVOS OWNER */}
                                   {currentUser.rol === 'owner' && (
                                     <>
-                                      <button onClick={(e) => { e.stopPropagation(); exportarDossierPDF(h); }} className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded transition-all" title="Exportar Trazabilidad">
-                                        <FileText size={16} />
-                                      </button>
-                                      
+                                      <button onClick={(e) => { e.stopPropagation(); exportarDossierPDF(h); }} className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded transition-all" title="Exportar Trazabilidad"><FileText size={16} /></button>
                                       {h.estado === 'ABIERTO' && (
                                         <button 
                                           onClick={(e) => { 
@@ -740,6 +725,25 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
           {auditoriaTab === 'kpis' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               
+              {/* PANEL DE CONTROL DE HERRAMIENTAS EXCLUSIVAS (SOLO VISIBLE PARA OWNER) */}
+              {currentUser.rol === 'owner' && (
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400"><RefreshCw size={18} className="animate-spin-slow" /></div>
+                    <div>
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider">Módulo de Rescate Crítico de Datos</h4>
+                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">Utilidad permanente para restablecer la integridad de los 20 hilos históricos del CSV.</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={ejecutarRescateDeTickets} 
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 py-3 rounded-xl shadow-md uppercase tracking-widest text-[10px] transition-all flex items-center gap-2 shrink-0 border border-indigo-500"
+                  >
+                    🚀 Reinyectar Respaldo CSV
+                  </button>
+                </div>
+              )}
+
               {filtroMes !== "TODOS" && (
                 <div className="bg-orange-50 border border-orange-200 text-orange-800 px-4 py-3 rounded-xl flex items-center gap-3">
                   <AlertCircle size={18} />
@@ -836,7 +840,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     <History size={20} className="text-slate-800"/>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Pulso de Actividad Reciente <span className="text-sky-600 font-bold ml-2 text-xs">{filtrosActivosText && `(Filtros: ${filtrosActivosText})`}</span></h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen en los últimos 20 días (Clickeá una barra para ver detalles del día)</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen en los últimos 20 días (Clickeá una barra para aislar la actividad de ese día)</p>
                     </div>
                   </div>
                   {(operarioEnfoque || grupoEnfoque || compradorEnfoque || diaEnfoque) && (
@@ -912,7 +916,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                   {kpiData.listaCompradores.length === 0 ? (
                     <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">Sin registros</div>
                   ) : (
-                    <div className="overflow-x-auto max-h-[300px] scrollbar-thin scrollbar-thumb-slate-200 flex-1">
+                    <div className="overflow-x-auto max-h-[300px] shrink-0 scrollbar-thin scrollbar-thumb-slate-200 flex-1">
                       <table className="w-full text-left whitespace-nowrap text-xs font-bold">
                         <thead className="sticky top-0 bg-white z-10">
                           <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -943,7 +947,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                     <Users size={20} className="text-slate-800"/>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Alertas por Operario</h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Clickeá para filtrar el tablero</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Catálogo unificado del período</p>
                     </div>
                   </div>
                   
@@ -974,14 +978,14 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
-              {/* 4. TABLA DINÁMICA DE INSUMOS (NUEVO) */}
+              {/* TABLA DINÁMICA DE DETALLE DE INSUMOS */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full mt-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div className="flex items-center gap-2">
                     <FileText size={20} className="text-slate-800"/>
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Detalle de Materiales Activos en las Métricas</h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Hacé clic en un insumo para abrir su ficha completa en el panel derecho</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Hacé clic en un insumo para desplegar su ficha técnica en el panel lateral derecho</p>
                     </div>
                   </div>
                   
@@ -1018,7 +1022,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                                <div className="flex flex-col">
                                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CÓDIGO: {item.codigo}</span>
                                   <span className="text-xs font-black text-slate-800 uppercase">{item.nombre}</span>
-                               </div>
+                                </div>
                             </td>
                             <td className="py-3 px-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">{item.grupo}</td>
                             <td className="py-3 px-4 text-[10px] font-black uppercase text-slate-600">{item.comprador}</td>
