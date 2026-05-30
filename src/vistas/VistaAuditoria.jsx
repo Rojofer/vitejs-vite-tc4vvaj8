@@ -6,7 +6,7 @@ import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare,
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
-const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, setDialogoConfirmacion, setActiveInsumo, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo }) => {
+const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha, obtenerMesAnio, setToastMsg, setDialogoConfirmacion, setActiveInsumo, auditoriaFiltroInsumo, setAuditoriaFiltroInsumo }) => {
     const [filtroMes, setFiltroMes] = useState("TODOS");
     const [filtroTipo, setFiltroTipo] = useState("TODOS"); 
     const [filtroOperario, setFiltroOperario] = useState("TODOS");
@@ -72,26 +72,40 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const resumenOperarios = useMemo(() => {
       const mapa = {};
 
-      // 1. Detectar Huérfanos (Supervivencia <= 30, Sin ticket Y Favoritos)
+      // CEREBRO DE FUSIÓN: Traduce cualquier Alias de SAP al Nombre Real del Directorio
+      const obtenerNombreReal = (rawName) => {
+        const txt = (rawName || 'SIN ASIGNAR').trim().toUpperCase();
+        if (!config || !config.contactos) return txt;
+        
+        const contacto = config.contactos.find(c => 
+          (c.alias && c.alias.trim().toUpperCase() === txt) || 
+          (c.label && c.label.trim().toUpperCase() === txt)
+        );
+        return contacto && contacto.label ? contacto.label.trim().toUpperCase() : txt;
+      };
+
+      const umbral = config?.umbralUrgencia || 30;
+
+      // 1. Detectar Huérfanos
       insumos.forEach(ins => {
-        if (!ins.discontinuado && ins.favorito && ins.supervivencia <= 30 && !ins.ticketReclamo) {
-          const op = (ins.owner || 'SIN ASIGNAR').trim().toUpperCase();
-          if (!mapa[op]) mapa[op] = { nombre: op, huerfanos: 0, activos: 0 };
-          mapa[op].huerfanos++;
+        if (!ins.discontinuado && ins.favorito && ins.supervivencia <= umbral && !ins.ticketReclamo) {
+          const opUnificado = obtenerNombreReal(ins.owner);
+          if (!mapa[opUnificado]) mapa[opUnificado] = { nombre: opUnificado, huerfanos: 0, activos: 0 };
+          mapa[opUnificado].huerfanos++;
         }
       });
 
       // 2. Detectar Tickets Activos
       reclamos.forEach(r => {
         if (r.estado === 'ABIERTO' && r.tipo !== 'equipo') {
-          const op = (r.operario || 'SIN ASIGNAR').trim().toUpperCase();
-          if (!mapa[op]) mapa[op] = { nombre: op, huerfanos: 0, activos: 0 };
-          mapa[op].activos++;
+          const opUnificado = obtenerNombreReal(r.operario);
+          if (!mapa[opUnificado]) mapa[opUnificado] = { nombre: opUnificado, huerfanos: 0, activos: 0 };
+          mapa[opUnificado].activos++;
         }
       });
 
       return Object.values(mapa).sort((a, b) => a.nombre.localeCompare(b.nombre));
-    }, [insumos, reclamos]);
+    }, [insumos, reclamos, config]);
 
     // --- ACCIÓN DE DESPACHO MANUAL AL SERVIDOR (APPS SCRIPT) ---
     const ejecutarDespachoManual = async () => {
@@ -102,7 +116,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         // ==============================================================================
         // ⚠️ IMPORTANTE FERNANDO: Pegá acá la URL de tu Web App de Google Apps Script ⚠️
         // ==============================================================================
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8bM3RDSxzNN4XfpLm0M83ZIiP01S3LkX0MGXZZ2niJ2h4H0gwbfRGqyCSs5SOK-M/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxh4h7YeDyNNRyby4VENlhhIhfN9djcLNKPzFAMIJG6F1gaLOaba-Ez-InO7HV7is9W/exec"; 
         
         await fetch(SCRIPT_URL, {
           method: 'POST',
