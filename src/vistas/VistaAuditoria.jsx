@@ -72,9 +72,9 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const resumenOperarios = useMemo(() => {
       const mapa = {};
 
-      // 1. Detectar Huérfanos (< 30 días Y sin ticket abierto)
+      // 1. Detectar Huérfanos (Supervivencia <= 30, Sin ticket Y Favoritos)
       insumos.forEach(ins => {
-        if (!ins.discontinuado && ins.cobertura < 30 && !ins.ticketReclamo) {
+        if (!ins.discontinuado && ins.favorito && ins.supervivencia <= 30 && !ins.ticketReclamo) {
           const op = (ins.owner || 'SIN ASIGNAR').trim().toUpperCase();
           if (!mapa[op]) mapa[op] = { nombre: op, huerfanos: 0, activos: 0 };
           mapa[op].huerfanos++;
