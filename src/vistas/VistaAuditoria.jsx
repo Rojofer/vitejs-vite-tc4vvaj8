@@ -69,26 +69,33 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
     }, [reclamos]);
 
     // --- LÓGICA DE RESUMEN PARA EL PANEL DE DESPACHO ---
+    // --- LÓGICA DE RESUMEN PARA EL PANEL DE DESPACHO ---
     const resumenOperarios = useMemo(() => {
       const mapa = {};
+      
+      // Normalizador anti-tildes
+      const normalize = (str) => (str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
 
-      // CEREBRO DE FUSIÓN: Traduce cualquier Alias de SAP al Nombre Real del Directorio
       const obtenerNombreReal = (rawName) => {
-        const txt = (rawName || 'SIN ASIGNAR').trim().toUpperCase();
+        const txt = normalize(rawName);
         if (!config || !config.contactos) return txt;
         
         const contacto = config.contactos.find(c => 
-          (c.alias && c.alias.trim().toUpperCase() === txt) || 
-          (c.label && c.label.trim().toUpperCase() === txt)
+          normalize(c.alias) === txt || normalize(c.label) === txt
         );
-        return contacto && contacto.label ? contacto.label.trim().toUpperCase() : txt;
+        return contacto && contacto.label ? normalize(contacto.label) : txt;
       };
 
-      const umbral = config?.umbralUrgencia || 30;
+      // Usa estrictamente el deslizador de "Email" (el morado)
+      let umbral = 30;
+      if (config && config.umbralMailRiesgo !== undefined) {
+         umbral = Number(config.umbralMailRiesgo);
+      }
 
       // 1. Detectar Huérfanos
       insumos.forEach(ins => {
-        if (!ins.discontinuado && ins.favorito && ins.supervivencia <= umbral && !ins.ticketReclamo) {
+        // ins.supervivencia ya viene de app.txt y equivale a stock/consumo
+        if (!ins.discontinuado && ins.favorito && Math.round(ins.supervivencia) <= umbral && !ins.ticketReclamo) {
           const opUnificado = obtenerNombreReal(ins.owner);
           if (!mapa[opUnificado]) mapa[opUnificado] = { nombre: opUnificado, huerfanos: 0, activos: 0 };
           mapa[opUnificado].huerfanos++;
@@ -116,7 +123,7 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
         // ==============================================================================
         // ⚠️ IMPORTANTE FERNANDO: Pegá acá la URL de tu Web App de Google Apps Script ⚠️
         // ==============================================================================
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxh4h7YeDyNNRyby4VENlhhIhfN9djcLNKPzFAMIJG6F1gaLOaba-Ez-InO7HV7is9W/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby-02Klnl3pyYPeK1MYan5M8-Dvxj0597pD0-7tHc0nIbKyantL-1GiMUjWOe0c2Ysr/exec"; 
         
         await fetch(SCRIPT_URL, {
           method: 'POST',
