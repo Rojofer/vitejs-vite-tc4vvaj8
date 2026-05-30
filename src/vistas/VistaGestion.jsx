@@ -293,18 +293,9 @@ const VistaGestion = ({
 
                 const total = misInsumosDashboard.length || 1;
             
-                // NUEVO KPI: Insumos a Reclamar (Matemática Pura sin OCs)
-                const umbralMail = config?.umbralMailRiesgo !== undefined ? config.umbralMailRiesgo : 30;
-                const kpiReclamar = misInsumosDashboard.filter(i => {
-                  if (!i.favorito || i.ticketReclamo) return false;
-                  const stock = Number(i.stockActual) || 0;
-                  const consumoPromedio = Number(i.consumoPromedio) || 0;
-                  const consumoDiario = consumoPromedio > 0 ? (consumoPromedio / 26) : 0;
-                  let coberturaReal = 999;
-                  if (consumoDiario > 0) coberturaReal = stock / consumoDiario;
-                  else if (stock === 0) coberturaReal = 0;
-                  return Math.round(coberturaReal) <= umbralMail;
-                });
+                // NUEVO KPI: Insumos a Reclamar
+                const umbral = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 30;
+                const kpiReclamar = misInsumosDashboard.filter(i => i.favorito && i.escalados === 0 && Math.round(i.supervivencia) <= umbral);
 
                 return (
                   <>
@@ -350,7 +341,7 @@ const VistaGestion = ({
                       <div className="flex items-end justify-between">
                         <p className="text-3xl font-black text-slate-800 leading-none">{kpiReclamar.length}</p>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right leading-tight">
-                          - {umbralMail} Días<br/>S/ Ticket
+                          - {umbral} Días<br/>S/ Ticket
                         </span>
                       </div>
                     </div>
