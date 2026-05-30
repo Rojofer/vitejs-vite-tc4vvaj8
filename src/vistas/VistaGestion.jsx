@@ -292,6 +292,19 @@ const VistaGestion = ({
                 );
 
                 const total = misInsumosDashboard.length || 1;
+            
+                // NUEVO KPI: Insumos a Reclamar (Matemática Pura sin OCs)
+                const umbralMail = config?.umbralMailRiesgo !== undefined ? config.umbralMailRiesgo : 30;
+                const kpiReclamar = misInsumosDashboard.filter(i => {
+                  if (!i.favorito || i.ticketReclamo) return false;
+                  const stock = Number(i.stockActual) || 0;
+                  const consumoPromedio = Number(i.consumoPromedio) || 0;
+                  const consumoDiario = consumoPromedio > 0 ? (consumoPromedio / 26) : 0;
+                  let coberturaReal = 999;
+                  if (consumoDiario > 0) coberturaReal = stock / consumoDiario;
+                  else if (stock === 0) coberturaReal = 0;
+                  return Math.round(coberturaReal) <= umbralMail;
+                });
 
                 return (
                   <>
@@ -328,6 +341,20 @@ const VistaGestion = ({
                       </div>
                     </div>
 
+                    {/* NUEVA TARJETA: INSUMOS A RECLAMAR */}
+                    <div onClick={() => setFiltroAlerta('insumos_a_reclamar')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-red-400 transition-all duration-300 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] sm:text-[11px] font-black text-red-600 uppercase tracking-widest leading-tight">Insumos a Reclamar</span>
+                        <div className="p-2 bg-red-50 rounded-xl"><AlertTriangle size={16} className="text-red-500"/></div>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <p className="text-3xl font-black text-slate-800 leading-none">{kpiReclamar.length}</p>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right leading-tight">
+                          - {umbralMail} Días<br/>S/ Ticket
+                        </span>
+                      </div>
+                    </div>
+                    
                     <div onClick={() => setFiltroAlerta('solpeds_viejas')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-indigo-200 transition-all duration-300 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-4">
                         <span className="text-[10px] sm:text-[11px] font-black text-indigo-500 uppercase tracking-widest leading-tight">Solpeds s/ OC</span>
