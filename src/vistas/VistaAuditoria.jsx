@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2 } from 'lucide-react';
+import { History, FileSpreadsheet, Search, Filter, X, ChevronRight, CheckSquare, AlertCircle, Info, FileText, CornerDownRight, Mail, MessageSquare, Target, Zap, BarChart2, Timer, Users, Copy, Package, ShoppingCart, Download, Trash2, Megaphone, CheckSquare as CheckIcon, Square } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, writeBatch, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
@@ -17,12 +17,17 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
     const [expandedRow, setExpandedRow] = useState(null);
     const [modalMensaje, setModalMensaje] = useState(null);
     
-    // ESTADOS DE INTERACTIVIDAD DEL DASHBOARD KPI
+    // ESTADOS KPI Y DASHBOARD
     const [operarioEnfoque, setOperarioEnfoque] = useState(null);
     const [grupoEnfoque, setGrupoEnfoque] = useState(null);
     const [compradorEnfoque, setCompradorEnfoque] = useState(null);
     const [diaEnfoque, setDiaEnfoque] = useState(null); 
     const [busquedaKpi, setBusquedaKpi] = useState("");
+
+    // ESTADOS DEL PANEL DE DESPACHO MANUAL
+    const [modalDespacho, setModalDespacho] = useState(false);
+    const [operariosSeleccionados, setOperariosSeleccionados] = useState([]);
+    const [enviandoMails, setEnviandoMails] = useState(false);
 
     // CEREBRO CLASIFICADOR
     const getTipoReclamo = (asunto) => {
@@ -35,7 +40,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
-    // EXTRACCIÓN Y NORMALIZACIÓN DE COMPRADORES ESTÁNDAR
     const extraerComprador = (cuerpo) => {
       if (!cuerpo) return 'SIN ASIGNAR';
       const txt = cuerpo.toUpperCase();
@@ -63,6 +67,59 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
         return Number(b.split(" ")[1]) - Number(a.split(" ")[1]) || ordenMeses.indexOf(b.split(" ")[0]) - ordenMeses.indexOf(a.split(" ")[0]); 
       }); 
     }, [reclamos]);
+
+    // --- LÓGICA DE RESUMEN PARA EL PANEL DE DESPACHO ---
+    const resumenOperarios = useMemo(() => {
+      const mapa = {};
+
+      // 1. Detectar Huérfanos (< 30 días Y sin ticket abierto)
+      insumos.forEach(ins => {
+        if (!ins.discontinuado && ins.cobertura < 30 && !ins.ticketReclamo) {
+          const op = (ins.owner || 'SIN ASIGNAR').trim().toUpperCase();
+          if (!mapa[op]) mapa[op] = { nombre: op, huerfanos: 0, activos: 0 };
+          mapa[op].huerfanos++;
+        }
+      });
+
+      // 2. Detectar Tickets Activos
+      reclamos.forEach(r => {
+        if (r.estado === 'ABIERTO' && r.tipo !== 'equipo') {
+          const op = (r.operario || 'SIN ASIGNAR').trim().toUpperCase();
+          if (!mapa[op]) mapa[op] = { nombre: op, huerfanos: 0, activos: 0 };
+          mapa[op].activos++;
+        }
+      });
+
+      return Object.values(mapa).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }, [insumos, reclamos]);
+
+    // --- ACCIÓN DE DESPACHO MANUAL AL SERVIDOR (APPS SCRIPT) ---
+    const ejecutarDespachoManual = async () => {
+      if (operariosSeleccionados.length === 0) return;
+      setEnviandoMails(true);
+
+      try {
+        // ==============================================================================
+        // ⚠️ IMPORTANTE FERNANDO: Pegá acá la URL de tu Web App de Google Apps Script ⚠️
+        // ==============================================================================
+        const SCRIPT_URL = "LA_URL_DE_TU_WEB_APP_AQUI"; 
+        
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain evita bloqueos CORS
+          body: JSON.stringify({ seleccionados: operariosSeleccionados })
+        });
+
+        setToastMsg(`✅ Reportes enviados con éxito a ${operariosSeleccionados.length} operarios.`);
+        setModalDespacho(false);
+        setOperariosSeleccionados([]);
+      } catch (error) {
+        console.error(error);
+        setToastMsg("⚠️ Error al conectarse con el servidor de correos.");
+      } finally {
+        setEnviandoMails(false);
+      }
+    };
 
     // --- LÓGICA DE CÁLCULO DE KPIs GERENCIALES ---
     const kpiData = useMemo(() => {
@@ -257,7 +314,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       };
     }, [reclamos, insumos, operarioEnfoque, grupoEnfoque, compradorEnfoque, diaEnfoque, filtroMes, busquedaKpi]);
 
-    // --- ACCIONES CORE ---
     const enviarReporteEmail = () => {
       const body = `REPORTE SEMANAL DE KPIs - PLANTA DEVESA\n\n1. EVACUACIÓN MENSUAL: ${kpiData.tasaResolucion}%\n2. BACKLOG ACTIVO: ${kpiData.activosBacklog} tickets\n3. LEAD TIME PROMEDIO: ${kpiData.leadTime} días\n4. EFICIENCIA DE CONTACTO: ${kpiData.efectividadPrimerContacto}%\n\nGenerado desde ERP Planta.`;
       window.open(`mailto:fachaval@devesa.com?subject=Reporte Semanal KPIs - ERP Planta&body=${encodeURIComponent(body)}`, '_blank');
@@ -358,7 +414,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
       link.download = `Auditoria_${new Date().toLocaleDateString('es-AR')}.csv`; link.click();
     };
 
-    // --- FILTRADO DE LA HOJA DE SEGUIMIENTO (TABLAS ABIERTOS / RESUELTOS) ---
+    // --- FILTRADO DE LA HOJA DE SEGUIMIENTO ---
     let filtrados = reclamos.filter(r => r.insumoId !== "BROADCAST" && r.estado !== "INICIALIZADO");
     
     const operariosUnicos = useMemo(() => [...new Set(filtrados.map(r => r.operario).filter(Boolean))].sort(), [filtrados]);
@@ -424,36 +480,43 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
               {currentUser.rol === 'owner' && <button onClick={() => setAuditoriaTab('kpis')} className={`pb-3 font-black text-xs uppercase tracking-widest transition-all border-b-2 -mb-[2px] ${auditoriaTab === 'kpis' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Tablero KPIs</button>}
             </div>
 
-            {auditoriaTab === 'kpis' && currentUser.rol === 'owner' && (
+            {/* BARRA SUPERIOR DE ACCIONES - AHORA CON BOTÓN DE DESPACHO */}
+            {currentUser.rol === 'owner' && (
               <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                
-                {/* TARJETA DINÁMICA DE TOTALES KPIs */}
-                <div className="flex items-center gap-2 bg-slate-900 px-3 py-2.5 rounded-xl shadow-sm border border-slate-800 shrink-0">
-                  <Package size={14} className="text-sky-400" />
-                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Activos:</span>
-                  <span className="text-[11px] font-black text-white">{kpiData.listaInsumos.length}</span>
-                </div>
+                <button 
+                  onClick={() => setModalDespacho(true)} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 transition-all shrink-0"
+                >
+                   <Megaphone size={14} /> Notificar Operarios
+                </button>
 
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar..." 
-                    value={busquedaKpi} 
-                    onChange={e => setBusquedaKpi(e.target.value)} 
-                    className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-28 sm:w-36"
-                  />
-                </div>
-                <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-700 hover:bg-slate-100 transition-colors">
-                  <option value="TODOS">Mes: Total</option>
-                  {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-                <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all hidden md:flex">
-                   <FileText size={14} /> PDF
-                </button>
-                <button onClick={enviarReporteEmail} className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all hidden md:flex">
-                   <Mail size={14} /> Reporte
-                </button>
+                {auditoriaTab === 'kpis' && (
+                  <>
+                    <div className="flex items-center gap-2 bg-slate-900 px-3 py-2.5 rounded-xl shadow-sm border border-slate-800 shrink-0">
+                      <Package size={14} className="text-sky-400" />
+                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Activos:</span>
+                      <span className="text-[11px] font-black text-white">{kpiData.listaInsumos.length}</span>
+                    </div>
+
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Buscar..." 
+                        value={busquedaKpi} 
+                        onChange={e => setBusquedaKpi(e.target.value)} 
+                        className="pl-8 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-sky-500 transition-all shadow-sm w-28 sm:w-36"
+                      />
+                    </div>
+                    <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer shadow-sm text-slate-700 hover:bg-slate-100 transition-colors">
+                      <option value="TODOS">Mes: Total</option>
+                      {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <button onClick={exportarKpiPDF} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm transition-all hidden md:flex">
+                       <FileText size={14} /> PDF
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -778,6 +841,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
+              {/* GRILLAS Y TABLAS INFERIORES... */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                   <div className="flex items-center gap-2">
@@ -811,7 +875,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
-              {/* GRILLA DE RANKINGS CRUZADOS DE 3 VÍAS */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
@@ -922,7 +985,6 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
                 </div>
               </div>
 
-              {/* TABLA DINÁMICA DE DETALLE DE INSUMOS */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full mt-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div className="flex items-center gap-2">
@@ -991,6 +1053,7 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
             </motion.div>
           )}
           
+          {/* LECTOR DE CORREOS MODAL */}
           <AnimatePresence>
             {modalMensaje && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
@@ -1020,6 +1083,117 @@ const VistaAuditoria = ({ insumos, reclamos, currentUser, formatearFecha, obtene
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* ========================================================================= */}
+          {/* PANEL MAGNO DE DESPACHO MANUAL (ALTA DENSIDAD) */}
+          {/* ========================================================================= */}
+          <AnimatePresence>
+            {modalDespacho && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8">
+                <motion.div initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
+                  
+                  {/* Header */}
+                  <div className="p-6 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-indigo-800 rounded-full flex items-center justify-center border border-indigo-700 shadow-inner">
+                        <Megaphone size={20} className="text-indigo-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-black uppercase tracking-widest">Despacho de Reportes a Planta</h2>
+                        <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Seleccioná a qué operarios notificar hoy.</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setModalDespacho(false)} className="text-indigo-400 hover:text-white transition-colors p-2"><X size={24} /></button>
+                  </div>
+
+                  {/* Botonera Selección Rápida */}
+                  <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
+                    <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                      {operariosSeleccionados.length} Seleccionados de {resumenOperarios.length}
+                    </span>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setOperariosSeleccionados([])} 
+                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-colors"
+                      >
+                        Limpiar Selección
+                      </button>
+                      <button 
+                        onClick={() => setOperariosSeleccionados(resumenOperarios.map(op => op.nombre))} 
+                        className="px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-100 transition-colors"
+                      >
+                        Seleccionar Todos
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Grilla Alta Densidad */}
+                  <div className="flex-1 overflow-y-auto p-6 bg-[#F8FAFC]">
+                    {resumenOperarios.length === 0 ? (
+                      <div className="text-center py-20">
+                        <CheckSquare size={48} className="mx-auto text-emerald-300 mb-4" />
+                        <h3 className="text-slate-800 font-black text-lg uppercase tracking-widest">Planta al día</h3>
+                        <p className="text-slate-500 text-xs font-bold uppercase mt-2">Nadie tiene insumos huérfanos ni tickets abiertos hoy.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {resumenOperarios.map(op => {
+                          const isChecked = operariosSeleccionados.includes(op.nombre);
+                          return (
+                            <div 
+                              key={op.nombre}
+                              onClick={() => {
+                                setOperariosSeleccionados(prev => prev.includes(op.nombre) ? prev.filter(n => n !== op.nombre) : [...prev, op.nombre]);
+                              }}
+                              className={`flex items-center gap-4 p-4 rounded-2xl border cursor-pointer transition-all ${isChecked ? 'bg-indigo-50 border-indigo-300 shadow-md ring-2 ring-indigo-500/20' : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm hover:shadow-md'}`}
+                            >
+                              <div className={`${isChecked ? 'text-indigo-600' : 'text-slate-300'}`}>
+                                {isChecked ? <CheckIcon size={24} /> : <Square size={24} />}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-2">{op.nombre}</h4>
+                                <div className="flex gap-2">
+                                  <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 ${op.huerfanos > 0 ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                                    <AlertCircle size={10} /> {op.huerfanos} Huérfanos
+                                  </span>
+                                  <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 ${op.activos > 0 ? 'bg-sky-100 text-sky-700 border border-sky-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                                    <FileText size={10} /> {op.activos} En Curso
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pie del Modal */}
+                  <div className="p-6 bg-white border-t border-slate-200 flex justify-end gap-4 shrink-0">
+                    <button 
+                      onClick={() => setModalDespacho(false)} 
+                      className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    
+                    <button 
+                      onClick={ejecutarDespachoManual}
+                      disabled={operariosSeleccionados.length === 0 || enviandoMails}
+                      className={`px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg ${operariosSeleccionados.length === 0 || enviandoMails ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/30'}`}
+                    >
+                      {enviandoMails ? (
+                        <>⏳ Procesando envíos...</>
+                      ) : (
+                        <>🚀 Despachar a {operariosSeleccionados.length} operarios</>
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         </div>
       </div>
     );
