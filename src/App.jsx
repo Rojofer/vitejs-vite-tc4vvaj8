@@ -779,6 +779,7 @@ const App = () => {
               insumos={insumos} 
               reclamos={reclamos} 
               currentUser={currentUser} 
+              config={config}
               formatearFecha={formatearFecha} 
               obtenerMesAnio={obtenerMesAnio} 
               setToastMsg={setToastMsg} 
