@@ -568,42 +568,19 @@ const App = () => {
     return new Date(fRaw);
   };
 
-  if (filtroAlerta === 'favoritos') { 
-    datosAlerta = insumosVivos.filter(i => i.favorito); 
-    tituloAlerta = currentUser.rol === 'owner' ? "Todos los Favoritos" : "Mis Favoritos"; 
-  } 
-  else if (filtroAlerta === 'riesgo') { 
-    datosAlerta = insumosVivos.filter(i => i.favorito && i.supervivencia <= uUrgenciaApp); 
-    tituloAlerta = "Insumos en Riesgo Crítico"; 
-  } 
-  else if (filtroAlerta === 'ocs') { 
-    datosAlerta = insumosVivos.filter(i => i.ocDemorada > 0); 
-    tituloAlerta = "Órdenes de Compra Demoradas"; 
-  } 
-  else if (filtroAlerta === 'solpeds_viejas') {
-    datosAlerta = insumosVivos.filter(ins => 
-      (ins.detalleSolpeds || []).some(sp => {
-        const fechaBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
-        if (!fechaBase) return false;
-        return parsearFechaApp(fechaBase) < hace10DiasApp;
-      })
-    );
-    tituloAlerta = "SOLPEDS Emitidas s/ OC (+10 Días)";
-  }
-  else if (filtroAlerta === 'tickets_abiertos') {
-    // Agrupa por ID de insumo único para no duplicar tickets si hay varios reclamos en un mismo hilo
-    const insumosConTicket = [...new Set(reclamos.filter(r => r.estado === 'ABIERTO').map(r => r.insumoId))];
-    datosAlerta = insumosVivos.filter(i => insumosConTicket.includes(i.id));
-    tituloAlerta = "Insumos con Reclamos Activos";
-  } else if (filtroAlerta === 'oc_pend_aprobacion') {
-    datosAlerta = insumosVivos.filter(i => 
-      i.detalleOCs && i.detalleOCs.some(oc => 
-        String(oc.estado || '').toUpperCase().includes('PROCESO') || 
-        String(oc.estado || '').toUpperCase().includes('AUTORIZAC') || 
-        String(oc.estado || '').toUpperCase().includes('PENDIENTE')
-      )
-    );
-    tituloAlerta = "Órdenes de Compra a Firmar / Pendientes";
+  else if (filtroAlerta === 'insumos_a_reclamar') {
+    const umbralMail = config?.umbralMailRiesgo !== undefined ? config.umbralMailRiesgo : 30;
+    datosAlerta = insumosVivos.filter(i => {
+      if (!i.favorito || i.ticketReclamo) return false;
+      const stock = Number(i.stockActual) || 0;
+      const consumoPromedio = Number(i.consumoPromedio) || 0;
+      const consumoDiario = consumoPromedio > 0 ? (consumoPromedio / 26) : 0;
+      let coberturaReal = 999;
+      if (consumoDiario > 0) coberturaReal = stock / consumoDiario;
+      else if (stock === 0) coberturaReal = 0;
+      return Math.round(coberturaReal) <= umbralMail;
+    });
+    tituloAlerta = "Insumos a Reclamar";
   }
   else if (filtroAlerta === 'todos') { 
     datosAlerta = insumosVivos; 
