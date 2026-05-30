@@ -92,10 +92,20 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
          umbral = Number(config.umbralMailRiesgo);
       }
 
-      // 1. Detectar Huérfanos
+      // 1. Detectar Huérfanos (Fórmula Pura)
       insumos.forEach(ins => {
-        // ins.supervivencia ya viene de app.txt y equivale a stock/consumo
-        if (!ins.discontinuado && ins.favorito && Math.round(ins.supervivencia) <= umbral && !ins.ticketReclamo) {
+        const stockActual = Number(ins.stockActual) || 0;
+        const consumoPromedio = Number(ins.consumoPromedio) || 0;
+        const consumoDiario = consumoPromedio > 0 ? (consumoPromedio / 26) : 0;
+        
+        let coberturaReal = 999;
+        if (consumoDiario > 0) {
+          coberturaReal = stockActual / consumoDiario;
+        } else if (stockActual === 0) {
+          coberturaReal = 0;
+        }
+
+        if (!ins.discontinuado && ins.favorito && Math.round(coberturaReal) <= umbral && !ins.ticketReclamo) {
           const opUnificado = obtenerNombreReal(ins.owner);
           if (!mapa[opUnificado]) mapa[opUnificado] = { nombre: opUnificado, huerfanos: 0, activos: 0 };
           mapa[opUnificado].huerfanos++;
@@ -123,7 +133,7 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
         // ==============================================================================
         // ⚠️ IMPORTANTE FERNANDO: Pegá acá la URL de tu Web App de Google Apps Script ⚠️
         // ==============================================================================
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby-02Klnl3pyYPeK1MYan5M8-Dvxj0597pD0-7tHc0nIbKyantL-1GiMUjWOe0c2Ysr/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXY0naXy9GBxI606pN0BGqrib8FdcNeBsvMheka5jotU1sUDp4Rn7kHeldvgaWxUml/exec"; 
         
         await fetch(SCRIPT_URL, {
           method: 'POST',
