@@ -606,17 +606,8 @@ const App = () => {
     tituloAlerta = "Órdenes de Compra a Firmar / Pendientes";
   }
   else if (filtroAlerta === 'insumos_a_reclamar') {
-    const umbralMail = config?.umbralMailRiesgo !== undefined ? config.umbralMailRiesgo : 30;
-    datosAlerta = insumosVivos.filter(i => {
-      if (!i.favorito || i.ticketReclamo) return false;
-      const stock = Number(i.stockActual) || 0;
-      const consumoPromedio = Number(i.consumoPromedio) || 0;
-      const consumoDiario = consumoPromedio > 0 ? (consumoPromedio / 26) : 0;
-      let coberturaReal = 999;
-      if (consumoDiario > 0) coberturaReal = stock / consumoDiario;
-      else if (stock === 0) coberturaReal = 0;
-      return Math.round(coberturaReal) <= umbralMail;
-    });
+    const umbral = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 30;
+    datosAlerta = insumosVivos.filter(i => i.favorito && i.escalados === 0 && Math.round(i.supervivencia) <= umbral);
     tituloAlerta = "Insumos a Reclamar";
   }
   else if (filtroAlerta === 'todos') { 
