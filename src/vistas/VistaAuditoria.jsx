@@ -105,7 +105,7 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
           coberturaReal = 0;
         }
 
-        if (!ins.discontinuado && ins.favorito && Math.round(coberturaReal) <= umbral && !ins.ticketReclamo) {
+        if (!ins.discontinuado && ins.favorito && Math.round(ins.supervivencia) <= umbral && ins.escalados === 0) {
           const opUnificado = obtenerNombreReal(ins.owner);
           if (!mapa[opUnificado]) mapa[opUnificado] = { nombre: opUnificado, huerfanos: 0, activos: 0 };
           mapa[opUnificado].huerfanos++;
