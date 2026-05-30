@@ -155,7 +155,10 @@ const VistaGestion = ({
                 {itemsSeleccionados.length > 0 && (
                   <button onClick={() => {
                       const itemsCompletos = doc.items.filter(i => itemsSeleccionados.includes(i.id));
-                      if (itemsCompletos.length > 0 && typeof abrirRedactorReclamo === 'function') abrirRedactorReclamo(itemsCompletos);
+                      if (itemsCompletos.length > 0 && typeof abrirRedactorReclamo === 'function') {
+                          // MAGIA: Le sumamos el proveedor al contexto
+                          abrirRedactorReclamo(itemsCompletos, { numero: doc.numero, tipo: doc.tipo, proveedor: doc.proveedor });
+                      }
                     }}
                     className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-black uppercase text-[10px] tracking-widest px-4 py-2.5 rounded-xl shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2"
                   >
