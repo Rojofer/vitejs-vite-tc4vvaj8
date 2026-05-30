@@ -41,19 +41,65 @@ const VistaGestion = ({
   const [docsExpandidos, setDocsExpandidos] = useState({});
   const [seleccionadosPorDoc, setSeleccionadosPorDoc] = useState({});
 
-  // --- MOTOR INTELIGENTE DE AGRUPACIÓN ---
+  // --- MOTOR INTELIGENTE DE AGRUPACIÓN (CORREGIDO) ---
   const agruparPorDocumento = (datosBase) => {
     const mapa = {};
-    datosBase.forEach(ins => {
-      let docTipo = 'SIN DOCUMENTO'; let docNumero = ''; let idAgrupacion = 'SIN_DOC';
-      if (ins.pendienteAutorizacion) { docTipo = 'PENDIENTE AUTORIZACIÓN'; idAgrupacion = 'PEND_AUTORIZ'; }
-      else if (ins.numeroOC) { docTipo = 'OC'; docNumero = ins.numeroOC; idAgrupacion = `OC_${ins.numeroOC}`; }
-      else if (ins.numeroSolped) { docTipo = 'SOLPED'; docNumero = ins.numeroSolped; idAgrupacion = `SOL_${ins.numeroSolped}`; }
 
-      if (!mapa[idAgrupacion]) mapa[idAgrupacion] = { id: idAgrupacion, tipo: docTipo, numero: docNumero, proveedor: ins.proveedor || ins.detalleOCs?.proveedor || 'S/P', items: [] };
-      mapa[idAgrupacion].items.push({ ...ins, consumoMensual: Math.round(Number(ins.consumoPromedio) || 0) });
+    datosBase.forEach(ins => {
+      let tieneDoc = false;
+
+      // 1. Desarmar y agrupar por Órdenes de Compra (OC)
+      if (ins.detalleOCs && ins.detalleOCs.length > 0) {
+        ins.detalleOCs.forEach(oc => {
+          const num = oc.numero || 'S/N';
+          const estadoOC = String(oc.estado || '').toUpperCase();
+          const esPendiente = estadoOC.includes('PROCESO') || estadoOC.includes('AUTORIZAC') || estadoOC.includes('PENDIENTE');
+          const docTipo = esPendiente ? 'OC A FIRMAR' : 'OC';
+          const idAgrupacion = `${docTipo}_${num}`;
+
+          if (!mapa[idAgrupacion]) {
+             mapa[idAgrupacion] = { id: idAgrupacion, tipo: docTipo, numero: num, proveedor: oc.proveedor || ins.proveedor || 'S/P', items: [] };
+          }
+          // Evitamos duplicados si la base datos tiene ruido, y le inyectamos el numeroOC temporal para que App.jsx lo lea en el asunto del mail
+          if (!mapa[idAgrupacion].items.some(i => i.id === ins.id)) {
+             mapa[idAgrupacion].items.push({ ...ins, consumoMensual: Math.round(Number(ins.consumoPromedio) || 0), numeroOC: num });
+          }
+          tieneDoc = true;
+        });
+      }
+
+      // 2. Desarmar y agrupar por Solpeds
+      if (ins.detalleSolpeds && ins.detalleSolpeds.length > 0) {
+        ins.detalleSolpeds.forEach(sp => {
+          const num = sp.numero || 'S/N';
+          const idAgrupacion = `SOL_${num}`;
+
+          if (!mapa[idAgrupacion]) {
+             mapa[idAgrupacion] = { id: idAgrupacion, tipo: 'SOLPED', numero: num, proveedor: 'INTERNO', items: [] };
+          }
+          if (!mapa[idAgrupacion].items.some(i => i.id === ins.id)) {
+             mapa[idAgrupacion].items.push({ ...ins, consumoMensual: Math.round(Number(ins.consumoPromedio) || 0), numeroSolped: num });
+          }
+          tieneDoc = true;
+        });
+      }
+
+      // 3. Los materiales que realmente están huérfanos sin ningún documento
+      if (!tieneDoc) {
+        const idAgrupacion = 'SIN_DOC';
+        if (!mapa[idAgrupacion]) {
+           mapa[idAgrupacion] = { id: idAgrupacion, tipo: 'SIN DOCUMENTO', numero: 'S/P', proveedor: ins.proveedor || 'S/P', items: [] };
+        }
+        mapa[idAgrupacion].items.push({ ...ins, consumoMensual: Math.round(Number(ins.consumoPromedio) || 0) });
+      }
     });
-    return Object.values(mapa);
+
+    // Ordenamos para que las OCs y Solpeds queden arriba, y los 'SIN DOCUMENTO' abajo
+    return Object.values(mapa).sort((a, b) => {
+      if (a.tipo === 'SIN DOCUMENTO') return 1;
+      if (b.tipo === 'SIN DOCUMENTO') return -1;
+      return a.id.localeCompare(b.id);
+    });
   };
 
   const toggleExpandirDoc = (id) => setDocsExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
@@ -100,7 +146,7 @@ const VistaGestion = ({
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${doc.tipo === 'OC' ? 'bg-sky-100 text-sky-800' : doc.tipo === 'SOLPED' ? 'bg-indigo-100 text-indigo-800' : 'bg-purple-100 text-purple-800'}`}>{doc.tipo}</span>
+                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${doc.tipo === 'OC' ? 'bg-sky-100 text-sky-800' : doc.tipo === 'OC A FIRMAR' ? 'bg-cyan-100 text-cyan-800' : doc.tipo === 'SOLPED' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-500 border border-slate-200 shadow-sm'}`}>{doc.tipo}</span>
                       <span className="font-black text-sm text-slate-800 tracking-tight">{doc.numero || 'PENDIENTE'}</span>
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">PROVEEDOR: <span className="text-slate-600">{doc.proveedor}</span></p>
