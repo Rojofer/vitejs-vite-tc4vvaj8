@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Users, Activity, Mail, TrendingUp, Calendar, Database, X, Plus, Trash2, Download, Upload, Save, Star, Clock, Factory, Eye, CheckCircle } from 'lucide-react';
+import { Settings, Users, Activity, Mail, TrendingUp, Calendar, Database, X, Plus, Trash2, Download, Upload, Save, Star, Clock, Factory, Eye, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImportar }) => {
@@ -7,6 +7,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
   const [localConfig, setLocalConfig] = useState(configInicial || {});
   const [nuevoFeriado, setNuevoFeriado] = useState("");
   const fileInputRef = useRef(null);
+  const [expandedTemplates, setExpandedTemplates] = useState([]);
 
   useEffect(() => {
     setLocalConfig(configInicial || {});
@@ -70,6 +71,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                       ...localConfig,
                       plantillasDinamicas: [...getPlantillas(), { id: idNuevo, nombre: "Nueva Plantilla", isNormal: false, isUrgente: false, isSolped: false, asunto: "", cuerpo: "", destino: "compras" }]
                     });
+                    setExpandedTemplates([...expandedTemplates, idNuevo]);
                   }}
                   className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/30 transition-all"
                 >
@@ -81,10 +83,15 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                 <AnimatePresence>
                 {getPlantillas().map((tpl, index) => (
                   <motion.div key={tpl.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm group">
-                    
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
-                      <div className="flex-1 flex gap-3">
-                        <div className="bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center shrink-0">
+                    <div className={`flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 ${expandedTemplates.includes(tpl.id) ? 'border-b border-slate-100 pb-4 mb-4' : ''}`}>
+                      <div className="flex-1 flex gap-3 w-full xl:w-auto items-center">
+                        <button 
+                           onClick={() => expandedTemplates.includes(tpl.id) ? setExpandedTemplates(expandedTemplates.filter(id => id !== tpl.id)) : setExpandedTemplates([...expandedTemplates, tpl.id])} 
+                           className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 text-slate-400 hover:text-slate-700 shrink-0"
+                        >
+                          {expandedTemplates.includes(tpl.id) ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
+                        <div className="bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center shrink-0 hidden sm:flex">
                            <span className="text-[10px] font-black text-slate-500">ID: {tpl.id.slice(-4)}</span>
                         </div>
                         <input 
@@ -100,64 +107,50 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                         />
                       </div>
                       
-                      <div className="flex gap-2 shrink-0">
-                        <button 
-                           onClick={() => { const nuevas = [...getPlantillas()]; nuevas[index].isNormal = !nuevas[index].isNormal; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }}
-                           className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all border ${tpl.isNormal ? 'bg-slate-800 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}
-                           title="Usar por defecto para Seguimientos Normales"
-                        > Default Normal </button>
-                        <button 
-                           onClick={() => { const nuevas = [...getPlantillas()]; nuevas[index].isUrgente = !nuevas[index].isUrgente; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }}
-                           className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all border ${tpl.isUrgente ? 'bg-red-500 text-white border-red-600' : 'bg-white text-slate-400 border-slate-200 hover:bg-red-50 hover:text-red-500'}`}
-                           title="Usar por defecto para Insumos en Quiebre"
-                        > Default Urgente </button>
-                        <button 
-                           onClick={() => { const nuevas = [...getPlantillas()]; nuevas[index].isSolped = !nuevas[index].isSolped; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }}
-                           className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all border ${tpl.isSolped ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200 hover:bg-indigo-50 hover:text-indigo-500'}`}
-                           title="Usar por defecto para Solpeds sin OC"
-                        > Default Solped </button>
-                        <button 
-                           onClick={() => {
-                             if(window.confirm(`¿Eliminar plantilla ${tpl.nombre}?`)) {
-                               const nuevas = getPlantillas().filter((_, i) => i !== index);
-                               setLocalConfig({...localConfig, plantillasDinamicas: nuevas});
-                             }
-                           }}
-                           className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                        > <Trash2 size={16}/> </button>
+                      <div className="flex gap-2 shrink-0 flex-wrap">
+                        <button onClick={() => { const nuevas = [...getPlantillas()]; nuevas[index].isNormal = !nuevas[index].isNormal; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all border ${tpl.isNormal ? 'bg-slate-800 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`} title="Usar por defecto para Seguimientos Normales"> Default Normal </button>
+                        <button onClick={() => { const nuevas = [...getPlantillas()]; nuevas[index].isUrgente = !nuevas[index].isUrgente; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all border ${tpl.isUrgente ? 'bg-red-500 text-white border-red-600' : 'bg-white text-slate-400 border-slate-200 hover:bg-red-50 hover:text-red-500'}`} title="Usar por defecto para Insumos en Quiebre"> Default Urgente </button>
+                        <button onClick={() => { const nuevas = [...getPlantillas()]; nuevas[index].isSolped = !nuevas[index].isSolped; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all border ${tpl.isSolped ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200 hover:bg-indigo-50 hover:text-indigo-500'}`} title="Usar por defecto para Solpeds sin OC"> Default Solped </button>
+                        <button onClick={() => { if(window.confirm(`¿Eliminar plantilla ${tpl.nombre}?`)) { const nuevas = getPlantillas().filter((_, i) => i !== index); setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); } }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition-colors"> <Trash2 size={16}/> </button>
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="flex flex-col md:flex-row gap-4 items-center">
-                         <div className="flex-1 w-full">
-                           <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Estructura del Asunto</label>
-                           <input type="text" value={tpl.asunto} onChange={(e) => { const nuevas = [...getPlantillas()]; nuevas[index].asunto = e.target.value; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-50 transition-all placeholder:text-slate-300 shadow-inner" placeholder="Ej: URGENTE: {nombre} - {codigo}" />
-                         </div>
-                         <div className="w-full md:w-48 shrink-0">
-                           <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Bandeja Destino</label>
-                           <select value={tpl.destino || 'compras'} onChange={(e) => { const nuevas = [...getPlantillas()]; nuevas[index].destino = e.target.value; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase text-slate-700 outline-none focus:border-sky-500 transition-all shadow-sm">
-                             <option value="compras">Sector Compras</option>
-                             <option value="planta">Interno Planta</option>
-                           </select>
-                         </div>
-                      </div>
-                      
-                      <div>
-                        <div className="flex justify-between items-end mb-1.5">
-                           <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Cuerpo del Correo</label>
-                           <div className="flex gap-1.5 flex-wrap justify-end">
-                             <span className="text-[8px] font-mono bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded cursor-help" title="Nombre del insumo">{"{nombre}"}</span>
-                             <span className="text-[8px] font-mono bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded cursor-help" title="Código SAP">{"{codigo}"}</span>
-                             <span className="text-[8px] font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded cursor-help" title="Días para quiebre">{"{dias}"}</span>
-                             <span className="text-[8px] font-mono bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded cursor-help" title="Listado OC demoradas">{"{ocs}"}</span>
-                             <span className="text-[8px] font-mono bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded cursor-help" title="Listado OC a futuro">{"{ocs_a_adelantar}"}</span>
-                             <span className="text-[8px] font-mono bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded cursor-help" title="Listado S/P sin OC">{"{solpeds}"}</span>
-                           </div>
-                        </div>
-                        <textarea value={tpl.cuerpo} onChange={(e) => { const nuevas = [...getPlantillas()]; nuevas[index].cuerpo = e.target.value; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-50 transition-all h-40 resize-y shadow-inner leading-relaxed" placeholder="Escribí acá el cuerpo del mensaje. Usá las variables para que se autocompleten solas..." />
-                      </div>
-                    </div>
+                    <AnimatePresence>
+                      {expandedTemplates.includes(tpl.id) && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                          <div className="space-y-4 pt-2">
+                            <div className="flex flex-col md:flex-row gap-4 items-center">
+                               <div className="flex-1 w-full">
+                                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Estructura del Asunto</label>
+                                 <input type="text" value={tpl.asunto} onChange={(e) => { const nuevas = [...getPlantillas()]; nuevas[index].asunto = e.target.value; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-50 transition-all placeholder:text-slate-300 shadow-inner" placeholder="Ej: URGENTE: {nombre} - {codigo}" />
+                               </div>
+                               <div className="w-full md:w-48 shrink-0">
+                                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Bandeja Destino</label>
+                                 <select value={tpl.destino || 'compras'} onChange={(e) => { const nuevas = [...getPlantillas()]; nuevas[index].destino = e.target.value; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase text-slate-700 outline-none focus:border-sky-500 transition-all shadow-sm">
+                                   <option value="compras">Sector Compras</option>
+                                   <option value="planta">Interno Planta</option>
+                                 </select>
+                               </div>
+                            </div>
+                            
+                            <div>
+                               <div className="flex justify-between items-end mb-1.5">
+                                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Cuerpo del Correo</label>
+                                 <div className="flex gap-1.5 flex-wrap justify-end">
+                                   <span className="text-[8px] font-mono bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded cursor-help" title="Nombre del insumo">{"{nombre}"}</span>
+                                   <span className="text-[8px] font-mono bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded cursor-help" title="Código SAP">{"{codigo}"}</span>
+                                   <span className="text-[8px] font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded cursor-help" title="Días para quiebre">{"{dias}"}</span>
+                                   <span className="text-[8px] font-mono bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded cursor-help" title="Listado OC demoradas">{"{ocs}"}</span>
+                                   <span className="text-[8px] font-mono bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded cursor-help" title="Listado OC a futuro">{"{ocs_a_adelantar}"}</span>
+                                   <span className="text-[8px] font-mono bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded cursor-help" title="Listado S/P sin OC">{"{solpeds}"}</span>
+                                 </div>
+                              </div>
+                              <textarea value={tpl.cuerpo} onChange={(e) => { const nuevas = [...getPlantillas()]; nuevas[index].cuerpo = e.target.value; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-50 transition-all h-40 resize-y shadow-inner leading-relaxed" placeholder="Escribí acá el cuerpo del mensaje..." />
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 ))}
                 </AnimatePresence>
@@ -186,80 +179,98 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                 }} className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-sky-500/30 transition-all"><Plus size={14}/> Agregar Contacto</button>
               </div>
 
-              <div className="grid gap-4">
-                {(localConfig.contactos || []).map((contacto, idx) => (
-                  <motion.div key={contacto.id || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row gap-4 p-4 bg-white border border-slate-200 rounded-2xl items-start md:items-center shadow-sm relative group overflow-hidden">
-                    
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${contacto.tipo === 'equipo' ? 'bg-orange-500' : contacto.tipo === 'planta' ? 'bg-purple-500' : 'bg-sky-500'}`}></div>
-                    
-                    <div className="w-full md:w-48 pl-2 shrink-0">
-                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nombre / Cargo</label>
-                      <input type="text" value={contacto.label} onChange={(e) => {
-                        const nuevos = [...localConfig.contactos]; nuevos[idx].label = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos });
-                      }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner" placeholder="Ej: Juan Pérez" />
-                    </div>
-                    
-                    <div className="w-full md:w-32 shrink-0">
-                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">Alias SAP <span className="text-slate-300" title="Nombre exacto que figura en el Excel de SAP">ⓘ</span></label>
-                      <input type="text" value={contacto.alias} onChange={(e) => {
-                        const nuevos = [...localConfig.contactos]; nuevos[idx].alias = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos });
-                      }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all uppercase shadow-inner" placeholder="Ej: JPEREZ" />
-                    </div>
-                    
-                    <div className="flex-1 w-full">
-                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Correo Electrónico</label>
-                      <input type="email" value={contacto.email} onChange={(e) => {
-                        const nuevos = [...localConfig.contactos]; nuevos[idx].email = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos });
-                      }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner" placeholder="ejemplo@empresa.com" />
-                    </div>
-                    
-                    <div className="w-full md:w-28 shrink-0">
-                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Sector</label>
-                      <select value={contacto.tipo} onChange={(e) => {
-                        const nuevos = [...localConfig.contactos]; nuevos[idx].tipo = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos });
-                      }} className={`w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-black uppercase outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner ${contacto.tipo === 'equipo' ? 'text-orange-600' : contacto.tipo === 'planta' ? 'text-purple-600' : 'text-sky-600'}`}>
-                        <option value="compras">Compras</option>
-                        <option value="equipo">ERP / Operario</option>
-                        <option value="planta">Directorio Planta</option>
-                      </select>
-                    </div>
-                    
-                    {contacto.tipo === 'equipo' && (
-                       <div className="w-full md:w-auto shrink-0 flex flex-col gap-1.5 border-l border-slate-100 pl-3">
-                         <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={contacto.editorFavoritos || false} onChange={(e) => { const n = [...localConfig.contactos]; n[idx].editorFavoritos = e.target.checked; setLocalConfig({...localConfig, contactos: n}); }} className="w-3.5 h-3.5 text-orange-500 rounded border-slate-300 focus:ring-orange-500" />
-                            <span className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-1"><Star size={10} className="text-yellow-500"/> Editar Favs</span>
-                         </label>
-                         <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={contacto.visionGlobal || false} onChange={(e) => { const n = [...localConfig.contactos]; n[idx].visionGlobal = e.target.checked; setLocalConfig({...localConfig, contactos: n}); }} className="w-3.5 h-3.5 text-sky-500 rounded border-slate-300 focus:ring-sky-500" />
-                            <span className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-1"><Eye size={10} className="text-sky-500"/> Visión Global</span>
-                         </label>
-                       </div>
-                    )}
-                    
-                    <div className="w-full md:w-20 shrink-0">
-                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Etiqueta</label>
-                      <select value={contacto.color || 'slate'} onChange={(e) => {
-                        const nuevos = [...localConfig.contactos]; nuevos[idx].color = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos });
-                      }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner">
-                        <option value="slate">Gris</option>
-                        <option value="emerald">Verde</option>
-                        <option value="purple">Violeta</option>
-                        <option value="blue">Azul</option>
-                        <option value="pink">Rosa</option>
-                        <option value="amber">Ámbar</option>
-                        <option value="indigo">Índigo</option>
-                      </select>
-                    </div>
+              {(() => {
+                const contactosConIndice = (localConfig.contactos || []).map((c, i) => ({ ...c, idxReal: i }));
+                
+                const gruposContactos = [
+                  { id: 'equipo', titulo: 'ERP / Operarios de Planta', items: contactosConIndice.filter(c => c.tipo === 'equipo'), icon: <Activity size={16} className="text-orange-500"/>, color: 'text-orange-800', bg: 'bg-orange-50', border: 'border-orange-200', bar: 'bg-orange-500' },
+                  { id: 'compras', titulo: 'Sector Compras', items: contactosConIndice.filter(c => c.tipo === 'compras'), icon: <Mail size={16} className="text-sky-500"/>, color: 'text-sky-800', bg: 'bg-sky-50', border: 'border-sky-200', bar: 'bg-sky-500' },
+                  { id: 'planta', titulo: 'Directorio General Planta', items: contactosConIndice.filter(c => c.tipo === 'planta'), icon: <Factory size={16} className="text-purple-500"/>, color: 'text-purple-800', bg: 'bg-purple-50', border: 'border-purple-200', bar: 'bg-purple-500' }
+                ];
+                
+                const otrosContactos = contactosConIndice.filter(c => !['equipo', 'compras', 'planta'].includes(c.tipo));
+                if (otrosContactos.length > 0) gruposContactos.push({ id: 'otros', titulo: 'Otros / Sin Clasificar', items: otrosContactos, icon: <Users size={16} className="text-slate-500"/>, color: 'text-slate-800', bg: 'bg-slate-50', border: 'border-slate-200', bar: 'bg-slate-500' });
 
-                    <button onClick={() => {
-                      const nuevos = localConfig.contactos.filter((_, i) => i !== idx); setLocalConfig({ ...localConfig, contactos: nuevos });
-                    }} className="mt-4 md:mt-0 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
-                      <Trash2 size={18} />
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
+                return (
+                  <div className="flex flex-col gap-8">
+                    {gruposContactos.map(grupo => {
+                      if (grupo.items.length === 0) return null;
+                      return (
+                        <div key={grupo.id} className="space-y-4">
+                          <h4 className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 px-4 py-2.5 rounded-xl ${grupo.bg} ${grupo.color} ${grupo.border} border shadow-sm`}>
+                            {grupo.icon} {grupo.titulo} <span className="bg-white/50 px-2 py-0.5 rounded-full text-slate-800">{grupo.items.length}</span>
+                          </h4>
+                          <div className="grid gap-4 pl-1 md:pl-3 border-l-2 border-slate-100">
+                            {grupo.items.map((contacto) => {
+                              const idx = contacto.idxReal;
+                              return (
+                                <motion.div key={contacto.id || idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row gap-4 p-4 bg-white border border-slate-200 rounded-2xl items-start md:items-center shadow-sm relative group overflow-hidden">
+                                  
+                                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${grupo.bar}`}></div>
+                                 
+                                  <div className="w-full md:w-48 pl-2 shrink-0">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nombre / Cargo</label>
+                                    <input type="text" value={contacto.label} onChange={(e) => { const nuevos = [...localConfig.contactos]; nuevos[idx].label = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos }); }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner" placeholder="Ej: Juan Pérez" />
+                                  </div>
+                                  
+                                  <div className="w-full md:w-32 shrink-0">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">Alias SAP <span className="text-slate-300" title="Nombre exacto que figura en el Excel de SAP">ⓘ</span></label>
+                                    <input type="text" value={contacto.alias} onChange={(e) => { const nuevos = [...localConfig.contactos]; nuevos[idx].alias = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos }); }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all uppercase shadow-inner" placeholder="Ej: JPEREZ" />
+                                  </div>
+                                  
+                                  <div className="flex-1 w-full">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Correo Electrónico</label>
+                                    <input type="email" value={contacto.email} onChange={(e) => { const nuevos = [...localConfig.contactos]; nuevos[idx].email = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos }); }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner" placeholder="ejemplo@empresa.com" />
+                                  </div>
+                                  
+                                  <div className="w-full md:w-28 shrink-0">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Sector</label>
+                                    <select value={contacto.tipo} onChange={(e) => { const nuevos = [...localConfig.contactos]; nuevos[idx].tipo = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos }); }} className={`w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-black uppercase outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner ${contacto.tipo === 'equipo' ? 'text-orange-600' : contacto.tipo === 'planta' ? 'text-purple-600' : 'text-sky-600'}`}>
+                                      <option value="compras">Compras</option>
+                                      <option value="equipo">ERP / Operario</option>
+                                      <option value="planta">Directorio Planta</option>
+                                    </select>
+                                  </div>
+                                  
+                                  {contacto.tipo === 'equipo' && (
+                                     <div className="w-full md:w-auto shrink-0 flex flex-col gap-1.5 border-l border-slate-100 pl-3">
+                                       <label className="flex items-center gap-2 cursor-pointer">
+                                          <input type="checkbox" checked={contacto.editorFavoritos || false} onChange={(e) => { const n = [...localConfig.contactos]; n[idx].editorFavoritos = e.target.checked; setLocalConfig({...localConfig, contactos: n}); }} className="w-3.5 h-3.5 text-orange-500 rounded border-slate-300 focus:ring-orange-500" />
+                                          <span className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-1"><Star size={10} className="text-yellow-500"/> Editar Favs</span>
+                                       </label>
+                                       <label className="flex items-center gap-2 cursor-pointer">
+                                          <input type="checkbox" checked={contacto.visionGlobal || false} onChange={(e) => { const n = [...localConfig.contactos]; n[idx].visionGlobal = e.target.checked; setLocalConfig({...localConfig, contactos: n}); }} className="w-3.5 h-3.5 text-sky-500 rounded border-slate-300 focus:ring-sky-500" />
+                                          <span className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-1"><Eye size={10} className="text-sky-500"/> Visión Global</span>
+                                       </label>
+                                     </div>
+                                  )}
+                                  
+                                  <div className="w-full md:w-20 shrink-0">
+                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Color</label>
+                                    <select value={contacto.color || 'slate'} onChange={(e) => { const nuevos = [...localConfig.contactos]; nuevos[idx].color = e.target.value; setLocalConfig({ ...localConfig, contactos: nuevos }); }} className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-500 transition-all shadow-inner">
+                                      <option value="slate">Gris</option>
+                                      <option value="emerald">Verde</option>
+                                      <option value="purple">Violeta</option>
+                                      <option value="blue">Azul</option>
+                                      <option value="pink">Rosa</option>
+                                      <option value="amber">Ámbar</option>
+                                      <option value="indigo">Índigo</option>
+                                    </select>
+                                  </div>
+
+                                  <button onClick={() => { const nuevos = localConfig.contactos.filter((_, i) => i !== idx); setLocalConfig({ ...localConfig, contactos: nuevos }); }} className="mt-4 md:mt-0 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                                    <Trash2 size={18} />
+                                  </button>
+                                </motion.div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </motion.div>
           )}
 
@@ -305,7 +316,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                       </button>
                     </div>
                  </div>
-              </div>
+               </div>
 
               {/* BLOQUE 2: MOTOR DE ALERTAS AUTOMÁTICAS */}
               <div className="bg-white border border-indigo-100 p-6 rounded-2xl shadow-sm">
