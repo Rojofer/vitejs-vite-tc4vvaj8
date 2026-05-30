@@ -133,7 +133,7 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
         // ==============================================================================
         // ⚠️ IMPORTANTE FERNANDO: Pegá acá la URL de tu Web App de Google Apps Script ⚠️
         // ==============================================================================
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXY0naXy9GBxI606pN0BGqrib8FdcNeBsvMheka5jotU1sUDp4Rn7kHeldvgaWxUml/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbweto_anTsSu9w_KI_cEbdwoQQix4op6uV_TuhdZVENL5KCTgFy4hOrEaKEPtJjtVBW/exec"; 
         
         await fetch(SCRIPT_URL, {
           method: 'POST',
