@@ -406,8 +406,7 @@ const App = () => {
     return { asunto: procesar(template.asunto || "⚠️ Asunto vacío"), cuerpo: procesar(template.cuerpo || "⚠️ Cuerpo vacío"), destino: template.destino || "compras" };
   };
 
-  const abrirRedactorReclamo = (dataPulsada) => {
-    // 1. Detección Inteligente: ¿Es un insumo o un lote (array)?
+  const abrirRedactorReclamo = (dataPulsada, docContext = null) => {
     const lote = Array.isArray(dataPulsada) ? dataPulsada : [dataPulsada];
     const insumoBase = insumos.find(i => i.id === lote[0].id) || lote[0];
 
@@ -422,21 +421,89 @@ const App = () => {
     if (!tInicial) tInicial = plantillas.find(p => p.isNormal);
     if (!tInicial) tInicial = plantillas[0];
     
-    // 2. Truco para la plantilla: Si es lote, inyectamos el título agrupado
-    const docReferencia = insumoBase.numeroOC ? `OC #${insumoBase.numeroOC}` : (insumoBase.numeroSolped ? `S/P #${insumoBase.numeroSolped}` : 'Varios');
-    const insumoParaPlantilla = lote.length > 1 ? { ...insumoBase, nombre: `LOTE DE ${lote.length} INSUMOS (${docReferencia})`, codigo: "MULTIPLES" } : insumoBase;
+    // AISLAMIENTO PARA QUE LA PLANTILLA BASE NO SE ENSUCIE
+    let ocAisladas = insumoBase.detalleOCs || [];
+    let spAisladas = insumoBase.detalleSolpeds || [];
+    if (docContext) {
+        if (docContext.tipo.includes('OC')) {
+            ocAisladas = ocAisladas.filter(oc => String(oc.numero) === String(docContext.numero));
+            spAisladas = []; 
+        } else if (docContext.tipo.includes('SOLPED')) {
+            spAisladas = spAisladas.filter(sp => String(sp.numero) === String(docContext.numero));
+            ocAisladas = [];
+        }
+    }
+
+    const docReferencia = docContext ? `${docContext.tipo} #${docContext.numero}` : (insumoBase.numeroOC ? `OC #${insumoBase.numeroOC}` : 'Varios');
+    
+    const insumoParaPlantilla = { 
+        ...insumoBase, 
+        detalleOCs: ocAisladas, 
+        detalleSolpeds: spAisladas,
+        nombre: lote.length > 1 ? `LOTE DE ${lote.length} INSUMOS (${docReferencia})` : insumoBase.nombre, 
+        codigo: lote.length > 1 ? "MULTIPLES" : insumoBase.codigo 
+    };
 
     const { asunto, cuerpo, destino } = aplicarPlantilla(insumoParaPlantilla, tInicial.id);
     const ticketActual = insumoBase.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
-    // 3. Inyectar la lista de los insumos al final del mail si es lote
+    // --- MAGIA VIP: REDACCIÓN ESTRUCTURADA PARA LOTES ---
     let cuerpoFinal = cuerpo;
+    
     if (lote.length > 1) {
-        const detalleLote = lote.map(i => `- ${i.codigo} | ${i.nombre} (Días: ${Math.round(i.supervivencia)})`).join('\n');
-        cuerpoFinal += `\n\nMateriales afectados en este ticket:\n${detalleLote}`;
+        const provMail = docContext?.proveedor || insumoBase.proveedor || 'S/P';
+        let bloqueDetalle = `📄 DOCUMENTO: ${docReferencia}\n🏢 PROVEEDOR: ${provMail}\n\n`;
+        
+        lote.forEach(item => {
+            bloqueDetalle += `🔸 [${item.codigo}] ${item.nombre}\n`;
+            bloqueDetalle += `     ↳ Cobertura actual: ${Math.round(item.supervivencia)} Días\n`;
+            
+            if (docContext && docContext.tipo.includes('OC') && item.detalleOCs) {
+                const ocsItem = item.detalleOCs.filter(o => String(o.numero) === String(docContext.numero));
+                if (ocsItem.length > 0) {
+                    bloqueDetalle += `     ↳ Entregas pendientes:\n`;
+                    let totalPend = 0;
+                    ocsItem.forEach(oc => {
+                        const cant = Number(oc.cantidad) || 0;
+                        totalPend += cant;
+                        const fechaStr = oc.fecha || 'Sin fecha';
+                        bloqueDetalle += `          • ${cant.toLocaleString('es-AR')} un. (Fecha SAP: ${fechaStr})\n`;
+                    });
+                    bloqueDetalle += `     ↳ TOTAL ADEUDADO: ${totalPend.toLocaleString('es-AR')} un.\n`;
+                }
+            } else if (docContext && docContext.tipo.includes('SOLPED') && item.detalleSolpeds) {
+                const spsItem = item.detalleSolpeds.filter(s => String(s.numero) === String(docContext.numero));
+                if (spsItem.length > 0) {
+                    bloqueDetalle += `     ↳ Solicitudes pendientes:\n`;
+                    let totalPend = 0;
+                    spsItem.forEach(sp => {
+                        const cant = Number(sp.cantidad) || 0;
+                        totalPend += cant;
+                        const fechaStr = sp.fechaCreacion || sp.fecha || 'Sin fecha';
+                        bloqueDetalle += `          • ${cant.toLocaleString('es-AR')} un. (Fecha SAP: ${fechaStr})\n`;
+                    });
+                    bloqueDetalle += `     ↳ TOTAL SOLICITADO: ${totalPend.toLocaleString('es-AR')} un.\n`;
+                }
+            }
+            bloqueDetalle += `\n`;
+        });
+
+        // Interceptamos la plantilla original y metemos nuestro bloque exacto
+        let rawCuerpo = tInicial.cuerpo;
+        rawCuerpo = rawCuerpo.replace(/{nombre}/g, `LOTE DE ${lote.length} INSUMOS`);
+        rawCuerpo = rawCuerpo.replace(/{codigo}/g, "MULTIPLES");
+        rawCuerpo = rawCuerpo.replace(/{dias}/g, "CRÍTICO");
+        
+        // Reemplazamos las variables de tu plantilla por este bloque
+        rawCuerpo = rawCuerpo.replace(/{ocs}/g, bloqueDetalle.trim());
+        rawCuerpo = rawCuerpo.replace(/{solpeds}/g, bloqueDetalle.trim());
+        rawCuerpo = rawCuerpo.replace(/{ocs_a_adelantar}/g, bloqueDetalle.trim());
+        
+        cuerpoFinal = rawCuerpo;
     }
 
+    // DESTINATARIOS
     let destinatariosMatch = [];
     if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
         const txtOwner = String(insumoBase.owner).trim().toLowerCase();
@@ -446,7 +513,7 @@ const App = () => {
 
     setReclamoDraft({ 
       insumo: insumoBase, 
-      lote: lote, // Guardamos el lote completo para impactar BD
+      lote: lote,
       destinatarios: destinatariosMatch, 
       asunto: asuntoConTicket, 
       cuerpo: cuerpoFinal, 
