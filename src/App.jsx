@@ -406,11 +406,14 @@ const App = () => {
     return { asunto: procesar(template.asunto || "⚠️ Asunto vacío"), cuerpo: procesar(template.cuerpo || "⚠️ Cuerpo vacío"), destino: template.destino || "compras" };
   };
 
-  const abrirRedactorReclamo = (insumoPulsado) => {
-    const insumo = insumos.find(i => i.id === insumoPulsado.id) || insumoPulsado;
+  const abrirRedactorReclamo = (dataPulsada) => {
+    // 1. Detección Inteligente: ¿Es un insumo o un lote (array)?
+    const lote = Array.isArray(dataPulsada) ? dataPulsada : [dataPulsada];
+    const insumoBase = insumos.find(i => i.id === lote[0].id) || lote[0];
+
     const umbral = config?.umbralUrgencia || 15;
-    const isGrave = Math.round(insumo.supervivencia) <= umbral;
-    const hasSolpeds = insumo.sp > 0;
+    const isGrave = lote.some(i => Math.round(i.supervivencia) <= umbral);
+    const hasSolpeds = lote.some(i => i.sp > 0);
     const plantillas = getPlantillasDinamicas();
     
     let tInicial = null;
@@ -419,22 +422,34 @@ const App = () => {
     if (!tInicial) tInicial = plantillas.find(p => p.isNormal);
     if (!tInicial) tInicial = plantillas[0];
     
-    const { asunto, cuerpo, destino } = aplicarPlantilla(insumo, tInicial.id);
-    const ticketActual = insumo.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
+    // 2. Truco para la plantilla: Si es lote, inyectamos el título agrupado
+    const docReferencia = insumoBase.numeroOC ? `OC #${insumoBase.numeroOC}` : (insumoBase.numeroSolped ? `S/P #${insumoBase.numeroSolped}` : 'Varios');
+    const insumoParaPlantilla = lote.length > 1 ? { ...insumoBase, nombre: `LOTE DE ${lote.length} INSUMOS (${docReferencia})`, codigo: "MULTIPLES" } : insumoBase;
+
+    const { asunto, cuerpo, destino } = aplicarPlantilla(insumoParaPlantilla, tInicial.id);
+    const ticketActual = insumoBase.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
+    // 3. Inyectar la lista de los insumos al final del mail si es lote
+    let cuerpoFinal = cuerpo;
+    if (lote.length > 1) {
+        const detalleLote = lote.map(i => `- ${i.codigo} | ${i.nombre} (Días: ${Math.round(i.supervivencia)})`).join('\n');
+        cuerpoFinal += `\n\nMateriales afectados en este ticket:\n${detalleLote}`;
+    }
+
     let destinatariosMatch = [];
-    if (insumo.owner && insumo.owner !== "Sin asignar") { // [cite: 194]
-        const txtOwner = String(insumo.owner).trim().toLowerCase(); // [cite: 194]
-        const contacto = (config.contactos || []).find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner)); // [cite: 195]
-        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id); // 
+    if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
+        const txtOwner = String(insumoBase.owner).trim().toLowerCase();
+        const contacto = (config.contactos || []).find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner));
+        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
     }
 
     setReclamoDraft({ 
-      insumo, 
+      insumo: insumoBase, 
+      lote: lote, // Guardamos el lote completo para impactar BD
       destinatarios: destinatariosMatch, 
       asunto: asuntoConTicket, 
-      cuerpo, 
+      cuerpo: cuerpoFinal, 
       tipoPlantilla: tInicial.id, 
       tipoDestino: destino, 
       showDestinatarios: destinatariosMatch.length === 0,
@@ -443,13 +458,23 @@ const App = () => {
   };
 
   const procesarGuardadoBD = async (draft) => {
+    const loteIds = draft.lote ? draft.lote.map(i => i.id) : [draft.insumo.id];
+
     await addDoc(collection(db, "reclamos"), { 
-      insumoId: draft.insumo.id, operario: currentUser.nombre, mensaje: draft.asunto, 
-      cuerpoOriginal: draft.cuerpo, fecha: serverTimestamp(), estado: "ABIERTO", tipo: draft.tipoDestino 
+      insumoId: draft.insumo.id, 
+      insumosLoteIds: loteIds, // Registramos todos los involucrados
+      operario: currentUser.nombre, 
+      mensaje: draft.asunto, 
+      cuerpoOriginal: draft.cuerpo, 
+      fecha: serverTimestamp(), 
+      estado: "ABIERTO", 
+      tipo: draft.tipoDestino 
     });
-    let updates = {};
-    updates.ticketReclamo = draft.ticketBorrador;
-    await updateDoc(doc(db, "insumos", draft.insumo.id), updates);
+
+    // Impactar el Ticket en TODOS los insumos seleccionados a la vez
+    for (const id of loteIds) {
+        await updateDoc(doc(db, "insumos", id), { ticketReclamo: draft.ticketBorrador });
+    }
   };
 
   const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
@@ -848,6 +873,7 @@ const App = () => {
               cerrarReclamoManual={cerrarReclamoManual}
               setDialogoConfirmacion={setDialogoConfirmacion}
               setVistaActiva={setVistaActiva}
+              abrirRedactorReclamo={abrirRedactorReclamo}
             />
           )}
         </main>
