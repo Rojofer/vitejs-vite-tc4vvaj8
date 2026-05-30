@@ -248,8 +248,8 @@ const VistaGestion = ({
           (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             
-            {/* GRILLA DE KPIS - 6 COLUMNAS SIMÉTRICAS (ALTA DENSIDAD SAAS) */}
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-10">
+            {/* GRILLA DE KPIS - AJUSTADA PARA 7 TARJETAS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-6">
               {(() => {
                 const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
                 
