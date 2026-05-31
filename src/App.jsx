@@ -361,7 +361,7 @@ const App = () => {
     ];
   };
 
-  const aplicarPlantilla = (insumo, templateId) => {
+  const aplicarPlantilla = (insumo, templateId, docContext = null) => {
     if (!insumo || !config) return { asunto: "", cuerpo: "", destino: "compras" };
     const plantillas = getPlantillasDinamicas();
     const template = plantillas.find(p => p.id === templateId) || plantillas[0];
@@ -378,16 +378,15 @@ const App = () => {
     }) || [];
     const listaOcs = ocsD.length > 0 ? ocsD.map(oc => `- OC ${oc.numero} (${formatoNum(oc.cantidad)} un.)`).join("\n") : "Sin OC Demoradas";
 
-    // NUEVO MOTOR 5: OCs a Futuro para Adelantar
     const ocsAdelantar = insumo.detalleOCs?.filter(oc => { 
       if (ocsIgnoradas.includes(oc.numero)) return false;
       const f = oc.fecha?.seconds ? new Date(oc.fecha.seconds * 1000) : new Date(oc.fecha); 
       const fCheck = new Date(f); fCheck.setHours(0,0,0,0); 
-      return fCheck >= hoyCheck; // Busca las que NO están demoradas
+      return fCheck >= hoyCheck; 
     }).sort((a,b) => {
       const fa = a.fecha?.seconds ? a.fecha.seconds : new Date(a.fecha).getTime()/1000;
       const fb = b.fecha?.seconds ? b.fecha.seconds : new Date(b.fecha).getTime()/1000;
-      return fa - fb; // Ordena de la más próxima a la más lejana
+      return fa - fb; 
     }) || [];
     
     const listaOcsAdelantar = ocsAdelantar.length > 0 ? ocsAdelantar.map(oc => {
@@ -400,8 +399,21 @@ const App = () => {
 
     const procesar = (txt) => {
       if (!txt) return "";
-      // Agregamos el replace de ocs_a_adelantar
-      return txt.replace(/{nombre}/g, insumo.nombre || "").replace(/{codigo}/g, insumo.codigo || "").replace(/{dias}/g, dias >= 999 ? 'Infinitos' : dias).replace(/{fechaQuiebre}/g, fechaQ).replace(/{ocs}/g, listaOcs).replace(/{solpeds}/g, listaSolpeds).replace(/{ocs_a_adelantar}/g, listaOcsAdelantar);
+      // Reemplazos base (Inyectamos soporte para doc_numero y proveedor)
+      let base = txt.replace(/{nombre}/g, insumo.nombre || "")
+                    .replace(/{codigo}/g, insumo.codigo || "")
+                    .replace(/{dias}/g, dias >= 999 ? 'Infinitos' : dias)
+                    .replace(/{fechaQuiebre}/g, fechaQ)
+                    .replace(/{doc_numero}/g, docContext ? docContext.numero : "VARIOS")
+                    .replace(/{proveedor}/g, docContext?.proveedor || insumo.proveedor || "S/P");
+
+      // Si es un LOTE, NO reemplazamos {ocs} acá, lo dejamos intacto para que el ModalRedactor incruste la Sub-Plantilla
+      if (insumo.codigo !== "MULTIPLES") {
+         base = base.replace(/{ocs}/g, listaOcs)
+                    .replace(/{solpeds}/g, listaSolpeds)
+                    .replace(/{ocs_a_adelantar}/g, listaOcsAdelantar);
+      }
+      return base;
     };
     return { asunto: procesar(template.asunto || "⚠️ Asunto vacío"), cuerpo: procesar(template.cuerpo || "⚠️ Cuerpo vacío"), destino: template.destino || "compras" };
   };
@@ -421,7 +433,6 @@ const App = () => {
     if (!tInicial) tInicial = plantillas.find(p => p.isNormal);
     if (!tInicial) tInicial = plantillas[0];
     
-    // AISLAMIENTO PARA QUE LA PLANTILLA BASE NO SE ENSUCIE
     let ocAisladas = insumoBase.detalleOCs || [];
     let spAisladas = insumoBase.detalleSolpeds || [];
     if (docContext) {
@@ -444,66 +455,10 @@ const App = () => {
         codigo: lote.length > 1 ? "MULTIPLES" : insumoBase.codigo 
     };
 
-    const { asunto, cuerpo, destino } = aplicarPlantilla(insumoParaPlantilla, tInicial.id);
+    const { asunto, cuerpo, destino } = aplicarPlantilla(insumoParaPlantilla, tInicial.id, docContext);
     const ticketActual = insumoBase.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
-    // --- MAGIA VIP: REDACCIÓN ESTRUCTURADA PARA LOTES ---
-    let cuerpoFinal = cuerpo;
-    
-    if (lote.length > 1) {
-        const provMail = docContext?.proveedor || insumoBase.proveedor || 'S/P';
-        let bloqueDetalle = `📄 DOCUMENTO: ${docReferencia}\n🏢 PROVEEDOR: ${provMail}\n\n`;
-        
-        lote.forEach(item => {
-            bloqueDetalle += `🔸 [${item.codigo}] ${item.nombre}\n`;
-            bloqueDetalle += `     ↳ Cobertura actual: ${Math.round(item.supervivencia)} Días\n`;
-            
-            if (docContext && docContext.tipo.includes('OC') && item.detalleOCs) {
-                const ocsItem = item.detalleOCs.filter(o => String(o.numero) === String(docContext.numero));
-                if (ocsItem.length > 0) {
-                    bloqueDetalle += `     ↳ Entregas pendientes:\n`;
-                    let totalPend = 0;
-                    ocsItem.forEach(oc => {
-                        const cant = Number(oc.cantidad) || 0;
-                        totalPend += cant;
-                        const fechaStr = oc.fecha || 'Sin fecha';
-                        bloqueDetalle += `          • ${cant.toLocaleString('es-AR')} un. (Fecha SAP: ${fechaStr})\n`;
-                    });
-                    bloqueDetalle += `     ↳ TOTAL ADEUDADO: ${totalPend.toLocaleString('es-AR')} un.\n`;
-                }
-            } else if (docContext && docContext.tipo.includes('SOLPED') && item.detalleSolpeds) {
-                const spsItem = item.detalleSolpeds.filter(s => String(s.numero) === String(docContext.numero));
-                if (spsItem.length > 0) {
-                    bloqueDetalle += `     ↳ Solicitudes pendientes:\n`;
-                    let totalPend = 0;
-                    spsItem.forEach(sp => {
-                        const cant = Number(sp.cantidad) || 0;
-                        totalPend += cant;
-                        const fechaStr = sp.fechaCreacion || sp.fecha || 'Sin fecha';
-                        bloqueDetalle += `          • ${cant.toLocaleString('es-AR')} un. (Fecha SAP: ${fechaStr})\n`;
-                    });
-                    bloqueDetalle += `     ↳ TOTAL SOLICITADO: ${totalPend.toLocaleString('es-AR')} un.\n`;
-                }
-            }
-            bloqueDetalle += `\n`;
-        });
-
-        // Interceptamos la plantilla original y metemos nuestro bloque exacto
-        let rawCuerpo = tInicial.cuerpo;
-        rawCuerpo = rawCuerpo.replace(/{nombre}/g, `LOTE DE ${lote.length} INSUMOS`);
-        rawCuerpo = rawCuerpo.replace(/{codigo}/g, "MULTIPLES");
-        rawCuerpo = rawCuerpo.replace(/{dias}/g, "CRÍTICO");
-        
-        // Reemplazamos las variables de tu plantilla por este bloque
-        rawCuerpo = rawCuerpo.replace(/{ocs}/g, bloqueDetalle.trim());
-        rawCuerpo = rawCuerpo.replace(/{solpeds}/g, bloqueDetalle.trim());
-        rawCuerpo = rawCuerpo.replace(/{ocs_a_adelantar}/g, bloqueDetalle.trim());
-        
-        cuerpoFinal = rawCuerpo;
-    }
-
-    // DESTINATARIOS
     let destinatariosMatch = [];
     if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
         const txtOwner = String(insumoBase.owner).trim().toLowerCase();
@@ -514,16 +469,16 @@ const App = () => {
     setReclamoDraft({ 
       insumo: insumoBase, 
       lote: lote,
+      docContext: docContext, // FUNDAMENTAL GUARDAR ESTO ACÁ PARA EL MODAL
       destinatarios: destinatariosMatch, 
       asunto: asuntoConTicket, 
-      cuerpo: cuerpoFinal, 
+      cuerpo: cuerpo, 
       tipoPlantilla: tInicial.id, 
       tipoDestino: destino, 
       showDestinatarios: destinatariosMatch.length === 0,
       ticketBorrador: ticketActual
     });
   };
-
   const procesarGuardadoBD = async (draft) => {
     const loteIds = draft.lote ? draft.lote.map(i => i.id) : [draft.insumo.id];
 
