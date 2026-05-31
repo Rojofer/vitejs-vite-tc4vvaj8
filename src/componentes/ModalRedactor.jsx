@@ -34,7 +34,7 @@ const ModalRedactor = ({
   }, [plantillas]);
 
   // --- MOTOR 1: PROCESADOR MATEMÁTICO DE ETIQUETAS MÁGICAS ---
-  const procesarTextoAvanzado = (txtOriginal, insumo) => {
+  const procesarTextoAvanzado = (txtOriginal, insumo, lote = [], docContext = null) => {
     let txt = txtOriginal || "";
     const hoy = new Date();
     const hace10Dias = new Date();
@@ -64,23 +64,22 @@ const ModalRedactor = ({
     };
 
     const calcularDemora = (fRaw) => {
-      if (!fRaw || fRaw === "-") return "?";
+      if (!fRaw || fRaw === "-") return 0;
       try {
         const f = parsearFecha(fRaw);
-        if (f.getFullYear() === 2100) return "?";
+        if (f.getFullYear() === 2100) return 0;
         const fechaHoy = new Date();
         fechaHoy.setHours(0,0,0,0);
         f.setHours(0,0,0,0);
         const diffTime = fechaHoy.getTime() - f.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays > 0 ? diffDays : 0;
-      } catch(e) { return "?"; }
+      } catch(e) { return 0; }
     };
 
     const formatearComprador = (rawName) => {
       if (!rawName || rawName === "SIN ASIGNAR" || rawName === "NO_ASIGNADA") return "Sin Asignar";
       const cleanName = String(rawName).trim().toLowerCase();
-      
       const contactoMatch = contactos.find(c => {
         const aliasC = String(c.alias || "").trim().toLowerCase();
         const labelC = String(c.label || "").trim().toLowerCase();
@@ -91,11 +90,59 @@ const ModalRedactor = ({
       return contactoMatch && contactoMatch.label ? contactoMatch.label : rawName;
     };
 
+    // --- MAGIA DE LOTES (Sub-Plantilla Dinámica) ---
+    if (lote.length > 1 && (txt.includes('{ocs}') || txt.includes('{ocs_aprobadas}') || txt.includes('{ocs_pendientes}'))) {
+        const subTemplate = config.plantillaItemLote || "🔸 [{codigo}] {nombre}\n{repartos_sap}\n     ↳ TOTAL ADEUDADO: {total} un.";
+        let bloqueLote = "";
+
+        lote.forEach(item => {
+            let itemTxt = subTemplate;
+            itemTxt = itemTxt.replace(/{codigo}/g, item.codigo || "");
+            itemTxt = itemTxt.replace(/{nombre}/g, item.nombre || "");
+            itemTxt = itemTxt.replace(/{dias}/g, Math.round(item.supervivencia));
+
+            let repartosTxt = "";
+            let total = 0;
+            let maxDemora = 0;
+
+            if (docContext && docContext.tipo.includes('OC') && item.detalleOCs) {
+                const ocsMatch = item.detalleOCs.filter(o => String(o.numero) === String(docContext.numero));
+                ocsMatch.forEach(oc => {
+                    const cant = Number(oc.cantidad) || 0;
+                    total += cant;
+                    const demora = calcularDemora(oc.fecha);
+                    if (demora > maxDemora) maxDemora = demora;
+                    // Diseño que pediste: Oculta la cobertura y muestra los días de demora
+                    repartosTxt += `     ↳ ${fmt(cant)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${demora} Días\n`;
+                });
+            } else if (docContext && docContext.tipo.includes('SOLPED') && item.detalleSolpeds) {
+                const spsMatch = item.detalleSolpeds.filter(s => String(s.numero) === String(docContext.numero));
+                spsMatch.forEach(sp => {
+                    const cant = Number(sp.cantidad) || 0;
+                    total += cant;
+                    const fBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
+                    const demora = calcularDemora(fBase);
+                    if (demora > maxDemora) maxDemora = demora;
+                    repartosTxt += `     ↳ ${fmt(cant)} un. | SAP: ${formatearFechaCorta(fBase)} | Demora: ${demora} Días\n`;
+                });
+            }
+
+            itemTxt = itemTxt.replace(/{repartos_sap}/g, repartosTxt.trimEnd());
+            itemTxt = itemTxt.replace(/{total}/g, fmt(total));
+            itemTxt = itemTxt.replace(/{dias_demora}/g, maxDemora);
+
+            bloqueLote += itemTxt + "\n\n";
+        });
+
+        // Reemplazamos las etiquetas viejas por nuestro nuevo bloque superador
+        txt = txt.replace(/{ocs}/g, bloqueLote.trimEnd());
+        txt = txt.replace(/{ocs_aprobadas}/g, bloqueLote.trimEnd());
+        txt = txt.replace(/{ocs_pendientes}/g, bloqueLote.trimEnd());
+    }
+
     const isAprobada = (estado) => {
       const e = (estado || "").toUpperCase();
-      if (e.includes('PENDIENTE') || e.includes('PROCESO') || e.includes('AUTORIZAC') || e === 'SIN ESTADO' || e.trim() === '') {
-        return false;
-      }
+      if (e.includes('PENDIENTE') || e.includes('PROCESO') || e.includes('AUTORIZAC') || e === 'SIN ESTADO' || e.trim() === '') return false;
       return true;
     };
 
@@ -125,7 +172,6 @@ const ModalRedactor = ({
 
     if (txt.includes('{solpeds_viejas}')) {
       const solpedsViejas = (insumo.detalleSolpeds || []).filter(sp => {
-        // Prioridad 1: Fecha de creación/solicitud. Prioridad 2: Fecha de liberación.
         const fechaBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
         return parsearFecha(fechaBase) < hace10Dias;
       });
@@ -149,8 +195,6 @@ const ModalRedactor = ({
 
     let matchNames = [];
     const originalTextUpper = String(textoTemplateCrudo || "").toUpperCase();
-    
-    // Escáner flexible de etiquetas en la plantilla
     if (originalTextUpper.includes('{SOLPEDS_VIEJAS}') || originalTextUpper.includes('{SOLPEDS}')) {
       (insumo.detalleSolpeds || []).forEach(sp => matchNames.push(sp.comprador));
     } 
@@ -166,27 +210,16 @@ const ModalRedactor = ({
       .filter(Boolean)
       .map(r => String(r).trim().toLowerCase())
       .filter(r => r !== "sin asignar" && r !== "no_asignada" && r !== "" && r !== "-");
-
     let matchedIds = [];
     
-    // Función para pulverizar acentos, diéresis y eñes
-    const limpiarAcentos = (str) => 
-      String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
+    const limpiarAcentos = (str) => String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const responsablesLimpios = responsablesFiltrados.map(r => limpiarAcentos(r));
 
     contactos.forEach(c => {
-      const terminos = [c.alias, c.label, c.email?.split('@')[0]]
-        .filter(Boolean)
-        .map(t => limpiarAcentos(t));
-        
+      const terminos = [c.alias, c.label, c.email?.split('@')[0]].filter(Boolean).map(t => limpiarAcentos(t));
       const coincidencia = terminos.some(t => responsablesLimpios.some(r => r.includes(t) || t.includes(r)));
-      
-      if (coincidencia && c.tipo === 'compras') {
-        matchedIds.push(c.id);
-      }
+      if (coincidencia && c.tipo === 'compras') matchedIds.push(c.id);
     });
-
     return [...new Set(matchedIds)];
   };
 
@@ -195,7 +228,8 @@ const ModalRedactor = ({
       const template = plantillas.find(p => p.id === reclamoDraft.tipoPlantilla) || plantillas[0];
       const cuerpoCrudoTemplate = template.cuerpo || "";
 
-      const nuevoCuerpo = procesarTextoAvanzado(reclamoDraft.cuerpo, reclamoDraft.insumo);
+      // Pasamos el Lote entero para que suceda la magia
+      const nuevoCuerpo = procesarTextoAvanzado(reclamoDraft.cuerpo, reclamoDraft.insumo, reclamoDraft.lote, reclamoDraft.docContext);
       const nuevosDestinos = autoSeleccionarDestinatarios(cuerpoCrudoTemplate, reclamoDraft.insumo, reclamoDraft.tipoPlantilla);
 
       setReclamoDraft(prev => ({
@@ -209,16 +243,16 @@ const ModalRedactor = ({
 
   const handlePlantillaChange = (e) => {
     const newTemplateId = e.target.value;
-    const { asunto, cuerpo, destino } = aplicarPlantilla(reclamoDraft.insumo, newTemplateId);
+    const { asunto, cuerpo, destino } = aplicarPlantilla(reclamoDraft.insumo, newTemplateId, reclamoDraft.docContext);
     const templateObj = plantillas.find(p => p.id === newTemplateId) || plantillas[0];
     
-    const cuerpoAvanzado = procesarTextoAvanzado(cuerpo, reclamoDraft.insumo);
+    const cuerpoAvanzado = procesarTextoAvanzado(cuerpo, reclamoDraft.insumo, reclamoDraft.lote, reclamoDraft.docContext);
     const destinosInteligentes = autoSeleccionarDestinatarios(templateObj.cuerpo, reclamoDraft.insumo, newTemplateId);
+    
     const ticketActual = reclamoDraft.ticketBorrador;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
-
     const destinoEfectivo = (newTemplateId.toUpperCase().includes('AUTORIZAR') || templateObj.nombre.toUpperCase().includes('AUTORIZAR')) ? 'planta' : destino;
-
+    
     setReclamoDraft({
       ...reclamoDraft,
       tipoPlantilla: newTemplateId,
@@ -228,7 +262,7 @@ const ModalRedactor = ({
       destinatarios: destinosInteligentes
     });
   };
-
+  
   const toggleDestinatario = (id) => {
     const actuales = reclamoDraft.destinatarios || [];
     if (actuales.includes(id)) {
