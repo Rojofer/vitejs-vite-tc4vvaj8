@@ -524,62 +524,35 @@ const App = () => {
     }
   };
 
-  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
-    const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
-    const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
-    const correosFinales = [...correosDirectorio];
-    if (correoManual) correosFinales.push(correoManual);
-    const correosStr = correosFinales.join(",");
-
-    if (correosStr.length === 0 && modoAccion !== 'HILO') {
-      setToastMsg("⚠️ Error: Seleccioná un destinatario antes de continuar.");
-      setTimeout(() => setToastMsg(null), 4000);
-      return;
-    }
-
-    const ejecutarFlujoNuevo = async () => {
-      try {
-        await procesarGuardadoBD(reclamoDraft);
-        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
-        setReclamoDraft(null);
-        setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
-        setTimeout(() => setToastMsg(null), 4000);
-      } catch (error) {
-        console.error("Error guardando reclamo:", error);
-      }
-    };
-
+  const confirmarYGuardarReclamo = async (modoAccion) => {
+    // 1. MODO HILO
     if (modoAccion === 'HILO') {
-      // 🛡️ CANDADO LÓGICO: Abortar si no existe un ticket real previo
+      // Candado de seguridad por si no hay ticket
       if (!reclamoDraft.insumo.ticketReclamo) {
          setToastMsg("⚠️ Error: No podés continuar un hilo porque no existe un reclamo previo.");
          setTimeout(() => setToastMsg(null), 4000);
          return;
       }
       try {
-        navigator.clipboard.writeText(reclamoDraft.cuerpo);
+        // SOLO GUARDAR Y CERRAR (Ya no abrimos Gmail acá)
         await procesarGuardadoBD(reclamoDraft);
-        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.insumo.ticketReclamo}"`, '_blank');
         setReclamoDraft(null);
-        setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
+        setToastMsg("✅ Ticket de Hilo generado correctamente en el historial.");
         setTimeout(() => setToastMsg(null), 5000);
       } catch (error) {
         console.error("Error en Hilo:", error);
       }
-    } else {
-      // Verifica si existe algún reclamo real de este insumo que todavía esté ABIERTO en la base de datos
-      const tieneTicketActivoReal = reclamos.some(r => r.insumoId === reclamoDraft.insumo.id && r.estado === 'ABIERTO');
-
-      if (reclamoDraft.insumo.ticketReclamo && tieneTicketActivoReal) {
-        setDialogoConfirmacion({
-          titulo: "⚠️ Atención: Reclamo ya iniciado",
-          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón "CONTINUAR HILO".`,
-          textoConfirmar: "Forzar envío nuevo",
-          colorBoton: "bg-red-500 hover:bg-red-600",
-          onConfirm: ejecutarFlujoNuevo
-        });
-      } else {
-        ejecutarFlujoNuevo();
+    } 
+    // 2. MODO NUEVO RECLAMO
+    else {
+      try {
+        // SOLO GUARDAR Y CERRAR (Ya no abrimos Gmail acá)
+        await procesarGuardadoBD(reclamoDraft);
+        setReclamoDraft(null);
+        setToastMsg("✅ Nuevo Ticket generado correctamente en el historial.");
+        setTimeout(() => setToastMsg(null), 5000);
+      } catch (error) {
+        console.error("Error en Nuevo Reclamo:", error);
       }
     }
   };
