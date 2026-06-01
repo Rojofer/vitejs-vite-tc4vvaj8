@@ -53,7 +53,6 @@ const VistaGestion = ({
     datosBase.forEach(ins => {
       let tieneDoc = false;
 
-      // 1. Desarmar y agrupar por Órdenes de Compra (OC)
       if (ins.detalleOCs && ins.detalleOCs.length > 0) {
         ins.detalleOCs.forEach(oc => {
           const num = oc.numero || 'S/N';
@@ -72,7 +71,6 @@ const VistaGestion = ({
         });
       }
 
-      // 2. Desarmar y agrupar por Solpeds
       if (ins.detalleSolpeds && ins.detalleSolpeds.length > 0) {
         ins.detalleSolpeds.forEach(sp => {
           const num = sp.numero || 'S/N';
@@ -125,7 +123,6 @@ const VistaGestion = ({
     const documentosTodos = agruparPorDocumento(datosRender);
     const umbral = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 30;
 
-    // FILTROS GERENCIALES SEGÚN EL TAB ACTIVO
     let documentosAMostrar = [];
     if (tipoVistaTabla === 'oc') {
         documentosAMostrar = documentosTodos.filter(doc => doc.tipo.includes('OC'));
@@ -134,7 +131,7 @@ const VistaGestion = ({
     }
 
     return (
-      <div className="p-4 space-y-4 max-w-full overflow-x-auto bg-slate-50/50 rounded-b-2xl border-t border-slate-200 mt-4">
+      <div className="p-4 space-y-4 max-w-full overflow-x-auto bg-slate-50/50 rounded-b-2xl border-t border-slate-200 mt-2">
         {documentosAMostrar.map((doc) => {
           const itemsSeleccionados = obtenerSeleccionadosIniciales(doc);
           const estaExpandido = !!docsExpandidos[doc.id];
@@ -289,13 +286,40 @@ const VistaGestion = ({
       );
   };
 
+  // --- DETERMINAR TÍTULO DINÁMICO PARA EL TOP HEADER ---
+  let cabeceraTitulo = null;
+  let cabeceraBadge = null;
+
+  if (searchTerm !== "") {
+    cabeceraTitulo = `RESULTADOS: ${searchTerm}`;
+  } else if (filtroAlerta) {
+    cabeceraTitulo = tituloAlerta;
+  } else if (selectedGroup) {
+    cabeceraTitulo = selectedGroup;
+    cabeceraBadge = insumos.filter(i => (i.grupo || 'SIN CLASIFICAR') === selectedGroup).length;
+  }
+
   return (
-    <div className="p-4 md:p-6 h-full max-w-full">
+    <div className="p-4 md:p-6 h-full max-w-full relative">
       
-      {/* CABECERA PRINCIPAL GESTIÓN ERP Y BARRA DE SALUD */}
-      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mb-8 gap-6">
+      {/* CABECERA PRINCIPAL GESTIÓN ERP Y BARRA DE SALUD (AHORA CON TÍTULO INTEGRADO) */}
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mb-6 gap-6 relative z-30">
         
-        {/* BARRA DE SALUD OPERATIVA (HEADER) CON MINI-KPIS */}
+        {/* POLO IZQUIERDO: TÍTULOS DINÁMICOS COMPACTOS */}
+        <div className="flex-1 w-full xl:w-auto flex items-center">
+          {cabeceraTitulo && (
+            <h2 className="text-xl sm:text-2xl font-black uppercase border-l-4 border-orange-500 pl-4 tracking-tight text-slate-800 flex items-center gap-3">
+              {cabeceraTitulo}
+              {cabeceraBadge !== null && (
+                <span className="bg-slate-100 border border-slate-200 text-slate-500 text-[14px] font-black px-2.5 py-0.5 rounded-lg shadow-inner">
+                  {cabeceraBadge}
+                </span>
+              )}
+            </h2>
+          )}
+        </div>
+
+        {/* POLO DERECHO: BARRA DE SALUD OPERATIVA CON MINI-KPIS */}
         {(() => {
           const misInsumosDashboard = currentUser.rol === 'owner' ? insumos : insumos.filter(i => i.owner?.toUpperCase().trim() === currentUser.aliasMatch);
           const totalProductos = misInsumosDashboard.length;
@@ -412,15 +436,12 @@ const VistaGestion = ({
         })()}
       </div>
 
+      {/* RENDERIZADO DINÁMICO DE SUB-VISTAS */}
       <AnimatePresence mode="wait">
         {searchTerm !== "" ? (
           <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="mb-4">
-                <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight text-slate-800 flex items-center gap-3">
-                  RESULTADOS: {searchTerm}
-                </h2>
-            </div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sticky top-0 z-[40] bg-[#F8FAFC] py-2">
               <div className="flex items-center gap-4">
                 <button onClick={() => setSearchTerm("")} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
                   <ArrowLeft size={14} /> Limpiar
@@ -441,12 +462,8 @@ const VistaGestion = ({
 
             return (
               <motion.div key="alerta" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="mb-4">
-                   <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight text-slate-800 flex items-center gap-3">
-                     {tituloAlerta}
-                   </h2>
-                </div>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sticky top-0 z-[40] bg-[#F8FAFC] py-2">
                   <div className="flex items-center gap-4">
                     <button onClick={() => { setFiltroAlerta(null); setFiltroVistaLista('todos'); }} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
                       <ArrowLeft size={14} /> Volver
@@ -678,7 +695,7 @@ const VistaGestion = ({
               );
             })()}
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4 sticky top-0 z-[40] bg-[#F8FAFC] py-2">
               <div className="flex items-center gap-4">
                 <h2 className="text-lg font-black uppercase tracking-tight">Tus Grupos</h2>
                 <button onClick={() => setFiltroRiesgoGrupo(!filtroRiesgoGrupo)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all border shadow-sm ${filtroRiesgoGrupo ? 'bg-red-500 text-white border-red-600' : 'bg-white text-red-500 border-red-200 hover:bg-red-50'}`}>
@@ -789,15 +806,8 @@ const VistaGestion = ({
 
             return (
               <motion.div key="tabla-grupo" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="mb-4">
-                   <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight flex items-center gap-3 text-slate-800">
-                     {selectedGroup}
-                     <span className="bg-slate-100 border border-slate-200 text-slate-500 text-[14px] font-black px-2.5 py-0.5 rounded-lg shadow-inner">
-                       {datosFiltradosGrupo.length}
-                     </span>
-                   </h2>
-                </div>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sticky top-0 z-[40] bg-[#F8FAFC] py-2">
                   <div className="flex items-center gap-4">
                     <button onClick={() => { setSelectedGroup(null); setFiltroVistaLista('todos'); }} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
                       <ArrowLeft size={14} /> Volver
