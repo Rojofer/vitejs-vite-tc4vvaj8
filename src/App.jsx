@@ -550,10 +550,16 @@ const App = () => {
     };
 
     if (modoAccion === 'HILO') {
+      // 🛡️ CANDADO LÓGICO: Abortar si no existe un ticket real previo
+      if (!reclamoDraft.insumo.ticketReclamo) {
+         setToastMsg("⚠️ Error: No podés continuar un hilo porque no existe un reclamo previo.");
+         setTimeout(() => setToastMsg(null), 4000);
+         return;
+      }
       try {
         navigator.clipboard.writeText(reclamoDraft.cuerpo);
         await procesarGuardadoBD(reclamoDraft);
-        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
+        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.insumo.ticketReclamo}"`, '_blank');
         setReclamoDraft(null);
         setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
         setTimeout(() => setToastMsg(null), 5000);
