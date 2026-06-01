@@ -17,7 +17,6 @@ const ModalRedactor = ({
   const plantillas = getPlantillasDinamicas();
   const contactos = config?.contactos || [];
 
-  // --- MOTOR DE ORDENAMIENTO NUMÉRICO PARA LA LISTA DESPLEGABLE ---
   const plantillasOrdenadas = React.useMemo(() => {
     return [...plantillas].sort((a, b) => {
       const nombreA = (a.nombre || "").trim();
@@ -33,7 +32,6 @@ const ModalRedactor = ({
     });
   }, [plantillas]);
 
-  // --- MOTOR 1: PROCESADOR MATEMÁTICO DE ETIQUETAS MÁGICAS ---
   const procesarTextoAvanzado = (txtOriginal, insumo, lote = [], docContext = null) => {
     let txt = txtOriginal || "";
     const hoy = new Date();
@@ -90,7 +88,7 @@ const ModalRedactor = ({
       return contactoMatch && contactoMatch.label ? contactoMatch.label : rawName;
     };
 
-    // --- MAGIA DE LOTES (Sub-Plantilla Dinámica) ---
+    // --- MAGIA DE LOTES ---
     if (lote.length > 1 && (txt.includes('{ocs}') || txt.includes('{ocs_aprobadas}') || txt.includes('{ocs_pendientes}'))) {
         const subTemplate = config.plantillaItemLote || "🔸 [{codigo}] {nombre}\n{repartos_sap}\n     ↳ TOTAL ADEUDADO: {total} un.";
         let bloqueLote = "";
@@ -112,7 +110,6 @@ const ModalRedactor = ({
                     total += cant;
                     const demora = calcularDemora(oc.fecha);
                     if (demora > maxDemora) maxDemora = demora;
-                    // Diseño que pediste: Oculta la cobertura y muestra los días de demora
                     repartosTxt += `     ↳ ${fmt(cant)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${demora} Días\n`;
                 });
             } else if (docContext && docContext.tipo.includes('SOLPED') && item.detalleSolpeds) {
@@ -134,7 +131,6 @@ const ModalRedactor = ({
             bloqueLote += itemTxt + "\n\n";
         });
 
-        // Reemplazamos las etiquetas viejas por nuestro nuevo bloque superador
         txt = txt.replace(/{ocs}/g, bloqueLote.trimEnd());
         txt = txt.replace(/{ocs_aprobadas}/g, bloqueLote.trimEnd());
         txt = txt.replace(/{ocs_pendientes}/g, bloqueLote.trimEnd());
@@ -187,7 +183,6 @@ const ModalRedactor = ({
     return txt;
   };
 
-  // --- MOTOR 2: MATCH AUTOMÁTICO DE CONTACTOS INTERNOS ---
   const autoSeleccionarDestinatarios = (textoTemplateCrudo, insumo, plantillaId) => {
     if (plantillaId !== 'comprasGrave' && plantillaId !== 'comprasLeve' && (String(plantillaId).toUpperCase().includes('AUTORIZAR') || String(textoTemplateCrudo).toUpperCase().includes('AUTORIZAR'))) {
       return contactos.filter(c => c.tipo === 'planta').map(c => c.id);
@@ -228,7 +223,6 @@ const ModalRedactor = ({
       const template = plantillas.find(p => p.id === reclamoDraft.tipoPlantilla) || plantillas[0];
       const cuerpoCrudoTemplate = template.cuerpo || "";
 
-      // Pasamos el Lote entero para que suceda la magia
       const nuevoCuerpo = procesarTextoAvanzado(reclamoDraft.cuerpo, reclamoDraft.insumo, reclamoDraft.lote, reclamoDraft.docContext);
       const nuevosDestinos = autoSeleccionarDestinatarios(cuerpoCrudoTemplate, reclamoDraft.insumo, reclamoDraft.tipoPlantilla);
 
@@ -243,8 +237,14 @@ const ModalRedactor = ({
 
   const handlePlantillaChange = (e) => {
     const newTemplateId = e.target.value;
-    const { asunto, cuerpo, destino } = aplicarPlantilla(reclamoDraft.insumo, newTemplateId, reclamoDraft.docContext);
     const templateObj = plantillas.find(p => p.id === newTemplateId) || plantillas[0];
+    
+    const isLote = reclamoDraft.lote && reclamoDraft.lote.length > 1;
+    const insumoMock = isLote 
+      ? { ...reclamoDraft.insumo, codigo: "MULTIPLES", nombre: `LOTE DE ${reclamoDraft.lote.length} INSUMOS` } 
+      : reclamoDraft.insumo;
+
+    const { asunto, cuerpo, destino } = aplicarPlantilla(insumoMock, newTemplateId, reclamoDraft.docContext);
     
     const cuerpoAvanzado = procesarTextoAvanzado(cuerpo, reclamoDraft.insumo, reclamoDraft.lote, reclamoDraft.docContext);
     const destinosInteligentes = autoSeleccionarDestinatarios(templateObj.cuerpo, reclamoDraft.insumo, newTemplateId);
@@ -262,7 +262,7 @@ const ModalRedactor = ({
       destinatarios: destinosInteligentes
     });
   };
-  
+
   const toggleDestinatario = (id) => {
     const actuales = reclamoDraft.destinatarios || [];
     if (actuales.includes(id)) {
@@ -274,7 +274,7 @@ const ModalRedactor = ({
 
   const tipoFiltroContacto = (reclamoDraft.tipoPlantilla?.toUpperCase().includes('AUTORIZAR') || reclamoDraft.tipoDestino === 'planta') ? 'planta' : 'compras';
 
-    return (
+  return (
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
@@ -287,7 +287,6 @@ const ModalRedactor = ({
         exit={{ scale: 0.96, opacity: 0 }} 
         className="bg-white rounded-3xl w-full max-w-5xl flex flex-col shadow-2xl overflow-hidden max-h-[90vh] border border-slate-200"
       >
-        {/* CABECERA COMPACTA CON INTEGRACIÓN DE CANAL */}
         <div className="flex justify-between items-center px-8 py-4 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-base font-black text-slate-800 tracking-tight uppercase">
@@ -299,10 +298,7 @@ const ModalRedactor = ({
               Interacción {tipoFiltroContacto === 'planta' ? '--> ADMINISTRACIÓN' : '--> SECTOR COMPRAS'}
             </div>
           </div>
-          <button 
-            onClick={() => setReclamoDraft(null)} 
-            className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 rounded-full transition-colors"
-          >
+          <button onClick={() => setReclamoDraft(null)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 rounded-full transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -311,11 +307,7 @@ const ModalRedactor = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 shrink-0">
             <div>
               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Plantilla Operativa</label>
-              <select 
-                value={reclamoDraft.tipoPlantilla} 
-                onChange={handlePlantillaChange}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all cursor-pointer"
-              >
+              <select value={reclamoDraft.tipoPlantilla} onChange={handlePlantillaChange} className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all cursor-pointer">
                 {plantillasOrdenadas.map(p => (
                   <option key={p.id} value={p.id}>{p.nombre.toUpperCase()}</option>
                 ))}
@@ -325,10 +317,7 @@ const ModalRedactor = ({
             <div>
               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Destinatarios ({reclamoDraft.destinatarios?.length || 0})</label>
               <div className="relative">
-                <div 
-                  onClick={() => setReclamoDraft({...reclamoDraft, showDestinatarios: !reclamoDraft.showDestinatarios})}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-all shadow-sm min-h-[42px]"
-                >
+                <div onClick={() => setReclamoDraft({...reclamoDraft, showDestinatarios: !reclamoDraft.showDestinatarios})} className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-all shadow-sm min-h-[42px]">
                   <span className="truncate uppercase font-black text-slate-700 max-w-[90%]">
                     {reclamoDraft.destinatarios?.length > 0 
                       ? reclamoDraft.destinatarios.map(id => {
@@ -345,12 +334,7 @@ const ModalRedactor = ({
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto p-2">
                     {contactos.filter(c => c.tipo === tipoFiltroContacto).map(c => (
                       <label key={c.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
-                        <input 
-                          type="checkbox" 
-                          checked={(reclamoDraft.destinatarios || []).includes(c.id)}
-                          onChange={() => toggleDestinatario(c.id)}
-                          className="w-4 h-4 text-orange-500 rounded border-slate-300 focus:ring-orange-500"
-                        />
+                        <input type="checkbox" checked={(reclamoDraft.destinatarios || []).includes(c.id)} onChange={() => toggleDestinatario(c.id)} className="w-4 h-4 text-orange-500 rounded border-slate-300 focus:ring-orange-500" />
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-slate-700">{c.label || c.alias}</span>
                           <span className="text-[10px] text-slate-400">{c.email}</span>
@@ -368,44 +352,26 @@ const ModalRedactor = ({
 
           <div className="shrink-0">
             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Asunto Oficial</label>
-            <input 
-              type="text" 
-              value={reclamoDraft.asunto} 
-              onChange={(e) => setReclamoDraft({...reclamoDraft, asunto: e.target.value})}
-              className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all"
-            />
+            <input type="text" value={reclamoDraft.asunto} onChange={(e) => setReclamoDraft({...reclamoDraft, asunto: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all" />
           </div>
 
           <div className="flex flex-col flex-1 h-full min-h-[350px]">
             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Cuerpo del Mensaje</label>
-            <textarea 
-              value={reclamoDraft.cuerpo} 
-              onChange={(e) => setReclamoDraft({...reclamoDraft, cuerpo: e.target.value})}
-              className="w-full h-80 bg-white border-2 border-slate-200 text-lg font-medium text-slate-700 rounded-2xl px-6 py-5 outline-none focus:border-orange-500 transition-all resize-none shadow-sm font-sans leading-relaxed"
-            />
+            <textarea value={reclamoDraft.cuerpo} onChange={(e) => setReclamoDraft({...reclamoDraft, cuerpo: e.target.value})} className="w-full h-80 bg-white border-2 border-slate-200 text-lg font-medium text-slate-700 rounded-2xl px-6 py-5 outline-none focus:border-orange-500 transition-all resize-none shadow-sm font-sans leading-relaxed" />
           </div>
         </div>
 
         <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
-          <button 
-            onClick={() => setReclamoDraft(null)} 
-            className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
-          >
+          <button onClick={() => setReclamoDraft(null)} className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
             Cancelar
           </button>
           
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => confirmarYGuardarReclamo('HILO')} 
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white border-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-400 shadow-sm transition-all active:scale-95"
-            >
+            <button onClick={() => confirmarYGuardarReclamo('HILO')} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white border-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-400 shadow-sm transition-all active:scale-95">
               <Search size={14} /> Continuar Hilo
             </button>
 
-            <button 
-              onClick={() => confirmarYGuardarReclamo('NUEVO')} 
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-orange-500 text-white hover:bg-orange-600 shadow-md transition-all active:scale-95"
-            >
+            <button onClick={() => confirmarYGuardarReclamo('NUEVO')} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-orange-500 text-white hover:bg-orange-600 shadow-md transition-all active:scale-95">
               <Send size={14} /> Abrir Gmail
             </button>
           </div>
