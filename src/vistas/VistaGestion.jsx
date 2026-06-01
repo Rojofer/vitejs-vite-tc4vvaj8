@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AlertTriangle, Star, Clock, ArrowLeft, Package, Activity, MessageSquare, CheckSquare, ChevronDown, ChevronUp, FileText, ListFilter, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TablaInsumos from '../componentes/TablaInsumos';
@@ -40,6 +40,11 @@ const VistaGestion = ({
   const [tipoVistaTabla, setTipoVistaTabla] = useState('insumos'); // 'insumos' | 'oc' | 'solped'
   const [docsExpandidos, setDocsExpandidos] = useState({});
   const [seleccionadosPorDoc, setSeleccionadosPorDoc] = useState({});
+
+  // --- EFECTO NUEVO: Reiniciar la tabla a "Lista" al cambiar de pantalla ---
+  useEffect(() => {
+    setTipoVistaTabla('insumos');
+  }, [filtroAlerta, selectedGroup, searchTerm]);
 
   // --- MOTOR INTELIGENTE DE AGRUPACIÓN ---
   const agruparPorDocumento = (datosBase) => {
@@ -84,8 +89,10 @@ const VistaGestion = ({
       }
     });
 
-    // Filtramos ruido base. El filtrado fino se hace en el renderizado según el Tab.
-    return Object.values(mapa).filter(doc => doc.tipo !== 'SIN DOCUMENTO').sort((a, b) => a.id.localeCompare(b.id));
+    // FILTRO GERENCIAL: Eliminamos los 'SIN DOCUMENTO' y dejamos estrictamente OCs/Solpeds con más de 1 insumo
+    const documentosValidos = Object.values(mapa).filter(doc => doc.tipo !== 'SIN DOCUMENTO' && doc.items.length > 1);
+
+    return documentosValidos.sort((a, b) => a.id.localeCompare(b.id));
   };
 
   const toggleExpandirDoc = (id) => setDocsExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
@@ -121,7 +128,7 @@ const VistaGestion = ({
     // FILTROS GERENCIALES SEGÚN EL TAB ACTIVO
     let documentosAMostrar = [];
     if (tipoVistaTabla === 'oc') {
-        documentosAMostrar = documentosTodos.filter(doc => doc.tipo.includes('OC') && doc.items.length > 1);
+        documentosAMostrar = documentosTodos.filter(doc => doc.tipo.includes('OC'));
     } else if (tipoVistaTabla === 'solped') {
         documentosAMostrar = documentosTodos.filter(doc => doc.tipo.includes('SOLPED'));
     }
@@ -259,14 +266,28 @@ const VistaGestion = ({
     );
   };
 
-  // Switcher visual para usar al lado de los títulos
-  const InterruptorVista = () => (
-    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner ml-4 shrink-0 overflow-x-auto">
-      <button onClick={() => setTipoVistaTabla('insumos')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'insumos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Lista Insumos</button>
-      <button onClick={() => setTipoVistaTabla('oc')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'oc' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-400 hover:text-sky-500'}`}>Múltiples x OC</button>
-      <button onClick={() => setTipoVistaTabla('solped')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'solped' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-indigo-500'}`}>Por Solped</button>
-    </div>
-  );
+  // --- SWITCHER INTELIGENTE ---
+  const InterruptorVista = () => {
+      let mostrarOC = true;
+      let mostrarSolped = true;
+
+      if (filtroAlerta === 'solpeds_viejas') {
+        mostrarOC = false; 
+      } else if (filtroAlerta === 'ocs' || filtroAlerta === 'oc_pend_aprobacion') {
+        mostrarSolped = false; 
+      } else if (filtroAlerta === 'tickets_abiertos') {
+        mostrarOC = false;
+        mostrarSolped = false;
+      }
+
+      return (
+        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner shrink-0 overflow-x-auto">
+          <button onClick={() => setTipoVistaTabla('insumos')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'insumos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Lista Insumos</button>
+          {mostrarOC && <button onClick={() => setTipoVistaTabla('oc')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'oc' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-400 hover:text-sky-500'}`}>Múltiples x OC</button>}
+          {mostrarSolped && <button onClick={() => setTipoVistaTabla('solped')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'solped' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-indigo-500'}`}>Por Solped</button>}
+        </div>
+      );
+  };
 
   return (
     <div className="p-4 md:p-6 h-full max-w-full">
@@ -394,9 +415,16 @@ const VistaGestion = ({
       <AnimatePresence mode="wait">
         {searchTerm !== "" ? (
           <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <div className="mb-4">
+                <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight text-slate-800 flex items-center gap-3">
+                  RESULTADOS: {searchTerm}
+                </h2>
+            </div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div className="flex items-center">
-                <h2 className="text-xl font-black uppercase tracking-tight">Resultados: {searchTerm}</h2>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setSearchTerm("")} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
+                  <ArrowLeft size={14} /> Limpiar
+                </button>
                 <InterruptorVista />
               </div>
               {renderRadarDinamico(resultadosBusqueda.filter(i => currentUser.rol === 'owner' || i.owner?.toUpperCase().trim() === currentUser.aliasMatch))}
@@ -413,15 +441,17 @@ const VistaGestion = ({
 
             return (
               <motion.div key="alerta" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <div className="mb-4">
+                   <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight text-slate-800 flex items-center gap-3">
+                     {tituloAlerta}
+                   </h2>
+                </div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div className="flex items-center gap-4">
                     <button onClick={() => { setFiltroAlerta(null); setFiltroVistaLista('todos'); }} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
                       <ArrowLeft size={14} /> Volver
                     </button>
-                    <div className="flex items-center">
-                      <h2 className="text-lg font-medium text-slate-700 tracking-tight">{tituloAlerta}</h2>
-                      <InterruptorVista />
-                    </div>
+                    <InterruptorVista />
                   </div>
                   <div className="flex items-center gap-4">
                     {filtroAlerta !== 'favoritos' && filtroAlerta !== 'mis_favoritos' && (
@@ -571,7 +601,7 @@ const VistaGestion = ({
               })()}
             </div>
                         
-            {/* DETALLE DE SALUD POR OPERARIO (SOLO ADMIN) - LIMPIADO */}
+            {/* DETALLE DE SALUD POR OPERARIO (SOLO ADMIN) */}
             {currentUser.rol === 'owner' && (() => {
               const uCritico = config?.umbralCritico !== undefined ? config.umbralCritico : 0;
               const uUrgencia = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 15;
@@ -759,20 +789,20 @@ const VistaGestion = ({
 
             return (
               <motion.div key="tabla-grupo" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <div className="mb-4">
+                   <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight flex items-center gap-3 text-slate-800">
+                     {selectedGroup}
+                     <span className="bg-slate-100 border border-slate-200 text-slate-500 text-[14px] font-black px-2.5 py-0.5 rounded-lg shadow-inner">
+                       {datosFiltradosGrupo.length}
+                     </span>
+                   </h2>
+                </div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                   <div className="flex items-center gap-4">
                     <button onClick={() => { setSelectedGroup(null); setFiltroVistaLista('todos'); }} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase bg-white px-3 py-1.5 rounded-lg border hover:text-orange-500 shadow-sm transition-colors">
                       <ArrowLeft size={14} /> Volver
                     </button>
-                    <div className="flex items-center">
-                        <h2 className="text-2xl font-black uppercase border-l-2 border-orange-500 pl-4 tracking-tight flex items-center gap-3">
-                          {selectedGroup}
-                          <span className="bg-slate-100 border border-slate-200 text-slate-500 text-[14px] font-black px-2.5 py-0.5 rounded-lg shadow-inner">
-                            {datosFiltradosGrupo.length}
-                          </span>
-                        </h2>
-                        <InterruptorVista />
-                    </div>
+                    <InterruptorVista />
                   </div>
                   
                   <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner">
