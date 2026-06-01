@@ -88,11 +88,29 @@ const ModalRedactor = ({
       return contactoMatch && contactoMatch.label ? contactoMatch.label : rawName;
     };
 
-    // --- MAGIA DE LOTES ---
+    // --- MAGIA DE LOTES CON CABECERA ---
     if (lote.length > 1 && (txt.includes('{ocs}') || txt.includes('{ocs_aprobadas}') || txt.includes('{ocs_pendientes}'))) {
         const subTemplate = config.plantillaItemLote || "🔸 [{codigo}] {nombre}\n{repartos_sap}\n     ↳ TOTAL ADEUDADO: {total} un.";
         let bloqueLote = "";
 
+        // INYECCIÓN DE CABECERA (OC, Responsable y Proveedor)
+        if (docContext) {
+            let respGlobal = "SIN ASIGNAR";
+            if (docContext.tipo.includes('OC')) {
+                const ocF = lote[0].detalleOCs?.find(o => String(o.numero) === String(docContext.numero));
+                if (ocF && ocF.comprador) respGlobal = formatearComprador(ocF.comprador);
+            } else if (docContext.tipo.includes('SOLPED')) {
+                const spF = lote[0].detalleSolpeds?.find(s => String(s.numero) === String(docContext.numero));
+                if (spF && spF.comprador) respGlobal = formatearComprador(spF.comprador);
+            }
+            const prov = docContext.proveedor || lote[0].proveedor || "S/P";
+            
+            bloqueLote += `📄 DOCUMENTO: ${docContext.tipo} #${docContext.numero}\n`;
+            bloqueLote += `👤 RESPONSABLE: ${respGlobal.toUpperCase()} | 🏢 PROVEEDOR: ${prov}\n`;
+            bloqueLote += `--------------------------------------------------\n\n`;
+        }
+
+        // ARMADO DE CADA INSUMO
         lote.forEach(item => {
             let itemTxt = subTemplate;
             itemTxt = itemTxt.replace(/{codigo}/g, item.codigo || "");
