@@ -88,12 +88,12 @@ const ModalRedactor = ({
       return contactoMatch && contactoMatch.label ? contactoMatch.label : rawName;
     };
 
-    // --- MAGIA DE LOTES CON CABECERA ---
+    // --- MAGIA DE LOTES CON CABECERA LIMPIA Y FILTRO A FUTURO ---
     if (lote.length > 1 && (txt.includes('{ocs}') || txt.includes('{ocs_aprobadas}') || txt.includes('{ocs_pendientes}'))) {
-        const subTemplate = config.plantillaItemLote || "🔸 [{codigo}] {nombre}\n{repartos_sap}\n     ↳ TOTAL ADEUDADO: {total} un.";
+        const subTemplate = config.plantillaItemLote || "[{codigo}] {nombre}\n{repartos_sap}\n  TOTAL ADEUDADO: {total} un.";
         let bloqueLote = "";
 
-        // INYECCIÓN DE CABECERA (OC, Responsable y Proveedor)
+        // INYECCIÓN DE CABECERA (Cero Emojis)
         if (docContext) {
             let respGlobal = "SIN ASIGNAR";
             if (docContext.tipo.includes('OC')) {
@@ -105,14 +105,14 @@ const ModalRedactor = ({
             }
             const prov = docContext.proveedor || lote[0].proveedor || "S/P";
             
-            bloqueLote += `📄 DOCUMENTO: ${docContext.tipo} #${docContext.numero}\n`;
-            bloqueLote += `👤 RESPONSABLE: ${respGlobal.toUpperCase()} | 🏢 PROVEEDOR: ${prov}\n`;
+            bloqueLote += `DOCUMENTO: ${docContext.tipo} #${docContext.numero}\n`;
+            bloqueLote += `RESPONSABLE: ${respGlobal.toUpperCase()} | PROVEEDOR: ${prov}\n`;
             bloqueLote += `--------------------------------------------------\n\n`;
         }
 
         // ARMADO DE CADA INSUMO
         lote.forEach(item => {
-            let itemTxt = subTemplate;
+            let itemTxt = subTemplate.replace(/🔸 |↳ /g, ''); // Forzamos limpieza de iconos si quedaron
             itemTxt = itemTxt.replace(/{codigo}/g, item.codigo || "");
             itemTxt = itemTxt.replace(/{nombre}/g, item.nombre || "");
             itemTxt = itemTxt.replace(/{dias}/g, Math.round(item.supervivencia));
@@ -124,22 +124,31 @@ const ModalRedactor = ({
             if (docContext && docContext.tipo.includes('OC') && item.detalleOCs) {
                 const ocsMatch = item.detalleOCs.filter(o => String(o.numero) === String(docContext.numero));
                 ocsMatch.forEach(oc => {
-                    const cant = Number(oc.cantidad) || 0;
-                    total += cant;
                     const demora = calcularDemora(oc.fecha);
-                    if (demora > maxDemora) maxDemora = demora;
-                    repartosTxt += `     ↳ ${fmt(cant)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${demora} Días\n`;
+                    if (demora > 0) { // <-- FILTRO: SOLO ENTRA SI ESTÁ DEMORADA
+                        const cant = Number(oc.cantidad) || 0;
+                        total += cant;
+                        if (demora > maxDemora) maxDemora = demora;
+                        repartosTxt += `  - ${fmt(cant)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${demora} Días\n`;
+                    }
                 });
             } else if (docContext && docContext.tipo.includes('SOLPED') && item.detalleSolpeds) {
                 const spsMatch = item.detalleSolpeds.filter(s => String(s.numero) === String(docContext.numero));
                 spsMatch.forEach(sp => {
-                    const cant = Number(sp.cantidad) || 0;
-                    total += cant;
                     const fBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
                     const demora = calcularDemora(fBase);
-                    if (demora > maxDemora) maxDemora = demora;
-                    repartosTxt += `     ↳ ${fmt(cant)} un. | SAP: ${formatearFechaCorta(fBase)} | Demora: ${demora} Días\n`;
+                    if (demora > 0) { // <-- FILTRO: SOLO ENTRA SI ESTÁ DEMORADA
+                        const cant = Number(sp.cantidad) || 0;
+                        total += cant;
+                        if (demora > maxDemora) maxDemora = demora;
+                        repartosTxt += `  - ${fmt(cant)} un. | SAP: ${formatearFechaCorta(fBase)} | Demora: ${demora} Días\n`;
+                    }
                 });
+            }
+
+            // Si el insumo no tenía NADA demorado (solo a futuro), mostramos un mensaje o lo dejamos vacío
+            if (repartosTxt === "") {
+                repartosTxt = `  - Sin entregas demoradas\n`;
             }
 
             itemTxt = itemTxt.replace(/{repartos_sap}/g, repartosTxt.trimEnd());
