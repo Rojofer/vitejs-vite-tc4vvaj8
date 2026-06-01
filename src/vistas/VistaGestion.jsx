@@ -36,12 +36,12 @@ const VistaGestion = ({
   abrirRedactorReclamo
 }) => {
 
-  // --- ESTADOS PARA LA VISTA AGRUPADA (NUEVO) ---
-  const [tipoVistaTabla, setTipoVistaTabla] = useState('insumos'); 
+  // --- ESTADOS PARA LA VISTA AGRUPADA ---
+  const [tipoVistaTabla, setTipoVistaTabla] = useState('insumos'); // 'insumos' | 'oc' | 'solped'
   const [docsExpandidos, setDocsExpandidos] = useState({});
   const [seleccionadosPorDoc, setSeleccionadosPorDoc] = useState({});
 
-  // --- MOTOR INTELIGENTE DE AGRUPACIÓN (CORREGIDO) ---
+  // --- MOTOR INTELIGENTE DE AGRUPACIÓN ---
   const agruparPorDocumento = (datosBase) => {
     const mapa = {};
 
@@ -60,7 +60,6 @@ const VistaGestion = ({
           if (!mapa[idAgrupacion]) {
              mapa[idAgrupacion] = { id: idAgrupacion, tipo: docTipo, numero: num, proveedor: oc.proveedor || ins.proveedor || 'S/P', items: [] };
           }
-          // Evitamos duplicados si la base datos tiene ruido, y le inyectamos el numeroOC temporal para que App.jsx lo lea en el asunto del mail
           if (!mapa[idAgrupacion].items.some(i => i.id === ins.id)) {
              mapa[idAgrupacion].items.push({ ...ins, consumoMensual: Math.round(Number(ins.consumoPromedio) || 0), numeroOC: num });
           }
@@ -72,7 +71,7 @@ const VistaGestion = ({
       if (ins.detalleSolpeds && ins.detalleSolpeds.length > 0) {
         ins.detalleSolpeds.forEach(sp => {
           const num = sp.numero || 'S/N';
-          const idAgrupacion = `SOL_${num}`;
+          const idAgrupacion = `SOLPED_${num}`;
 
           if (!mapa[idAgrupacion]) {
              mapa[idAgrupacion] = { id: idAgrupacion, tipo: 'SOLPED', numero: num, proveedor: 'INTERNO', items: [] };
@@ -83,21 +82,10 @@ const VistaGestion = ({
           tieneDoc = true;
         });
       }
-
-      // 3. Los materiales que realmente están huérfanos sin ningún documento
-      if (!tieneDoc) {
-        const idAgrupacion = 'SIN_DOC';
-        if (!mapa[idAgrupacion]) {
-           mapa[idAgrupacion] = { id: idAgrupacion, tipo: 'SIN DOCUMENTO', numero: 'S/P', proveedor: ins.proveedor || 'S/P', items: [] };
-        }
-        mapa[idAgrupacion].items.push({ ...ins, consumoMensual: Math.round(Number(ins.consumoPromedio) || 0) });
-      }
     });
 
-    // FILTRO GERENCIAL: Eliminamos los 'SIN DOCUMENTO' y dejamos estrictamente OCs/Solpeds con más de 1 insumo
-    const documentosValidos = Object.values(mapa).filter(doc => doc.tipo !== 'SIN DOCUMENTO' && doc.items.length > 1);
-
-    return documentosValidos.sort((a, b) => a.id.localeCompare(b.id));
+    // Filtramos ruido base. El filtrado fino se hace en el renderizado según el Tab.
+    return Object.values(mapa).filter(doc => doc.tipo !== 'SIN DOCUMENTO').sort((a, b) => a.id.localeCompare(b.id));
   };
 
   const toggleExpandirDoc = (id) => setDocsExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
@@ -127,12 +115,20 @@ const VistaGestion = ({
       );
     }
 
-    const documentos = agruparPorDocumento(datosRender);
+    const documentosTodos = agruparPorDocumento(datosRender);
     const umbral = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 30;
+
+    // FILTROS GERENCIALES SEGÚN EL TAB ACTIVO
+    let documentosAMostrar = [];
+    if (tipoVistaTabla === 'oc') {
+        documentosAMostrar = documentosTodos.filter(doc => doc.tipo.includes('OC') && doc.items.length > 1);
+    } else if (tipoVistaTabla === 'solped') {
+        documentosAMostrar = documentosTodos.filter(doc => doc.tipo.includes('SOLPED'));
+    }
 
     return (
       <div className="p-4 space-y-4 max-w-full overflow-x-auto bg-slate-50/50 rounded-b-2xl border-t border-slate-200 mt-4">
-        {documentos.map((doc) => {
+        {documentosAMostrar.map((doc) => {
           const itemsSeleccionados = obtenerSeleccionadosIniciales(doc);
           const estaExpandido = !!docsExpandidos[doc.id];
           return (
@@ -154,7 +150,6 @@ const VistaGestion = ({
                   <button onClick={() => {
                       const itemsCompletos = doc.items.filter(i => itemsSeleccionados.includes(i.id));
                       if (itemsCompletos.length > 0 && typeof abrirRedactorReclamo === 'function') {
-                          // Se inyecta el proveedor al contexto
                           abrirRedactorReclamo(itemsCompletos, { numero: doc.numero, tipo: doc.tipo, proveedor: doc.proveedor });
                       }
                     }}
@@ -192,7 +187,6 @@ const VistaGestion = ({
                           if (Math.round(ins.supervivencia) <= (config?.umbralCritico || 0)) colorSemaforo = "text-red-600 bg-red-50 border-red-100";
                           else if (Math.round(ins.supervivencia) <= umbral) colorSemaforo = "text-amber-600 bg-amber-50 border-amber-100";
 
-                          // MAGIA NUEVA: Calcular la deuda atrasada EXCLUSIVA de este documento
                           let cantAtrasadaDoc = 0;
                           const hoyTabla = new Date(); hoyTabla.setHours(0,0,0,0);
                           
@@ -235,8 +229,6 @@ const VistaGestion = ({
                                   {Math.round(ins.supervivencia) > 998 ? '999+' : Math.round(ins.supervivencia)} D
                                 </span>
                               </td>
-                              
-                              {/* NUEVA CELDA: COLUMNA DEMORADO */}
                               <td className="py-3 px-4 text-center font-black text-xs" onClick={() => setActiveInsumo(ins)}>
                                 {cantAtrasadaDoc > 0 ? (
                                   <span className="text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100">{formatoNum(cantAtrasadaDoc)}</span>
@@ -244,7 +236,6 @@ const VistaGestion = ({
                                   <span className="text-slate-300">0</span>
                                 )}
                               </td>
-
                               <td className="py-3 px-4 text-center" onClick={() => setActiveInsumo(ins)}>
                                 {tieneTicketAbierto ? <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">🔒 {ins.ticketReclamo || 'Gestión'}</span> : <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Limpio</span>}
                               </td>
@@ -259,7 +250,7 @@ const VistaGestion = ({
             </div>
           );
         })}
-        {documentos.length === 0 && (
+        {documentosAMostrar.length === 0 && (
           <div className="text-center py-10 bg-white border border-slate-200 border-dashed rounded-2xl">
             <p className="text-slate-500 font-bold text-sm uppercase tracking-wider">No hay documentos en esta vista</p>
           </div>
@@ -270,9 +261,10 @@ const VistaGestion = ({
 
   // Switcher visual para usar al lado de los títulos
   const InterruptorVista = () => (
-    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner ml-4 shrink-0">
-      <button onClick={() => setTipoVistaTabla('insumos')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${tipoVistaTabla === 'insumos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Lista Insumos</button>
-      <button onClick={() => setTipoVistaTabla('documentos')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${tipoVistaTabla === 'documentos' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-400 hover:text-orange-400'}`}>Por Documento</button>
+    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner ml-4 shrink-0 overflow-x-auto">
+      <button onClick={() => setTipoVistaTabla('insumos')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'insumos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Lista Insumos</button>
+      <button onClick={() => setTipoVistaTabla('oc')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'oc' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-400 hover:text-sky-500'}`}>Múltiples x OC</button>
+      <button onClick={() => setTipoVistaTabla('solped')} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${tipoVistaTabla === 'solped' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-indigo-500'}`}>Por Solped</button>
     </div>
   );
 
@@ -483,7 +475,6 @@ const VistaGestion = ({
                 );
                 const misInsumosIds = misInsumosDashboard.map(i => i.id);
                 const kpiTickets = (reclamos || []).filter(r => r.estado === 'ABIERTO' && r.tipo !== 'AVISO GERENCIA' && misInsumosIds.includes(r.insumoId));
-                // Nuevo KPI: OCs Trabadas por firmas (Lee directo de SAP)
                 const kpiOcPendientes = misInsumosDashboard.filter(i => 
                   i.detalleOCs && i.detalleOCs.some(oc => 
                     String(oc.estado || '').toUpperCase().includes('PROCESO') || 
@@ -493,7 +484,6 @@ const VistaGestion = ({
                 );
                 const total = misInsumosDashboard.length || 1;
             
-                // NUEVO KPI: Insumos a Reclamar
                 const umbral = config?.umbralUrgencia !== undefined ? config.umbralUrgencia : 30;
                 const kpiReclamar = misInsumosDashboard.filter(i => i.favorito && i.escalados === 0 && Math.round(i.supervivencia) <= umbral);
                 return (
@@ -531,7 +521,6 @@ const VistaGestion = ({
                       </div>
                     </div>
 
-                    {/* NUEVA TARJETA: INSUMOS A RECLAMAR */}
                     <div onClick={() => setFiltroAlerta('insumos_a_reclamar')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-red-400 transition-all duration-300 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-4">
                         <span className="text-[10px] sm:text-[11px] font-black text-red-600 uppercase tracking-widest leading-tight">Insumos a Reclamar</span>
@@ -556,7 +545,6 @@ const VistaGestion = ({
                   </div>
                 </div>
 
-                {/* NUEVA TARJETA: OC PENDIENTES DE APROBACIÓN */}
                 <div onClick={() => setFiltroAlerta('oc_pend_aprobacion')} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-cyan-300 transition-all duration-300 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-[10px] sm:text-[11px] font-black text-cyan-600 uppercase tracking-widest leading-tight">OC a Firmar</span>
