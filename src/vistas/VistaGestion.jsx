@@ -173,16 +173,17 @@ const VistaGestion = ({
               <AnimatePresence initial={false}>
                 {estaExpandido && (
                   <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden bg-white">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
                       <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                           <th className="py-3 px-4 w-12 text-center">Sel.</th>
                           <th className="py-3 px-4 w-32">Código</th>
                           <th className="py-3 px-4">Insumo</th>
-                          <th className="py-3 px-4 text-center w-28">Stock</th>
-                          <th className="py-3 px-4 text-center w-32">Consumo Mes</th>
-                          <th className="py-3 px-4 text-center w-28">Cobertura</th>
-                          <th className="py-3 px-4 text-center w-36">Ticket</th>
+                          <th className="py-3 px-4 text-center w-24">Stock</th>
+                          <th className="py-3 px-4 text-center w-28">Consumo</th>
+                          <th className="py-3 px-4 text-center w-24">Cobertura</th>
+                          <th className="py-3 px-4 text-center w-28">Demorado</th>
+                          <th className="py-3 px-4 text-center w-32">Ticket</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -192,6 +193,30 @@ const VistaGestion = ({
                           let colorSemaforo = "text-emerald-600 bg-emerald-50 border-emerald-100";
                           if (Math.round(ins.supervivencia) <= (config?.umbralCritico || 0)) colorSemaforo = "text-red-600 bg-red-50 border-red-100";
                           else if (Math.round(ins.supervivencia) <= umbral) colorSemaforo = "text-amber-600 bg-amber-50 border-amber-100";
+
+                          // MAGIA NUEVA: Calcular la deuda atrasada EXCLUSIVA de este documento
+                          let cantAtrasadaDoc = 0;
+                          const hoyTabla = new Date(); hoyTabla.setHours(0,0,0,0);
+                          
+                          if (doc.tipo.includes('OC') && ins.detalleOCs) {
+                              ins.detalleOCs.filter(o => String(o.numero) === String(doc.numero)).forEach(oc => {
+                                  const fRaw = oc.fecha;
+                                  if (fRaw) {
+                                      let f = fRaw.seconds ? new Date(fRaw.seconds * 1000) : new Date(fRaw);
+                                      f.setHours(0,0,0,0);
+                                      if (f < hoyTabla) cantAtrasadaDoc += (Number(oc.cantidad) || 0);
+                                  }
+                              });
+                          } else if (doc.tipo.includes('SOLPED') && ins.detalleSolpeds) {
+                              ins.detalleSolpeds.filter(s => String(s.numero) === String(doc.numero)).forEach(sp => {
+                                  const fRaw = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
+                                  if (fRaw) {
+                                      let f = fRaw.seconds ? new Date(fRaw.seconds * 1000) : new Date(fRaw);
+                                      f.setHours(0,0,0,0);
+                                      if (f < hoyTabla) cantAtrasadaDoc += (Number(sp.cantidad) || 0);
+                                  }
+                              });
+                          }
 
                           return (
                             <tr key={ins.id} className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors cursor-pointer group">
@@ -212,6 +237,16 @@ const VistaGestion = ({
                                   {Math.round(ins.supervivencia) > 998 ? '999+' : Math.round(ins.supervivencia)} D
                                 </span>
                               </td>
+                              
+                              {/* NUEVA CELDA: COLUMNA DEMORADO */}
+                              <td className="py-3 px-4 text-center font-black text-xs" onClick={() => setActiveInsumo(ins)}>
+                                {cantAtrasadaDoc > 0 ? (
+                                  <span className="text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100">{formatoNum(cantAtrasadaDoc)}</span>
+                                ) : (
+                                  <span className="text-slate-300">0</span>
+                                )}
+                              </td>
+
                               <td className="py-3 px-4 text-center" onClick={() => setActiveInsumo(ins)}>
                                 {tieneTicketAbierto ? <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">🔒 {ins.ticketReclamo || 'Gestión'}</span> : <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Limpio</span>}
                               </td>
