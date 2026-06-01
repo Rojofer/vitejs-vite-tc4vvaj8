@@ -91,7 +91,9 @@ const ModalRedactor = ({
     // --- MAGIA DE LOTES CON CABECERA LIMPIA Y FILTRO A FUTURO ---
     if (lote.length > 1 && (txt.includes('{ocs}') || txt.includes('{ocs_aprobadas}') || txt.includes('{ocs_pendientes}'))) {
         const subTemplate = config.plantillaItemLote || "[{codigo}] {nombre}\n{repartos_sap}\n  TOTAL ADEUDADO: {total} un.";
-        let bloqueLote = "";
+        let cabeceraLote = "";
+        let cuerpoLote = "";
+        let itemsValidos = 0;
 
         // INYECCIÓN DE CABECERA (Cero Emojis)
         if (docContext) {
@@ -105,14 +107,14 @@ const ModalRedactor = ({
             }
             const prov = docContext.proveedor || lote[0].proveedor || "S/P";
             
-            bloqueLote += `DOCUMENTO: ${docContext.tipo} #${docContext.numero}\n`;
-            bloqueLote += `RESPONSABLE: ${respGlobal.toUpperCase()} | PROVEEDOR: ${prov}\n`;
-            bloqueLote += `--------------------------------------------------\n\n`;
+            cabeceraLote += `DOCUMENTO: ${docContext.tipo} #${docContext.numero}\n`;
+            cabeceraLote += `RESPONSABLE: ${respGlobal.toUpperCase()} | PROVEEDOR: ${prov}\n`;
+            cabeceraLote += `--------------------------------------------------\n\n`;
         }
 
         // ARMADO DE CADA INSUMO
         lote.forEach(item => {
-            let itemTxt = subTemplate.replace(/🔸 |↳ /g, ''); // Forzamos limpieza de iconos si quedaron
+            let itemTxt = subTemplate.replace(/🔸 |↳ /g, ''); // Limpieza estricta de iconos
             itemTxt = itemTxt.replace(/{codigo}/g, item.codigo || "");
             itemTxt = itemTxt.replace(/{nombre}/g, item.nombre || "");
             itemTxt = itemTxt.replace(/{dias}/g, Math.round(item.supervivencia));
@@ -125,7 +127,7 @@ const ModalRedactor = ({
                 const ocsMatch = item.detalleOCs.filter(o => String(o.numero) === String(docContext.numero));
                 ocsMatch.forEach(oc => {
                     const demora = calcularDemora(oc.fecha);
-                    if (demora > 0) { // <-- FILTRO: SOLO ENTRA SI ESTÁ DEMORADA
+                    if (demora > 0) { 
                         const cant = Number(oc.cantidad) || 0;
                         total += cant;
                         if (demora > maxDemora) maxDemora = demora;
@@ -137,7 +139,7 @@ const ModalRedactor = ({
                 spsMatch.forEach(sp => {
                     const fBase = sp.fechaCreacion || sp.fechaSolicitud || sp.fecha;
                     const demora = calcularDemora(fBase);
-                    if (demora > 0) { // <-- FILTRO: SOLO ENTRA SI ESTÁ DEMORADA
+                    if (demora > 0) { 
                         const cant = Number(sp.cantidad) || 0;
                         total += cant;
                         if (demora > maxDemora) maxDemora = demora;
@@ -146,21 +148,30 @@ const ModalRedactor = ({
                 });
             }
 
-            // Si el insumo no tenía NADA demorado (solo a futuro), mostramos un mensaje o lo dejamos vacío
-            if (repartosTxt === "") {
-                repartosTxt = `  - Sin entregas demoradas\n`;
+            // 🚀 PURIFICADOR DE RUIDO: Si el insumo tiene 0 entregas demoradas, SE ELIMINA DEL CORREO
+            if (repartosTxt === "" || total === 0) {
+                return; // Corta la ejecución de este ítem y pasa al siguiente, ignorándolo.
             }
 
+            itemsValidos++;
             itemTxt = itemTxt.replace(/{repartos_sap}/g, repartosTxt.trimEnd());
             itemTxt = itemTxt.replace(/{total}/g, fmt(total));
             itemTxt = itemTxt.replace(/{dias_demora}/g, maxDemora);
 
-            bloqueLote += itemTxt + "\n\n";
+            cuerpoLote += itemTxt + "\n\n";
         });
 
-        txt = txt.replace(/{ocs}/g, bloqueLote.trimEnd());
-        txt = txt.replace(/{ocs_aprobadas}/g, bloqueLote.trimEnd());
-        txt = txt.replace(/{ocs_pendientes}/g, bloqueLote.trimEnd());
+        // ENSAMBLAJE FINAL
+        let bloqueFinal = "";
+        if (itemsValidos > 0) {
+            bloqueFinal = cabeceraLote + cuerpoLote;
+        } else {
+            bloqueFinal = "⚠️ ALERTA DE SISTEMA: LOS INSUMOS SELECCIONADOS FUERON OMITIDOS PORQUE NINGUNO REGISTRA ENTREGAS DEMORADAS EN SAP PARA ESTA ORDEN DE COMPRA. NO ES NECESARIO RECLAMAR.";
+        }
+
+        txt = txt.replace(/{ocs}/g, bloqueFinal.trimEnd());
+        txt = txt.replace(/{ocs_aprobadas}/g, bloqueFinal.trimEnd());
+        txt = txt.replace(/{ocs_pendientes}/g, bloqueFinal.trimEnd());
     }
 
     const isAprobada = (estado) => {
