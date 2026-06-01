@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, Search, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const [esperandoEnvio, setEsperandoEnvio] = useState(false);
+const [modoSeleccionado, setModoSeleccionado] = useState(null);
+
 const ModalRedactor = ({
   reclamoDraft,
   setReclamoDraft,
