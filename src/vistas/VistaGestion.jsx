@@ -94,15 +94,10 @@ const VistaGestion = ({
       }
     });
 
-    // FILTRO CORPORATIVO: Dejamos solo los documentos con más de 1 insumo (las OCs individuales se ven en la lista general)
-    const documentosAgrupados = Object.values(mapa).filter(doc => doc.tipo === 'SIN DOCUMENTO' || doc.items.length > 1);
+    // FILTRO GERENCIAL: Eliminamos los 'SIN DOCUMENTO' y dejamos estrictamente OCs/Solpeds con más de 1 insumo
+    const documentosValidos = Object.values(mapa).filter(doc => doc.tipo !== 'SIN DOCUMENTO' && doc.items.length > 1);
 
-    // Ordenamos para que las OCs y Solpeds queden arriba, y los 'SIN DOCUMENTO' abajo
-    return documentosAgrupados.sort((a, b) => {
-      if (a.tipo === 'SIN DOCUMENTO') return 1;
-      if (b.tipo === 'SIN DOCUMENTO') return -1;
-      return a.id.localeCompare(b.id);
-    });
+    return documentosValidos.sort((a, b) => a.id.localeCompare(b.id));
   };
 
   const toggleExpandirDoc = (id) => setDocsExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
