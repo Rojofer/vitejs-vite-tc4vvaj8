@@ -156,11 +156,15 @@ const VistaGestion = ({
                   <button onClick={() => {
                       const itemsCompletos = doc.items.filter(i => itemsSeleccionados.includes(i.id));
                       if (itemsCompletos.length > 0 && typeof abrirRedactorReclamo === 'function') {
-                          // MAGIA: Le sumamos el proveedor al contexto
+                          // Se inyecta el proveedor al contexto
                           abrirRedactorReclamo(itemsCompletos, { numero: doc.numero, tipo: doc.tipo, proveedor: doc.proveedor });
                       }
                     }}
-                    className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-black uppercase text-[10px] tracking-widest px-4 py-2.5 rounded-xl shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-2"
+                    className={`w-full sm:w-auto text-white font-black uppercase text-[10px] tracking-widest px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 ${
+                      itemsSeleccionados.length > 1
+                        ? 'bg-indigo-600 hover:bg-indigo-700 shadow-[0_4px_15px_rgba(79,70,229,0.4)] ring-2 ring-indigo-200/50 scale-105'
+                        : 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
+                    }`}
                   >
                     <MessageSquare size={14}/> Reclamar {itemsSeleccionados.length} Sel.
                   </button>
