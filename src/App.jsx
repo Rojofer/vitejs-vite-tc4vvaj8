@@ -428,6 +428,11 @@ const App = () => {
     const plantillas = getPlantillasDinamicas();
     
     let tInicial = null;
+    
+    // MAGIA 1: Si es un lote, clava automáticamente la plantilla "6-MULTIPLES"
+    if (lote.length > 1) {
+        tInicial = plantillas.find(p => p.nombre.toUpperCase().includes('MULTIPLE') || p.nombre.startsWith('6'));
+    }
     if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped);
     if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente);
     if (!tInicial) tInicial = plantillas.find(p => p.isNormal);
@@ -459,17 +464,36 @@ const App = () => {
     const ticketActual = insumoBase.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
+    // MAGIA 2: Auto-seleccionar al Comprador exacto de esa OC
     let destinatariosMatch = [];
-    if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
-        const txtOwner = String(insumoBase.owner).trim().toLowerCase();
-        const contacto = (config.contactos || []).find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner));
-        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
+    let matchNames = [];
+    
+    if (docContext) {
+        if (docContext.tipo.includes('OC') && insumoBase.detalleOCs) {
+            const ocMatch = insumoBase.detalleOCs.find(o => String(o.numero) === String(docContext.numero));
+            if (ocMatch && ocMatch.comprador) matchNames.push(ocMatch.comprador);
+        } else if (docContext.tipo.includes('SOLPED') && insumoBase.detalleSolpeds) {
+            const spMatch = insumoBase.detalleSolpeds.find(s => String(s.numero) === String(docContext.numero));
+            if (spMatch && spMatch.comprador) matchNames.push(spMatch.comprador);
+        }
     }
+    if (matchNames.length === 0 && insumoBase.owner && insumoBase.owner !== "Sin asignar") {
+        matchNames.push(insumoBase.owner);
+    }
+
+    const limpiarAcentos = (str) => String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const responsablesLimpios = matchNames.filter(Boolean).map(r => limpiarAcentos(r));
+
+    (config.contactos || []).forEach(c => {
+        const terminos = [c.alias, c.label, c.email?.split('@')[0]].filter(Boolean).map(t => limpiarAcentos(t));
+        const coincidencia = terminos.some(t => responsablesLimpios.some(r => r.includes(t) || t.includes(r)));
+        if (coincidencia && c.tipo === destino) destinatariosMatch.push(c.id);
+    });
 
     setReclamoDraft({ 
       insumo: insumoBase, 
       lote: lote,
-      docContext: docContext, // FUNDAMENTAL GUARDAR ESTO ACÁ PARA EL MODAL
+      docContext: docContext, 
       destinatarios: destinatariosMatch, 
       asunto: asuntoConTicket, 
       cuerpo: cuerpo, 
@@ -479,6 +503,7 @@ const App = () => {
       ticketBorrador: ticketActual
     });
   };
+  
   const procesarGuardadoBD = async (draft) => {
     const loteIds = draft.lote ? draft.lote.map(i => i.id) : [draft.insumo.id];
 
