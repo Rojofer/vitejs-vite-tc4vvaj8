@@ -156,10 +156,26 @@ const ModalRedactor = ({
     
   // --- REGLA PARA LA ETIQUETA {ocs} Y SUB-PLANTILLAS ---
     if (txt.includes('{ocs}')) {
-      // Usamos exactamente la variable 'lote' definida en app.jsx
       if (reclamoDraft?.lote && Array.isArray(reclamoDraft.lote)) {
         
-        // Tomamos la sub-plantilla de tu configuración
+        // 1. CONSTRUCCIÓN DEL ENCABEZADO (Documento, Responsable y Proveedor)
+        let headerStr = "";
+        const docCtx = reclamoDraft.docContext;
+        
+        if (docCtx && docCtx.numero) {
+            const docNum = docCtx.numero;
+            const proveedor = docCtx.proveedor || reclamoDraft.lote[0]?.proveedor || "S/D";
+            
+            let responsable = reclamoDraft.lote[0]?.owner || "SIN ASIGNAR";
+            const ocMatch = (reclamoDraft.lote[0]?.detalleOCs || []).find(o => String(o.numero) === String(docNum));
+            if (ocMatch && ocMatch.comprador) {
+                responsable = ocMatch.comprador;
+            }
+
+            headerStr = `DOCUMENTO: ${docCtx.tipo || 'OC'} #${docNum}\nRESPONSABLE: ${responsable} | PROVEEDOR: ${proveedor}\n------------------------------------------------\n\n`;
+        }
+
+        // 2. PROCESAMIENTO DE LOS INSUMOS (Sub-plantilla)
         const subPlantilla = config?.subPlantillaLotes || "[{codigo}] {nombre}\n{repartos_sap}\nTOTAL ADEUDADO: {total} un.";
         
         const str = reclamoDraft.lote.map(ins => {
@@ -168,16 +184,18 @@ const ModalRedactor = ({
            const codigo = ins.codigo || "S/C";
            const nombre = ins.nombre || "Sin Nombre";
            
-           // FILTRO ESTRICTO: Solo OCs aprobadas y que ya estén DEMORADAS (excluye futuras)
-           const ocsDemoradas = (ins.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
+           // Filtro: Solo OCs demoradas y que coincidan exactamente con el Documento agrupador
+           let ocsDemoradas = (ins.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
+           if (docCtx && docCtx.numero) {
+               ocsDemoradas = ocsDemoradas.filter(oc => String(oc.numero) === String(docCtx.numero));
+           }
+
            const totalAdeudado = ocsDemoradas.reduce((sum, oc) => sum + (Number(oc.cantidad) || 0), 0);
 
-           // Replicamos la línea exacta de tu captura para cada reparto
            const repartosStr = ocsDemoradas.map(oc => {
                return `- ${fmt(oc.cantidad)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${calcularDemora(oc.fecha)} Días`;
            }).join('\n');
 
-           // Reemplazos de las etiquetas de la sub-plantilla
            subTxt = subTxt.replace(/{codigo}/g, codigo);
            subTxt = subTxt.replace(/{nombre}/g, nombre);
            subTxt = subTxt.replace(/{repartos_sap}/g, repartosStr || "- Sin entregas pendientes demoradas registradas.");
@@ -186,7 +204,8 @@ const ModalRedactor = ({
            return subTxt;
         }).join('\n\n'); 
 
-        txt = txt.replace(/{ocs}/g, str);
+        // 3. UNIÓN DE ENCABEZADO + INSUMOS
+        txt = txt.replace(/{ocs}/g, headerStr + str);
       } else {
         txt = txt.replace(/{ocs}/g, "");
       }
