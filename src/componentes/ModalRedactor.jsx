@@ -153,6 +153,42 @@ const ModalRedactor = ({
         : "No hay Solicitudes de Pedido con más de 10 días de antigüedad.";
       txt = txt.replace(/{solpeds_viejas}/g, str);
     }
+    // --- REGLA PARA LA ETIQUETA {ocs} Y SUB-PLANTILLAS ---
+    if (txt.includes('{ocs}')) {
+      if (reclamoDraft?.insumosLote && Array.isArray(reclamoDraft.insumosLote)) {
+        
+        // Tomamos la sub-plantilla de tu configuración
+        const subPlantilla = config?.subPlantillaLotes || "[{codigo}] {nombre}\n{repartos_sap}\nTOTAL ADEUDADO: {total} un.";
+        
+        const str = reclamoDraft.insumosLote.map(ins => {
+           let subTxt = subPlantilla;
+           
+           const codigo = ins.codigo || "S/C";
+           const nombre = ins.nombre || "Sin Nombre";
+           
+           // FILTRO ESTRICTO: Solo OCs aprobadas y que ya estén DEMORADAS (excluye futuras)
+           const ocsDemoradas = (ins.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
+           const totalAdeudado = ocsDemoradas.reduce((sum, oc) => sum + (Number(oc.cantidad) || 0), 0);
+
+           // Replicamos la línea exacta de tu captura para cada reparto
+           const repartosStr = ocsDemoradas.map(oc => {
+               return `- ${fmt(oc.cantidad)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${calcularDemora(oc.fecha)} Días`;
+           }).join('\n');
+
+           // Reemplazos de las etiquetas de la sub-plantilla
+           subTxt = subTxt.replace(/{codigo}/g, codigo);
+           subTxt = subTxt.replace(/{nombre}/g, nombre);
+           subTxt = subTxt.replace(/{repartos_sap}/g, repartosStr || "- Sin entregas pendientes demoradas registradas.");
+           subTxt = subTxt.replace(/{total}/g, fmt(totalAdeudado));
+           
+           return subTxt;
+        }).join('\n\n'); 
+
+        txt = txt.replace(/{ocs}/g, str);
+      } else {
+        txt = txt.replace(/{ocs}/g, "");
+      }
+    }
 
     return txt;
   };
