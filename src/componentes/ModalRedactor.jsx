@@ -190,6 +190,8 @@ const ModalRedactor = ({
       txt = txt.replace(/{ocs}/g, "");
     }
   }
+    return txt;
+};
 
   // --- MOTOR 2: MATCH AUTOMÁTICO DE CONTACTOS INTERNOS ---
   const autoSeleccionarDestinatarios = (textoTemplateCrudo, insumo, plantillaId) => {
