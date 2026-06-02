@@ -158,53 +158,69 @@ const ModalRedactor = ({
     if (txt.includes('{ocs}')) {
       if (reclamoDraft?.lote && Array.isArray(reclamoDraft.lote)) {
         
-        // 1. CONSTRUCCIÓN DEL ENCABEZADO (Documento, Responsable y Proveedor)
-        let headerStr = "";
         const docCtx = reclamoDraft.docContext;
+        let headerStr = "";
         
+        // 1. FILTRO ESTRICTO: Nos quedamos SOLO con los insumos que tienen demora para este documento
+        const insumosConDemora = reclamoDraft.lote.filter(ins => {
+           let ocs = (ins.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
+           if (docCtx && docCtx.numero) {
+               ocs = ocs.filter(oc => String(oc.numero) === String(docCtx.numero));
+           }
+           return ocs.length > 0;
+        });
+
+        // 2. CONSTRUCCIÓN DEL ENCABEZADO (Formato exacto de la 3ra imagen)
         if (docCtx && docCtx.numero) {
             const docNum = docCtx.numero;
             const proveedor = docCtx.proveedor || reclamoDraft.lote[0]?.proveedor || "S/D";
             
             let responsable = reclamoDraft.lote[0]?.owner || "SIN ASIGNAR";
-            const ocMatch = (reclamoDraft.lote[0]?.detalleOCs || []).find(o => String(o.numero) === String(docNum));
-            if (ocMatch && ocMatch.comprador) {
-                responsable = ocMatch.comprador;
+            for (const ins of reclamoDraft.lote) {
+                const ocMatch = (ins.detalleOCs || []).find(o => String(o.numero) === String(docNum));
+                if (ocMatch && ocMatch.comprador) {
+                    responsable = ocMatch.comprador;
+                    break;
+                }
             }
 
-            headerStr = `DOCUMENTO: ${docCtx.tipo || 'OC'} #${docNum}\nRESPONSABLE: ${responsable} | PROVEEDOR: ${proveedor}\n------------------------------------------------\n\n`;
+            headerStr = `DOCUMENTO: ${docCtx.tipo || 'OC'} #${docNum}\nRESPONSABLE: ${responsable}\nPROVEEDOR: ${proveedor}\n------------------------------------------------\n\n`;
         }
 
-        // 2. PROCESAMIENTO DE LOS INSUMOS (Sub-plantilla)
+        // 3. PROCESAMIENTO DE LOS INSUMOS (Itera solo sobre los que pasaron el filtro)
         const subPlantilla = config?.subPlantillaLotes || "[{codigo}] {nombre}\n{repartos_sap}\nTOTAL ADEUDADO: {total} un.";
         
-        const str = reclamoDraft.lote.map(ins => {
-           let subTxt = subPlantilla;
-           
-           const codigo = ins.codigo || "S/C";
-           const nombre = ins.nombre || "Sin Nombre";
-           
-           // Filtro: Solo OCs demoradas y que coincidan exactamente con el Documento agrupador
-           let ocsDemoradas = (ins.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
-           if (docCtx && docCtx.numero) {
-               ocsDemoradas = ocsDemoradas.filter(oc => String(oc.numero) === String(docCtx.numero));
-           }
+        let str = "";
+        if (insumosConDemora.length > 0) {
+            str = insumosConDemora.map(ins => {
+               let subTxt = subPlantilla;
+               
+               const codigo = ins.codigo || "S/C";
+               const nombre = ins.nombre || "Sin Nombre";
+               
+               let ocsDemoradas = (ins.detalleOCs || []).filter(oc => isAprobada(oc.estado) && calcularDemora(oc.fecha) > 0);
+               if (docCtx && docCtx.numero) {
+                   ocsDemoradas = ocsDemoradas.filter(oc => String(oc.numero) === String(docCtx.numero));
+               }
 
-           const totalAdeudado = ocsDemoradas.reduce((sum, oc) => sum + (Number(oc.cantidad) || 0), 0);
+               const totalAdeudado = ocsDemoradas.reduce((sum, oc) => sum + (Number(oc.cantidad) || 0), 0);
 
-           const repartosStr = ocsDemoradas.map(oc => {
-               return `- ${fmt(oc.cantidad)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${calcularDemora(oc.fecha)} Días`;
-           }).join('\n');
+               const repartosStr = ocsDemoradas.map(oc => {
+                   return `- ${fmt(oc.cantidad)} un. | SAP: ${formatearFechaCorta(oc.fecha)} | Demora: ${calcularDemora(oc.fecha)} Días`;
+               }).join('\n');
 
-           subTxt = subTxt.replace(/{codigo}/g, codigo);
-           subTxt = subTxt.replace(/{nombre}/g, nombre);
-           subTxt = subTxt.replace(/{repartos_sap}/g, repartosStr || "- Sin entregas pendientes demoradas registradas.");
-           subTxt = subTxt.replace(/{total}/g, fmt(totalAdeudado));
-           
-           return subTxt;
-        }).join('\n\n'); 
+               subTxt = subTxt.replace(/{codigo}/g, codigo);
+               subTxt = subTxt.replace(/{nombre}/g, nombre);
+               subTxt = subTxt.replace(/{repartos_sap}/g, repartosStr);
+               subTxt = subTxt.replace(/{total}/g, fmt(totalAdeudado));
+               
+               return subTxt;
+            }).join('\n\n');
+        } else {
+            str = "No hay entregas pendientes demoradas para los materiales seleccionados bajo este documento.";
+        }
 
-        // 3. UNIÓN DE ENCABEZADO + INSUMOS
+        // 4. UNIÓN DE ENCABEZADO + INSUMOS
         txt = txt.replace(/{ocs}/g, headerStr + str);
       } else {
         txt = txt.replace(/{ocs}/g, "");
