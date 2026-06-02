@@ -124,21 +124,75 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
       return Object.values(mapa).sort((a, b) => a.nombre.localeCompare(b.nombre));
     }, [insumos, reclamos, config]);
 
-    // --- ACCIÓN DE DESPACHO MANUAL AL SERVIDOR (APPS SCRIPT) ---
+    // --- ACCIÓN DE DESPACHO MANUAL AL SERVIDOR (APPS SCRIPT - OPTIMIZADO CERO CONSUMO) ---
     const ejecutarDespachoManual = async () => {
       if (operariosSeleccionados.length === 0) return;
       setEnviandoMails(true);
 
       try {
-        // ==============================================================================
-        // ⚠️ IMPORTANTE FERNANDO: Pegá acá la URL de tu Web App de Google Apps Script ⚠️
-        // ==============================================================================
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwzI91Zwm3ZAMhdlgKvKDtn2x0WXK6fQIuH2YQX9_bePkuSP8bKlMLZ_SnYDXFv3_IP/exec"; 
+        // 1. Armamos las lógicas de normalización y umbrales igual que el useMemo de la pantalla
+        const normalize = (str) => (str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+        
+        const obtenerNombreReal = (rawName) => {
+          const txt = normalize(rawName);
+          if (!config || !config.contactos) return txt;
+          const contacto = config.contactos.find(c => 
+            normalize(c.alias) === txt || normalize(c.label) === txt
+          );
+          return contacto && contacto.label ? normalize(contacto.label) : txt;
+        };
+
+        let umbral = 30;
+        if (config && config.umbralMailRiesgo !== undefined) {
+           umbral = Number(config.umbralMailRiesgo);
+        }
+
+        // 2. Mapeamos los tickets abiertos para aplicar el Filtro Anti-Fantasma en caliente
+        const insumosConReclamosActivos = {};
+        reclamos.forEach(r => {
+          if (r.estado === 'ABIERTO' && r.tipo !== 'equipo' && r.insumoId) {
+            insumosConReclamosActivos[r.insumoId] = true;
+          }
+        });
+
+        // 3. Filtramos la memoria local (Costo Firebase = 0) y agrupamos por Operario
+        const diccionarioAlertasMasticadas = {};
+
+        insumos.forEach(ins => {
+          if (ins.discontinuado || !ins.favorito) return;
+          if (ins.escalados !== 0) return;
+          if (Math.round(ins.supervivencia) > umbral) return;
+          
+          // Filtro Anti-Fantasma: Si ya tiene un ticket abierto en pantalla, no se vuelve a mandar
+          if (insumosConReclamosActivos[ins.id]) return;
+
+          const opUnificado = obtenerNombreReal(ins.owner);
+
+          // Si el operario actual no está tildado en los checkboxes del modal, lo salteamos
+          if (operariosSeleccionados.indexOf(opUnificado) === -1) return;
+
+          if (!diccionarioAlertasMasticadas[opUnificado]) {
+            diccionarioAlertasMasticadas[opUnificado] = [];
+          }
+
+          // Guardamos solo los datos estructurados que necesita Apps Script para armar el HTML
+          diccionarioAlertasMasticadas[opUnificado].push({
+            codigo: ins.codigo || "S/C",
+            nombre: ins.nombre || "Insumo",
+            cobertura: Math.round(ins.supervivencia || 0)
+          });
+        });
+
+        // 4. Despachamos el paquete estructurado al servidor
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwzI91Zwm3ZAMhdlgKvKDtn2x0WXK6fQIuH2YQX9_bePkuSP8bKlMLZ_SnYDXFv3_IP/exec";
         
         await fetch(SCRIPT_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain evita bloqueos CORS
-          body: JSON.stringify({ seleccionados: operariosSeleccionados })
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ 
+            seleccionados: operariosSeleccionados,
+            alertas: diccionarioAlertasMasticadas // <--- ACÁ VA EL NUEVO PAQUETE ARMADO
+          })
         });
 
         setToastMsg(`✅ Reportes enviados con éxito a ${operariosSeleccionados.length} operarios.`);
