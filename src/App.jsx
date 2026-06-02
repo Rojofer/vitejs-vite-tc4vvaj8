@@ -524,25 +524,21 @@ const App = () => {
     }
   };
 
-  const confirmarYGuardarReclamo = async (modoAccion) => {
-    // 1. MODO HILO
-    if (modoAccion === 'HILO') {
-      // Candado de seguridad por si no hay ticket
-      if (!reclamoDraft.insumo.ticketReclamo) {
-         setToastMsg("⚠️ Error: No podés continuar un hilo porque no existe un reclamo previo.");
-         setTimeout(() => setToastMsg(null), 4000);
-         return;
+  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
+    try {
+      await procesarGuardadoBD(reclamoDraft);
+      setReclamoDraft(null);
+      
+      if (modoAccion === 'HILO') {
+        setToastMsg("✅ Reclamo sumado al hilo y registrado en auditoría.");
+      } else {
+        setToastMsg("✅ Reclamo nuevo registrado en auditoría.");
       }
-      try {
-        // SOLO GUARDAR Y CERRAR (Ya no abrimos Gmail acá)
-        await procesarGuardadoBD(reclamoDraft);
-        setReclamoDraft(null);
-        setToastMsg("✅ Ticket de Hilo generado correctamente en el historial.");
-        setTimeout(() => setToastMsg(null), 5000);
-      } catch (error) {
-        console.error("Error en Hilo:", error);
-      }
-    } 
+      setTimeout(() => setToastMsg(null), 4000);
+    } catch (error) {
+      console.error("Error guardando reclamo:", error);
+    }
+  };
     // 2. MODO NUEVO RECLAMO
     else {
       try {
@@ -997,6 +993,8 @@ const App = () => {
             getPlantillasDinamicas={getPlantillasDinamicas}
             aplicarPlantilla={aplicarPlantilla}
             confirmarYGuardarReclamo={confirmarYGuardarReclamo}
+            tieneTicketActivo={reclamos.some(r => r.insumoId === reclamoDraft?.insumo?.id && r.estado === 'ABIERTO')}
+            setDialogoConfirmacion={setDialogoConfirmacion}
           />
         )}
       </AnimatePresence>
