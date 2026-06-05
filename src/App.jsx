@@ -428,11 +428,6 @@ const App = () => {
     const plantillas = getPlantillasDinamicas();
     
     let tInicial = null;
-    
-    // MAGIA 1: Si es un lote, clava automáticamente la plantilla "6-MULTIPLES"
-    if (lote.length > 1) {
-        tInicial = plantillas.find(p => p.nombre.toUpperCase().includes('MULTIPLE') || p.nombre.startsWith('6'));
-    }
     if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped);
     if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente);
     if (!tInicial) tInicial = plantillas.find(p => p.isNormal);
@@ -464,50 +459,26 @@ const App = () => {
     const ticketActual = insumoBase.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
-    // MAGIA 2: Auto-seleccionar al Comprador exacto de esa OC
     let destinatariosMatch = [];
-    let matchNames = [];
-    
-    if (docContext) {
-        if (docContext.tipo.includes('OC') && insumoBase.detalleOCs) {
-            const ocMatch = insumoBase.detalleOCs.find(o => String(o.numero) === String(docContext.numero));
-            if (ocMatch && ocMatch.comprador) matchNames.push(ocMatch.comprador);
-        } else if (docContext.tipo.includes('SOLPED') && insumoBase.detalleSolpeds) {
-            const spMatch = insumoBase.detalleSolpeds.find(s => String(s.numero) === String(docContext.numero));
-            if (spMatch && spMatch.comprador) matchNames.push(spMatch.comprador);
-        }
+    if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
+        const txtOwner = String(insumoBase.owner).trim().toLowerCase();
+        const contacto = (config.contactos || []).find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner));
+        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
     }
-    if (matchNames.length === 0 && insumoBase.owner && insumoBase.owner !== "Sin asignar") {
-        matchNames.push(insumoBase.owner);
-    }
-
-    const limpiarAcentos = (str) => String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const responsablesLimpios = matchNames.filter(Boolean).map(r => limpiarAcentos(r));
-
-    (config.contactos || []).forEach(c => {
-        const terminos = [c.alias, c.label, c.email?.split('@')[0]].filter(Boolean).map(t => limpiarAcentos(t));
-        const coincidencia = terminos.some(t => responsablesLimpios.some(r => r.includes(t) || t.includes(r)));
-        if (coincidencia && c.tipo === destino) destinatariosMatch.push(c.id);
-    });
-
-    // --- NUEVO: Detectar si el insumo ya tiene un ticket abierto en BD
-    const tieneTicketActivoReal = reclamos.some(r => r.insumoId === insumoBase.id && r.estado === 'ABIERTO');
 
     setReclamoDraft({ 
       insumo: insumoBase, 
       lote: lote,
-      docContext: docContext, 
+      docContext: docContext, // FUNDAMENTAL GUARDAR ESTO ACÁ PARA EL MODAL
       destinatarios: destinatariosMatch, 
       asunto: asuntoConTicket, 
       cuerpo: cuerpo, 
       tipoPlantilla: tInicial.id, 
       tipoDestino: destino, 
       showDestinatarios: destinatariosMatch.length === 0,
-      ticketBorrador: ticketActual,
-      tieneTicketActivo: tieneTicketActivoReal // --- NUEVO: Lo pasamos al modal
+      ticketBorrador: ticketActual
     });
   };
-  
   const procesarGuardadoBD = async (draft) => {
     const loteIds = draft.lote ? draft.lote.map(i => i.id) : [draft.insumo.id];
 
@@ -528,35 +499,56 @@ const App = () => {
     }
   };
 
-  const confirmarYGuardarReclamo = async (modoAccion) => {
-    // 1. MODO HILO
-    if (modoAccion === 'HILO') {
-      // Candado de seguridad por si no hay ticket
-      if (!reclamoDraft.insumo.ticketReclamo) {
-         setToastMsg("⚠️ Error: No podés continuar un hilo porque no existe un reclamo previo.");
-         setTimeout(() => setToastMsg(null), 4000);
-         return;
-      }
+  const confirmarYGuardarReclamo = async (modoAccion = 'NUEVO') => {
+    const correosDirectorio = reclamoDraft.destinatarios.map(id => config.contactos.find(c => c.id === id)?.email).filter(e => e);
+    const correoManual = reclamoDraft.correoManual ? reclamoDraft.correoManual.trim() : "";
+    const correosFinales = [...correosDirectorio];
+    if (correoManual) correosFinales.push(correoManual);
+    const correosStr = correosFinales.join(",");
+
+    if (correosStr.length === 0 && modoAccion !== 'HILO') {
+      setToastMsg("⚠️ Error: Seleccioná un destinatario antes de continuar.");
+      setTimeout(() => setToastMsg(null), 4000);
+      return;
+    }
+
+    const ejecutarFlujoNuevo = async () => {
       try {
-        // SOLO GUARDAR Y CERRAR (Ya no abrimos Gmail acá)
         await procesarGuardadoBD(reclamoDraft);
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
         setReclamoDraft(null);
-        setToastMsg("✅ Ticket de Hilo generado correctamente en el historial.");
+        setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
+        setTimeout(() => setToastMsg(null), 4000);
+      } catch (error) {
+        console.error("Error guardando reclamo:", error);
+      }
+    };
+
+    if (modoAccion === 'HILO') {
+      try {
+        navigator.clipboard.writeText(reclamoDraft.cuerpo);
+        await procesarGuardadoBD(reclamoDraft);
+        window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
+        setReclamoDraft(null);
+        setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
         setTimeout(() => setToastMsg(null), 5000);
       } catch (error) {
         console.error("Error en Hilo:", error);
       }
-    } 
-    // 2. MODO NUEVO RECLAMO
-    else {
-      try {
-        // SOLO GUARDAR Y CERRAR (Ya no abrimos Gmail acá)
-        await procesarGuardadoBD(reclamoDraft);
-        setReclamoDraft(null);
-        setToastMsg("✅ Nuevo Ticket generado correctamente en el historial.");
-        setTimeout(() => setToastMsg(null), 5000);
-      } catch (error) {
-        console.error("Error en Nuevo Reclamo:", error);
+    } else {
+      // Verifica si existe algún reclamo real de este insumo que todavía esté ABIERTO en la base de datos
+      const tieneTicketActivoReal = reclamos.some(r => r.insumoId === reclamoDraft.insumo.id && r.estado === 'ABIERTO');
+
+      if (reclamoDraft.insumo.ticketReclamo && tieneTicketActivoReal) {
+        setDialogoConfirmacion({
+          titulo: "⚠️ Atención: Reclamo ya iniciado",
+          mensaje: `Este material ya tiene un reclamo activo (${reclamoDraft.insumo.ticketReclamo}). Si enviás un correo nuevo, la conversación en Gmail se va a separar. Te sugerimos CANCELAR este cartel y presionar el botón "CONTINUAR HILO".`,
+          textoConfirmar: "Forzar envío nuevo",
+          colorBoton: "bg-red-500 hover:bg-red-600",
+          onConfirm: ejecutarFlujoNuevo
+        });
+      } else {
+        ejecutarFlujoNuevo();
       }
     }
   };
@@ -1006,17 +998,20 @@ const App = () => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {reclamoDraft && (
-          <ModalRedactor 
-            reclamoDraft={reclamoDraft}
-            setReclamoDraft={setReclamoDraft}
-            config={config}
-            currentUser={currentUser}
-            getPlantillasDinamicas={getPlantillasDinamicas}
-            aplicarPlantilla={aplicarPlantilla}
-            confirmarYGuardarReclamo={confirmarYGuardarReclamo}
-            setDialogoConfirmacion={setDialogoConfirmacion} // --- NUEVO
-          />
+        {showSettings && (
+          <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8">
+            <PanelAjustes 
+              configInicial={config} 
+              onClose={() => setShowSettings(false)} 
+              onGuardar={(nuevaConfig) => {
+                guardarConfigEnFirebase(nuevaConfig);
+                setToastMsg("✅ Ajustes guardados en la nube exitosamente.");
+                setTimeout(() => setToastMsg(null), 3000);
+              }}
+              onExportar={exportarBackupDB}
+              onImportar={importarBackupDB}
+            />
+          </div>
         )}
       </AnimatePresence>
       
