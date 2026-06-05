@@ -1006,20 +1006,17 @@ const App = () => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showSettings && (
-          <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8">
-            <PanelAjustes 
-              configInicial={config} 
-              onClose={() => setShowSettings(false)} 
-              onGuardar={(nuevaConfig) => {
-                guardarConfigEnFirebase(nuevaConfig);
-                setToastMsg("✅ Ajustes guardados en la nube exitosamente.");
-                setTimeout(() => setToastMsg(null), 3000);
-              }}
-              onExportar={exportarBackupDB}
-              onImportar={importarBackupDB}
-            />
-          </div>
+        {reclamoDraft && (
+          <ModalRedactor 
+            reclamoDraft={reclamoDraft}
+            setReclamoDraft={setReclamoDraft}
+            config={config}
+            currentUser={currentUser}
+            getPlantillasDinamicas={getPlantillasDinamicas}
+            aplicarPlantilla={aplicarPlantilla}
+            confirmarYGuardarReclamo={confirmarYGuardarReclamo}
+            setDialogoConfirmacion={setDialogoConfirmacion} // --- NUEVO
+          />
         )}
       </AnimatePresence>
       
