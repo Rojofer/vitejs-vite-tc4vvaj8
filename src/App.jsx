@@ -490,6 +490,9 @@ const App = () => {
         if (coincidencia && c.tipo === destino) destinatariosMatch.push(c.id);
     });
 
+    // --- NUEVO: Detectar si el insumo ya tiene un ticket abierto en BD
+    const tieneTicketActivoReal = reclamos.some(r => r.insumoId === insumoBase.id && r.estado === 'ABIERTO');
+
     setReclamoDraft({ 
       insumo: insumoBase, 
       lote: lote,
@@ -500,7 +503,8 @@ const App = () => {
       tipoPlantilla: tInicial.id, 
       tipoDestino: destino, 
       showDestinatarios: destinatariosMatch.length === 0,
-      ticketBorrador: ticketActual
+      ticketBorrador: ticketActual,
+      tieneTicketActivo: tieneTicketActivoReal // --- NUEVO: Lo pasamos al modal
     });
   };
   
