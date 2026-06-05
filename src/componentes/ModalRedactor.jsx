@@ -12,23 +12,7 @@ const ModalRedactor = ({
   confirmarYGuardarReclamo
 }) => {
   const [procesadoInicial, setProcesadoInicial] = useState(false);
-  const [esperandoEnvio, setEsperandoEnvio] = useState(false);
-  const [modoSeleccionado, setModoSeleccionado] = useState(null);
-
   if (!reclamoDraft) return null;
-
-  const prepararEnvio = (modo) => {
-      const docContext = reclamoDraft?.insumo;
-      const textoFinal = reclamoDraft?.cuerpo;
-      navigator.clipboard.writeText(textoFinal);
-      if (modo === 'HILO' && docContext?.ticketReclamo) {
-          window.open(`https://mail.google.com/mail/u/0/#search/"${docContext.ticketReclamo}"`, '_blank');
-      } else {
-          window.open('https://mail.google.com/mail/u/0/#inbox?compose=new', '_blank');
-      }
-      setModoSeleccionado(modo);
-      setEsperandoEnvio(true);
-  };
 
   const plantillas = getPlantillasDinamicas();
   const contactos = config?.contactos || [];
@@ -296,8 +280,7 @@ const ModalRedactor = ({
               <select 
                 value={reclamoDraft.tipoPlantilla} 
                 onChange={handlePlantillaChange}
-                disabled={esperandoEnvio}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all cursor-pointer disabled:opacity-50"
+                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all cursor-pointer"
               >
                 {plantillasOrdenadas.map(p => (
                   <option key={p.id} value={p.id}>{p.nombre.toUpperCase()}</option>
@@ -309,8 +292,8 @@ const ModalRedactor = ({
               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Destinatarios ({reclamoDraft.destinatarios?.length || 0})</label>
               <div className="relative">
                 <div 
-                  onClick={() => !esperandoEnvio && setReclamoDraft({...reclamoDraft, showDestinatarios: !reclamoDraft.showDestinatarios})}
-                  className={`w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-all shadow-sm min-h-[42px] ${esperandoEnvio ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => setReclamoDraft({...reclamoDraft, showDestinatarios: !reclamoDraft.showDestinatarios})}
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-all shadow-sm min-h-[42px]"
                 >
                   <span className="truncate uppercase font-black text-slate-700 max-w-[90%]">
                     {reclamoDraft.destinatarios?.length > 0 
@@ -324,7 +307,7 @@ const ModalRedactor = ({
                   <span className="text-[9px] text-slate-400 select-none">▼</span>
                 </div>  
                 
-                {reclamoDraft.showDestinatarios && !esperandoEnvio && (
+                {reclamoDraft.showDestinatarios && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto p-2">
                     {contactos.filter(c => c.tipo === tipoFiltroContacto).map(c => (
                       <label key={c.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
@@ -355,8 +338,7 @@ const ModalRedactor = ({
               type="text" 
               value={reclamoDraft.asunto} 
               onChange={(e) => setReclamoDraft({...reclamoDraft, asunto: e.target.value})}
-              disabled={esperandoEnvio}
-              className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all disabled:opacity-50"
+              className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-4 py-3 outline-none focus:border-orange-500 transition-all"
             />
           </div>
 
@@ -365,8 +347,7 @@ const ModalRedactor = ({
             <textarea 
               value={reclamoDraft.cuerpo} 
               onChange={(e) => setReclamoDraft({...reclamoDraft, cuerpo: e.target.value})}
-              disabled={esperandoEnvio}
-              className="w-full h-80 bg-white border-2 border-slate-200 text-lg font-medium text-slate-700 rounded-2xl px-6 py-5 outline-none focus:border-orange-500 transition-all resize-none shadow-sm font-sans leading-relaxed disabled:opacity-50 disabled:bg-slate-50"
+              className="w-full h-80 bg-white border-2 border-slate-200 text-lg font-medium text-slate-700 rounded-2xl px-6 py-5 outline-none focus:border-orange-500 transition-all resize-none shadow-sm font-sans leading-relaxed"
             />
           </div>
         </div>
@@ -374,38 +355,25 @@ const ModalRedactor = ({
         <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
           <button 
             onClick={() => setReclamoDraft(null)} 
-            disabled={esperandoEnvio}
-            className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            className="px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
           >
             Cancelar
           </button>
           
           <div className="flex items-center gap-3">
-            {esperandoEnvio ? (
-              <div className="flex w-full items-center justify-end gap-3 bg-orange-50 p-2 rounded-xl border border-orange-200">
-                <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest mr-auto pl-2 animate-pulse">⏳ ¿Enviaste el correo?</span>
-                <button onClick={() => setEsperandoEnvio(false)} className="px-4 py-2 rounded-lg font-bold text-[10px] uppercase bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 transition-all">❌ Cancelar</button>
-                <button onClick={() => confirmarYGuardarReclamo(modoSeleccionado)} className="px-4 py-2 rounded-lg font-black text-[10px] uppercase bg-emerald-500 text-white hover:bg-emerald-600 shadow-md transition-all">✅ SÍ, Generar Ticket</button>
-              </div>
-            ) : (
-              <>
-                {reclamoDraft?.insumo?.ticketReclamo && (
-                  <button 
-                    onClick={() => prepararEnvio('HILO')} 
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white border-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-400 shadow-sm transition-all active:scale-95"
-                  >
-                    <Search size={14} /> Continuar Hilo
-                  </button>
-                )}
+            <button 
+              onClick={() => confirmarYGuardarReclamo('HILO')} 
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white border-2 border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-400 shadow-sm transition-all active:scale-95"
+            >
+              <Search size={14} /> Continuar Hilo
+            </button>
 
-                <button 
-                  onClick={() => prepararEnvio('NUEVO')} 
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-orange-500 text-white hover:bg-orange-600 shadow-md transition-all active:scale-95"
-                >
-                  <Send size={14} /> Abrir Gmail
-                </button>
-              </>
-            )}
+            <button 
+              onClick={() => confirmarYGuardarReclamo('NUEVO')} 
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-orange-500 text-white hover:bg-orange-600 shadow-md transition-all active:scale-95"
+            >
+              <Send size={14} /> Abrir Gmail
+            </button>
           </div>
         </div>
       </motion.div>
