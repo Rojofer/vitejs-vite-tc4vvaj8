@@ -545,16 +545,30 @@ const App = () => {
     };
 
     if (lote.length > 1 && docContext?.tipo?.includes('OC')) {
-      // Buscar comprador en cualquier insumo del lote para la OC en cuestión
+      // Buscar comprador: 1) OC exacta, 2) cualquier OC del lote, 3) fallback owner
       let compradorOC = null;
+
+      // Intento 1: match exacto por número de OC
       for (const ins of lote) {
         const insReal = insumos.find(i => i.id === ins.id) || ins;
         const ocMatch = (insReal.detalleOCs || []).find(oc => String(oc.numero) === String(docContext.numero));
         if (ocMatch?.comprador) { compradorOC = ocMatch.comprador; break; }
       }
+
+      // Intento 2: cualquier OC del primer insumo del lote
+      if (!compradorOC) {
+        const insReal = insumos.find(i => i.id === lote[0].id) || lote[0];
+        const cualquierOC = (insReal.detalleOCs || [])[0];
+        if (cualquierOC?.comprador) compradorOC = cualquierOC.comprador;
+      }
+
+      // Intento 3: owner del insumo base
+      if (!compradorOC && insumoBase.owner) compradorOC = insumoBase.owner;
+
       if (compradorOC) {
         const contacto = buscarContactoPorNombre(compradorOC);
-        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
+        // Aceptar el contacto sin filtrar por tipo, ya que comprador puede ser de cualquier sector
+        if (contacto) destinatariosMatch.push(contacto.id);
       }
     } else if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
         const txtOwner = String(insumoBase.owner).trim().toLowerCase();
