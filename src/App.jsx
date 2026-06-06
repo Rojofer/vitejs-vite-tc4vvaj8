@@ -397,6 +397,35 @@ const App = () => {
     const solpedsD = insumo.detalleSolpeds || [];
     const listaSolpeds = solpedsD.length > 0 ? solpedsD.map(sp => `- S/P ${sp.numero} (${formatoNum(sp.cantidad)} un.)`).join("\n") : "Sin Solicitudes (S/P)";
 
+    // --- BLOQUE LOTE: genera cabecera OC + listado de insumos demorados ---
+    const calcularDemoradoDias = (fechaOC) => {
+      if (!fechaOC) return 0;
+      try {
+        const f = fechaOC.seconds ? new Date(fechaOC.seconds * 1000) : new Date(fechaOC);
+        const fCheck = new Date(f); fCheck.setHours(0,0,0,0);
+        const diff = Math.ceil((hoyCheck.getTime() - fCheck.getTime()) / (1000 * 60 * 60 * 24));
+        return diff > 0 ? diff : 0;
+      } catch(e) { return 0; }
+    };
+
+    const generarBloqueOCLote = (loteInsumos, ocNumero, ocProveedor, ocComprador) => {
+      const cabecera = `OC ${ocNumero} | Proveedor: ${ocProveedor || 'S/P'} | Responsable: ${ocComprador || 'SIN ASIGNAR'}`;
+      
+      const lineas = loteInsumos
+        .map(ins => {
+          // Buscar la OC específica en el detalle de este insumo
+          const ocDelInsumo = (ins.detalleOCs || []).find(oc => String(oc.numero) === String(ocNumero));
+          if (!ocDelInsumo) return null;
+          const diasDem = calcularDemoradoDias(ocDelInsumo.fecha);
+          if (diasDem === 0) return null; // Solo los que tienen demora real
+          return `${ins.codigo || ins.id} - ${ins.nombre || ''} (${formatoNum(ocDelInsumo.cantidad)} un.) | Demorada: ${diasDem} días`;
+        })
+        .filter(Boolean);
+
+      if (lineas.length === 0) return `${cabecera}\n\n(Sin ítems con demora registrada)`;
+      return `${cabecera}\n\n${lineas.join('\n')}`;
+    };
+
     const procesar = (txt) => {
       if (!txt) return "";
       // Reemplazos base (Inyectamos soporte para doc_numero y proveedor)
@@ -406,6 +435,40 @@ const App = () => {
                     .replace(/{fechaQuiebre}/g, fechaQ)
                     .replace(/{doc_numero}/g, docContext ? docContext.numero : "VARIOS")
                     .replace(/{proveedor}/g, docContext?.proveedor || insumo.proveedor || "S/P");
+
+      // Etiqueta especial para lotes agrupados por OC
+      if (base.includes('{ocs_lote_detalle}')) {
+        if (insumo.codigo === "MULTIPLES" && docContext) {
+          const ocNum = docContext.numero;
+          // Tomar proveedor y comprador de la primer OC que matchee en cualquier insumo del contexto
+          let ocProv = docContext.proveedor || "";
+          let ocComp = "";
+          const loteCompleto = insumo._loteRef || [];
+          if (!ocProv || !ocComp) {
+            for (const ins of loteCompleto) {
+              const ocMatch = (ins.detalleOCs || []).find(oc => String(oc.numero) === String(ocNum));
+              if (ocMatch) {
+                if (!ocProv) ocProv = ocMatch.proveedor || "";
+                if (!ocComp) ocComp = ocMatch.comprador || "";
+                if (ocProv && ocComp) break;
+              }
+            }
+          }
+          base = base.replace(/{ocs_lote_detalle}/g, generarBloqueOCLote(loteCompleto, ocNum, ocProv, ocComp));
+        } else if (insumo.codigo !== "MULTIPLES") {
+          // Para insumo individual, construir bloque con su única OC del docContext
+          const ocNum = docContext ? docContext.numero : (ocsD[0]?.numero || "");
+          const ocRef = ocsD.find(oc => String(oc.numero) === String(ocNum)) || ocsD[0];
+          if (ocRef) {
+            const diasDem = calcularDemoradoDias(ocRef.fecha);
+            const cabecera = `OC ${ocRef.numero} | Proveedor: ${ocRef.proveedor || 'S/P'} | Responsable: ${ocRef.comprador || 'SIN ASIGNAR'}`;
+            const linea = `${insumo.codigo} - ${insumo.nombre} (${formatoNum(ocRef.cantidad)} un.) | Demorada: ${diasDem} días`;
+            base = base.replace(/{ocs_lote_detalle}/g, `${cabecera}\n\n${linea}`);
+          } else {
+            base = base.replace(/{ocs_lote_detalle}/g, listaOcs);
+          }
+        }
+      }
 
       // Si es un LOTE, NO reemplazamos {ocs} acá, lo dejamos intacto para que el ModalRedactor incruste la Sub-Plantilla
       if (insumo.codigo !== "MULTIPLES") {
@@ -452,7 +515,8 @@ const App = () => {
         detalleOCs: ocAisladas, 
         detalleSolpeds: spAisladas,
         nombre: lote.length > 1 ? `LOTE DE ${lote.length} INSUMOS (${docReferencia})` : insumoBase.nombre, 
-        codigo: lote.length > 1 ? "MULTIPLES" : insumoBase.codigo 
+        codigo: lote.length > 1 ? "MULTIPLES" : insumoBase.codigo,
+        _loteRef: lote.length > 1 ? lote.map(l => insumos.find(i => i.id === l.id) || l) : [insumoBase]
     };
 
     const { asunto, cuerpo, destino } = aplicarPlantilla(insumoParaPlantilla, tInicial.id, docContext);
@@ -512,57 +576,26 @@ const App = () => {
       return;
     }
 
-    const ejecutarFlujoNuevo = () => {
-      const draftParaGuardar = { ...reclamoDraft };
-      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`;
-
-      // 1. Abre Gmail SIN generar el ticket todavía
-      window.open(gmailUrl, '_blank');
-      setReclamoDraft(null);
-
-      // 2. Pregunta si se envió el mail antes de registrar el ticket
-      setDialogoConfirmacion({
-        titulo: "📬 ¿Se envió el mail?",
-        mensaje: "¿Pudiste enviar el correo en Gmail? Si confirmás, se generará el ticket del reclamo en el sistema.",
-        textoConfirmar: "✅ Sí, generar ticket",
-        colorBoton: "bg-emerald-500 hover:bg-emerald-600",
-        onConfirm: async () => {
-          try {
-            await procesarGuardadoBD(draftParaGuardar);
-            setToastMsg("✅ Ticket registrado correctamente.");
-            setTimeout(() => setToastMsg(null), 4000);
-          } catch (error) {
-            console.error("Error guardando reclamo:", error);
-            setToastMsg("❌ Error al guardar el ticket. Reintentá.");
-            setTimeout(() => setToastMsg(null), 5000);
-          }
-        }
-      });
+    const ejecutarFlujoNuevo = async () => {
+      try {
+        await procesarGuardadoBD(reclamoDraft);
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
+        setReclamoDraft(null);
+        setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
+        setTimeout(() => setToastMsg(null), 4000);
+      } catch (error) {
+        console.error("Error guardando reclamo:", error);
+      }
     };
 
     if (modoAccion === 'HILO') {
-      const draftHilo = { ...reclamoDraft };
       try {
         navigator.clipboard.writeText(reclamoDraft.cuerpo);
+        await procesarGuardadoBD(reclamoDraft);
         window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
         setReclamoDraft(null);
-
-        // Pregunta si se envió el hilo antes de registrar
-        setDialogoConfirmacion({
-          titulo: "📬 ¿Se envió el hilo?",
-          mensaje: "¿Pegaste y enviaste el mensaje en Gmail? Si confirmás, se actualizará el registro del reclamo en auditoría.",
-          textoConfirmar: "✅ Sí, registrar",
-          colorBoton: "bg-sky-500 hover:bg-sky-600",
-          onConfirm: async () => {
-            try {
-              await procesarGuardadoBD(draftHilo);
-              setToastMsg("✅ Hilo registrado en auditoría.");
-              setTimeout(() => setToastMsg(null), 4000);
-            } catch (error) {
-              console.error("Error en Hilo:", error);
-            }
-          }
-        });
+        setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
+        setTimeout(() => setToastMsg(null), 5000);
       } catch (error) {
         console.error("Error en Hilo:", error);
       }
