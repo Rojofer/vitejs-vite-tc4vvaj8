@@ -584,6 +584,7 @@ const App = () => {
       asunto: asuntoConTicket, 
       cuerpo: cuerpo, 
       tipoPlantilla: tInicial.id, 
+      tipoPlantillaNombre: tInicial.nombre || tInicial.id,
       tipoDestino: destino, 
       showDestinatarios: destinatariosMatch.length === 0,
       ticketBorrador: ticketActual
@@ -600,7 +601,7 @@ const App = () => {
       cuerpoOriginal: draft.cuerpo, 
       fecha: serverTimestamp(), 
       estado: "ABIERTO", 
-      tipo: draft.tipoDestino 
+      tipo: draft.tipoPlantillaNombre || draft.tipoDestino 
     });
 
     // Impactar el Ticket en TODOS los insumos seleccionados a la vez
@@ -622,26 +623,56 @@ const App = () => {
       return;
     }
 
-    const ejecutarFlujoNuevo = async () => {
-      try {
-        await procesarGuardadoBD(reclamoDraft);
-        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`, '_blank');
-        setReclamoDraft(null);
-        setToastMsg("✅ Reclamo nuevo registrado y Gmail abierto.");
-        setTimeout(() => setToastMsg(null), 4000);
-      } catch (error) {
-        console.error("Error guardando reclamo:", error);
-      }
+    const ejecutarFlujoNuevo = () => {
+      const draftParaGuardar = { ...reclamoDraft };
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${correosStr}&su=${encodeURIComponent(reclamoDraft.asunto)}&body=${encodeURIComponent(reclamoDraft.cuerpo)}`;
+
+      // 1. Abre Gmail SIN generar el ticket todavía
+      window.open(gmailUrl, '_blank');
+      setReclamoDraft(null);
+
+      // 2. Pregunta si se envió el mail antes de registrar el ticket
+      setDialogoConfirmacion({
+        titulo: "📬 ¿Se envió el mail?",
+        mensaje: "¿Pudiste enviar el correo en Gmail? Si confirmás, se generará el ticket del reclamo en el sistema.",
+        textoConfirmar: "✅ Sí, generar ticket",
+        colorBoton: "bg-emerald-500 hover:bg-emerald-600",
+        onConfirm: async () => {
+          try {
+            await procesarGuardadoBD(draftParaGuardar);
+            setToastMsg("✅ Ticket registrado correctamente.");
+            setTimeout(() => setToastMsg(null), 4000);
+          } catch (error) {
+            console.error("Error guardando reclamo:", error);
+            setToastMsg("❌ Error al guardar el ticket. Reintentá.");
+            setTimeout(() => setToastMsg(null), 5000);
+          }
+        }
+      });
     };
 
     if (modoAccion === 'HILO') {
+      const draftHilo = { ...reclamoDraft };
       try {
         navigator.clipboard.writeText(reclamoDraft.cuerpo);
-        await procesarGuardadoBD(reclamoDraft);
         window.open(`https://mail.google.com/mail/u/0/#search/"${reclamoDraft.ticketBorrador}"`, '_blank');
         setReclamoDraft(null);
-        setToastMsg("✅ Texto copiado. Pegalo en la respuesta de Gmail.");
-        setTimeout(() => setToastMsg(null), 5000);
+
+        setDialogoConfirmacion({
+          titulo: "📬 ¿Se envió el hilo?",
+          mensaje: "¿Pegaste y enviaste el mensaje en Gmail? Si confirmás, se actualizará el registro del reclamo en auditoría.",
+          textoConfirmar: "✅ Sí, registrar",
+          colorBoton: "bg-sky-500 hover:bg-sky-600",
+          onConfirm: async () => {
+            try {
+              await procesarGuardadoBD(draftHilo);
+              setToastMsg("✅ Hilo registrado en auditoría.");
+              setTimeout(() => setToastMsg(null), 4000);
+            } catch (error) {
+              console.error("Error en Hilo:", error);
+            }
+          }
+        });
       } catch (error) {
         console.error("Error en Hilo:", error);
       }
