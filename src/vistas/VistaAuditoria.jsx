@@ -596,11 +596,26 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
     if (auditoriaFiltroInsumo) filtrados = filtrados.filter(r => r.insumoId === auditoriaFiltroInsumo);
 
     const hilos = useMemo(() => { 
-      const m = {}; 
-      filtrados.forEach(r => { 
-        if (!m[r.insumoId]) m[r.insumoId] = { ...r, totalReclamos: 1, subReclamos: [r] }; 
-        else { m[r.insumoId].totalReclamos += 1; m[r.insumoId].subReclamos.push(r); } 
-      }); 
+      const m = {};
+      filtrados.forEach(r => {
+        // Lotes: agrupar por loteTicket; individuales: agrupar por insumoId
+        const key = r.loteTicket ? `lote_${r.loteTicket}` : r.insumoId;
+        if (!m[key]) {
+          m[key] = { 
+            ...r, 
+            totalReclamos: 1, 
+            subReclamos: [r],
+            esLote: !!r.loteTicket,
+            loteInsumoIds: r.loteTicket ? [r.insumoId] : [],
+            // Para lotes mostrar como "LOTE" en lugar de insumoId individual
+            insumoId: r.loteTicket ? r.insumoId : r.insumoId
+          };
+        } else {
+          m[key].totalReclamos += 1;
+          m[key].subReclamos.push(r);
+          if (r.loteTicket) m[key].loteInsumoIds.push(r.insumoId);
+        }
+      });
       return Object.values(m).sort((a, b) => {
         if (ordenTabla === 'recientes') return (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0);
         if (ordenTabla === 'criticos') return (a.fecha?.seconds || 0) - (b.fecha?.seconds || 0);
@@ -782,13 +797,26 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
                                 })()}
                               </td>
                               <td className="py-4 px-4">
-                                <div className="flex flex-col">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CÓDIGO: {insumoAsociado.codigo || 'S/C'}</span>
-                                  <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
-                                    {insumoAsociado.nombre || 'GENERAL'}
-                                    {h.totalReclamos > 1 && <span className="bg-slate-200 text-slate-600 text-[8px] px-1.5 py-0.5 rounded-full">{h.totalReclamos} MSJS</span>}
-                                  </span>
-                                </div>
+                                {h.esLote ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">LOTE · {h.loteInsumoIds.length} INSUMOS</span>
+                                    {h.loteInsumoIds.slice(0, 3).map(id => {
+                                      const ins = insumos.find(i => i.id === id);
+                                      return ins ? (
+                                        <span key={id} className="text-[10px] font-black text-slate-700 uppercase">{ins.codigo} — {ins.nombre}</span>
+                                      ) : null;
+                                    })}
+                                    {h.loteInsumoIds.length > 3 && <span className="text-[9px] text-slate-400 font-bold">+{h.loteInsumoIds.length - 3} más...</span>}
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{insumoAsociado.codigo || 'S/C'}</span>
+                                    <span className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
+                                      {insumoAsociado.nombre || 'GENERAL'}
+                                      {h.totalReclamos > 1 && <span className="bg-slate-200 text-slate-600 text-[8px] px-1.5 py-0.5 rounded-full">{h.totalReclamos} MSJS</span>}
+                                    </span>
+                                  </div>
+                                )}
                               </td>
                               <td className="py-4 px-4 text-center">
                                 <div className="flex flex-col gap-1.5 items-center">
