@@ -30,13 +30,22 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
     const [enviandoMails, setEnviandoMails] = useState(false);
 
     // CEREBRO CLASIFICADOR
-    const getTipoReclamo = (asunto) => {
+    const getTipoReclamo = (asunto, tipoGuardado) => {
+      // Primero usar el tipo guardado en Firebase (más confiable)
+      const tipo = (tipoGuardado || "").toUpperCase();
+      if (tipo.includes("MULTIPLES") || tipo.includes("MÚLTIPLES") || tipo.includes("6-MULTIPLES") || tipo.includes("MULTIPLE")) return { num: "6", label: "MÚLTIPLES X O/C", style: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+      if (tipo.includes("SOLPED")) return { num: "1", label: "SOLPEDS SIN O/C", style: "bg-sky-50 text-sky-700 border-sky-200" };
+      if (tipo.includes("AUTORIZAR")) return { num: "2", label: "AUTORIZAR OC", style: "bg-purple-50 text-purple-700 border-purple-200" };
+      if (tipo.includes("DEMORADA") || tipo.includes("O/C DEMORADAS")) return { num: "3", label: "O/C DEMORADAS", style: "bg-orange-50 text-orange-700 border-orange-200" };
+      if (tipo.includes("QUIEBRE") || tipo.includes("URGENTE")) return { num: "4", label: "RIESGO DE QUIEBRE", style: "bg-red-50 text-red-700 border-red-200" };
+      if (tipo.includes("ADELANTAR")) return { num: "5", label: "ADELANTAR OC", style: "bg-teal-50 text-teal-700 border-teal-200" };
+      // Fallback por asunto del mail
       const txt = (asunto || "").toUpperCase();
       if (txt.includes("SOLPED")) return { num: "1", label: "SOLPEDS SIN O/C", style: "bg-sky-50 text-sky-700 border-sky-200" };
       if (txt.includes("AUTORIZAR")) return { num: "2", label: "AUTORIZAR OC", style: "bg-purple-50 text-purple-700 border-purple-200" };
-      if (txt.includes("APROBADA DEMORADA")) return { num: "3", label: "O/C DEMORADAS", style: "bg-orange-50 text-orange-700 border-orange-200" };
+      if (txt.includes("APROBADA DEMORADA") || txt.includes("DEMORADA")) return { num: "3", label: "O/C DEMORADAS", style: "bg-orange-50 text-orange-700 border-orange-200" };
       if (txt.includes("QUIEBRE")) return { num: "4", label: "RIESGO DE QUIEBRE", style: "bg-red-50 text-red-700 border-red-200" };
-      if (txt.includes("ADELANTAR")) return { num: "5", label: "ADELANTAR OC", style: "bg-teal-50 text-teal-700 border-teal-200" };
+      if (txt.includes("ADELANTAR")) return { num: "5", label: "ADELANTAR OC", style: "bg-teal-50 text-teal-79 border-teal-200" };
       return { num: "0", label: "HISTÓRICO", style: "bg-slate-50 text-slate-500 border-slate-200" };
     };
 
@@ -280,7 +289,7 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
       });
       const rankingComps = {};
       ticketsParaCompradores.forEach(r => {
-        const tipo = getTipoReclamo(r.mensaje);
+        const tipo = getTipoReclamo(r.mensaje, r.tipo);
         if (tipo.num === "2" || r.tipo === 'APROBACION GERENCIA') return; 
         const comp = extraerComprador(r.cuerpoOriginal);
         if (!rankingComps[comp]) rankingComps[comp] = { total: 0, cerrados: 0 };
@@ -341,7 +350,7 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
       ticketsDashboard.forEach(t => { if (t.interaccionesTotal === 1) hilosUnicos++; else if (t.interaccionesTotal > 1) hilosMultiples++; });
       const efectividadPrimerContacto = (hilosUnicos + hilosMultiples) > 0 ? Math.round((hilosUnicos / (hilosUnicos + hilosMultiples)) * 100) : 100;
 
-      const pendientesGerencia = ticketsDashboard.filter(r => (getTipoReclamo(r.mensaje).num === "2" || r.tipo === 'APROBACION GERENCIA') && r.estado === 'ABIERTO').length;
+      const pendientesGerencia = ticketsDashboard.filter(r => (getTipoReclamo(r.mensaje, r.tipo).num === "2" || r.tipo === 'APROBACION GERENCIA') && r.estado === 'ABIERTO').length;
 
       const ticketsTiempoReal = validosTickets.filter(r => {
         const ins = insumos.find(i => i.id === r.insumoId);
@@ -435,10 +444,18 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
     const ejecutarCierreMasivoEnBloque = async (insumoId) => {
       try {
         const batch = writeBatch(db);
+        // Preservar el ticketReclamo antes de borrarlo del insumo
+        const insumoActual = insumos.find(i => i.id === insumoId);
+        const ticketHistorial = insumoActual?.ticketReclamo || null;
         const qReclamos = query(collection(db, "reclamos"), where("insumoId", "==", insumoId), where("estado", "==", "ABIERTO"));
         const snapshot = await getDocs(qReclamos);
         snapshot.docs.forEach((docSnap) => {
-          batch.update(doc(db, "reclamos", docSnap.id), { estado: 'CERRADO', fechaCierre: serverTimestamp(), motivoCierre: `Cierre unificado por ${currentUser.nombre}` });
+          batch.update(doc(db, "reclamos", docSnap.id), { 
+            estado: 'CERRADO', 
+            fechaCierre: serverTimestamp(), 
+            motivoCierre: `Cierre unificado por ${currentUser.nombre}`,
+            ticketCerrado: ticketHistorial || docSnap.data().ticketBorrador || ""
+          });
         });
         batch.update(doc(db, "insumos", insumoId), { ticketReclamo: null });
         await batch.commit();
@@ -490,7 +507,7 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
       let csv = "Fecha,Estado,Tipo,Insumo,Comprador,Mensaje,Operario\n";
       filtrados.forEach(r => { 
         const ins = insumos.find(i => i.id === r.insumoId)?.nombre || 'Eliminado'; 
-        const tipoDef = getTipoReclamo(r.mensaje);
+        const tipoDef = getTipoReclamo(r.mensaje, r.tipo);
         const comp = extraerComprador(r.cuerpoOriginal);
         csv += `"${formatearFecha(r.fecha)}","${r.estado}","[${tipoDef.num}] ${tipoDef.label}","${ins}","${comp}","${r.mensaje}","${r.operario}"\n`; 
       });
@@ -713,12 +730,15 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
                                 ) : ( <span className="w-6 inline-block"></span> )}
                               </td>
                               <td className="py-4 px-4 text-center align-middle">
-                                {insumoAsociado.ticketReclamo ? (
-                                  <div className="flex items-center justify-center gap-1.5 group/ticket">
-                                    <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-700 tracking-wide border border-slate-200">{insumoAsociado.ticketReclamo}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`[${insumoAsociado.ticketReclamo}]`); setToastMsg(`📋 Copiado`); setTimeout(() => setToastMsg(null), 2000); }} className="p-1 rounded-md text-slate-400 hover:text-cyan-600 hover:bg-slate-100 opacity-0 group-hover/ticket:opacity-100 transition-all"><Copy size={12} /></button>
-                                  </div>
-                                ) : <span className="text-slate-400">-</span>}
+                                {(() => {
+                                  const ticketNum = insumoAsociado.ticketReclamo || h.ticketCerrado || null;
+                                  return ticketNum ? (
+                                    <div className="flex items-center justify-center gap-1.5 group/ticket">
+                                      <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-700 tracking-wide border border-slate-200">{ticketNum}</span>
+                                      <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`[${ticketNum}]`); setToastMsg(`📋 Copiado`); setTimeout(() => setToastMsg(null), 2000); }} className="p-1 rounded-md text-slate-400 hover:text-cyan-600 hover:bg-slate-100 opacity-0 group-hover/ticket:opacity-100 transition-all"><Copy size={12} /></button>
+                                    </div>
+                                  ) : <span className="text-slate-400">-</span>;
+                                })()}
                               </td>
                               <td className="py-4 px-4">
                                 <div className="flex flex-col">
