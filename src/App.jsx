@@ -584,7 +584,7 @@ const App = () => {
       asunto: asuntoConTicket, 
       cuerpo: cuerpo, 
       tipoPlantilla: tInicial.id, 
-      tipoPlantillaNombre: tInicial.nombre || tInicial.id,
+      tipoPlantillaNombre: tInicial.nombre || tInicial.id || "",
       tipoDestino: destino, 
       showDestinatarios: destinatariosMatch.length === 0,
       ticketBorrador: ticketActual
@@ -592,21 +592,38 @@ const App = () => {
   };
   const procesarGuardadoBD = async (draft) => {
     const loteIds = draft.lote ? draft.lote.map(i => i.id) : [draft.insumo.id];
+    const esLote = loteIds.length > 1;
+    const tipoFinal = draft.tipoPlantillaNombre || draft.tipoDestino;
 
-    await addDoc(collection(db, "reclamos"), { 
-      insumoId: draft.insumo.id, 
-      insumosLoteIds: loteIds, // Registramos todos los involucrados
-      operario: currentUser.nombre, 
-      mensaje: draft.asunto, 
-      cuerpoOriginal: draft.cuerpo, 
-      fecha: serverTimestamp(), 
-      estado: "ABIERTO", 
-      tipo: draft.tipoPlantillaNombre || draft.tipoDestino 
-    });
-
-    // Impactar el Ticket en TODOS los insumos seleccionados a la vez
-    for (const id of loteIds) {
+    if (esLote) {
+      // Para lotes: un registro por cada insumo, todos comparten ticket y cuerpo
+      for (const id of loteIds) {
+        await addDoc(collection(db, "reclamos"), {
+          insumoId: id,
+          insumosLoteIds: loteIds,
+          loteTicket: draft.ticketBorrador, // referencia al ticket madre del lote
+          operario: currentUser.nombre,
+          mensaje: draft.asunto,
+          cuerpoOriginal: draft.cuerpo,
+          fecha: serverTimestamp(),
+          estado: "ABIERTO",
+          tipo: tipoFinal
+        });
         await updateDoc(doc(db, "insumos", id), { ticketReclamo: draft.ticketBorrador });
+      }
+    } else {
+      // Insumo individual: un único registro
+      await addDoc(collection(db, "reclamos"), {
+        insumoId: draft.insumo.id,
+        insumosLoteIds: loteIds,
+        operario: currentUser.nombre,
+        mensaje: draft.asunto,
+        cuerpoOriginal: draft.cuerpo,
+        fecha: serverTimestamp(),
+        estado: "ABIERTO",
+        tipo: tipoFinal
+      });
+      await updateDoc(doc(db, "insumos", draft.insumo.id), { ticketReclamo: draft.ticketBorrador });
     }
   };
 
