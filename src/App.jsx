@@ -490,7 +490,12 @@ const App = () => {
     const hasSolpeds = lote.some(i => i.sp > 0);
     const plantillas = getPlantillasDinamicas();
     
+    // --- Selección de plantilla inicial ---
+    // Para lotes múltiples por OC, priorizar la plantilla marcada como isMultiple
     let tInicial = null;
+    if (lote.length > 1 && docContext?.tipo?.includes('OC')) {
+      tInicial = plantillas.find(p => p.isMultiple);
+    }
     if (!tInicial && hasSolpeds) tInicial = plantillas.find(p => p.isSolped);
     if (!tInicial && isGrave) tInicial = plantillas.find(p => p.isUrgente);
     if (!tInicial) tInicial = plantillas.find(p => p.isNormal);
@@ -523,10 +528,37 @@ const App = () => {
     const ticketActual = insumoBase.ticketReclamo || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const asuntoConTicket = `${asunto} [${ticketActual}]`;
 
+    // --- Match de destinatario ---
+    // Para lotes por OC: buscar el comprador de la OC en los contactos por nombre parcial
+    // Para insumo individual: usar el owner como antes
     let destinatariosMatch = [];
-    if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
+    const contactos = config.contactos || [];
+
+    const buscarContactoPorNombre = (nombreCompleto) => {
+      // "Nahuel Jose Jumill (GO9)" -> comparar cada palabra contra label/alias de contactos
+      const palabras = String(nombreCompleto).toLowerCase().replace(/\(.*?\)/g, '').trim().split(/\s+/);
+      return contactos.find(c => {
+        const label = String(c.label || '').toLowerCase().trim();
+        const alias = String(c.alias || '').toLowerCase().trim();
+        return palabras.some(p => p.length > 3 && (label.includes(p) || alias.includes(p)));
+      });
+    };
+
+    if (lote.length > 1 && docContext?.tipo?.includes('OC')) {
+      // Buscar comprador en cualquier insumo del lote para la OC en cuestión
+      let compradorOC = null;
+      for (const ins of lote) {
+        const insReal = insumos.find(i => i.id === ins.id) || ins;
+        const ocMatch = (insReal.detalleOCs || []).find(oc => String(oc.numero) === String(docContext.numero));
+        if (ocMatch?.comprador) { compradorOC = ocMatch.comprador; break; }
+      }
+      if (compradorOC) {
+        const contacto = buscarContactoPorNombre(compradorOC);
+        if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
+      }
+    } else if (insumoBase.owner && insumoBase.owner !== "Sin asignar") { 
         const txtOwner = String(insumoBase.owner).trim().toLowerCase();
-        const contacto = (config.contactos || []).find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner));
+        const contacto = contactos.find(c => (c.alias && String(c.alias).trim().toLowerCase() === txtOwner) || (c.label && String(c.label).trim().toLowerCase() === txtOwner));
         if (contacto && contacto.tipo === destino) destinatariosMatch.push(contacto.id);
     }
 
