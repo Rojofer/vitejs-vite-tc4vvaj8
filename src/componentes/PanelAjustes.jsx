@@ -79,27 +79,6 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                 </button>
               </div>
 
-              {/* NUEVO BLOQUE: SUB-PLANTILLA PARA LOTES (GLOBAL) */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 shadow-inner mb-8">
-                <div className="mb-4">
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2"><Mail size={16} className="text-orange-500"/> Estructura Base para Lotes (Sub-Plantilla)</h4>
-                  <p className="text-[10px] text-slate-500 font-bold mt-1">Definí cómo se verá cada insumo cuando selecciones varios a la vez. Este bloque se repetirá por cada material y reemplazará a las etiquetas {'{ocs}'} o {'{solpeds}'}.</p>
-                </div>
-                <div className="flex gap-1.5 flex-wrap mb-2">
-                   <span className="text-[8px] font-mono bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded cursor-help">{"{codigo}"}</span>
-                   <span className="text-[8px] font-mono bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded cursor-help">{"{nombre}"}</span>
-                   <span className="text-[8px] font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded cursor-help">{"{dias}"}</span>
-                   <span className="text-[8px] font-mono bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded cursor-help" title="Inyecta el listado de fechas de SAP">{"{repartos_sap}"}</span>
-                   <span className="text-[8px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded cursor-help" title="Suma total matemática">{"{total}"}</span>
-                </div>
-                <textarea 
-                  value={localConfig.plantillaItemLote !== undefined ? localConfig.plantillaItemLote : "🔸 [{codigo}] {nombre}\n     ↳ Cobertura actual: {dias} Días\n{repartos_sap}\n     ↳ TOTAL ADEUDADO: {total} un."}
-                  onChange={(e) => setLocalConfig({...localConfig, plantillaItemLote: e.target.value})}
-                  className="w-full p-4 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-700 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-50 transition-all h-32 resize-y shadow-sm leading-relaxed" 
-                  placeholder="Armá la estructura acá..." 
-                />
-              </div>
-
               <div className="grid grid-cols-1 gap-6">
                 <AnimatePresence>
                 {getPlantillas().map((tpl, index) => (
@@ -164,6 +143,7 @@ const PanelAjustes = ({ configInicial, onClose, onGuardar, onExportar, onImporta
                                    <span className="text-[8px] font-mono bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded cursor-help" title="Listado OC demoradas">{"{ocs}"}</span>
                                    <span className="text-[8px] font-mono bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded cursor-help" title="Listado OC a futuro">{"{ocs_a_adelantar}"}</span>
                                    <span className="text-[8px] font-mono bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded cursor-help" title="Listado S/P sin OC">{"{solpeds}"}</span>
+                                   <span className="text-[8px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded cursor-help border border-emerald-200" title="Bloque completo para reclamos por OC múltiple: cabecera con OC + proveedor + responsable, y listado de insumos demorados">{"{ocs_lote_detalle}"} ★</span>
                                  </div>
                               </div>
                               <textarea value={tpl.cuerpo} onChange={(e) => { const nuevas = [...getPlantillas()]; nuevas[index].cuerpo = e.target.value; setLocalConfig({...localConfig, plantillasDinamicas: nuevas}); }} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 outline-none focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-50 transition-all h-40 resize-y shadow-inner leading-relaxed" placeholder="Escribí acá el cuerpo del mensaje..." />
