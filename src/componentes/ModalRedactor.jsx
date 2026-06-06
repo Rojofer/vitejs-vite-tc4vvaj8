@@ -154,8 +154,15 @@ const ModalRedactor = ({
     if (originalTextUpper.includes('{SOLPEDS_VIEJAS}') || originalTextUpper.includes('{SOLPEDS}')) {
       (insumo.detalleSolpeds || []).forEach(sp => matchNames.push(sp.comprador));
     } 
-    if (originalTextUpper.includes('{OCS_APROBADAS}') || originalTextUpper.includes('{OCS_TODAS_ETIQUETADAS}') || originalTextUpper.includes('{OCS_PENDIENTES}') || originalTextUpper.includes('{OCS_A_ADELANTAR}') || originalTextUpper.includes('{OCS}')) {
-      (insumo.detalleOCs || []).forEach(oc => matchNames.push(oc.comprador));
+    if (originalTextUpper.includes('{OCS_APROBADAS}') || originalTextUpper.includes('{OCS_TODAS_ETIQUETADAS}') || originalTextUpper.includes('{OCS_PENDIENTES}') || originalTextUpper.includes('{OCS_A_ADELANTAR}') || originalTextUpper.includes('{OCS}') || originalTextUpper.includes('{OCS_LOTE_DETALLE}')) {
+      if (insumo.codigo === 'MULTIPLES' && insumo._loteRef && insumo._loteRef.length > 0) {
+        // Para lotes múltiples: sacar comprador del _loteRef
+        insumo._loteRef.forEach(ins => {
+          (ins.detalleOCs || []).forEach(oc => matchNames.push(oc.comprador));
+        });
+      } else {
+        (insumo.detalleOCs || []).forEach(oc => matchNames.push(oc.comprador));
+      }
     }
 
     if (matchNames.length === 0 && insumo.owner) {
@@ -222,6 +229,7 @@ const ModalRedactor = ({
     setReclamoDraft({
       ...reclamoDraft,
       tipoPlantilla: newTemplateId,
+      tipoPlantillaNombre: templateObj.nombre || newTemplateId,
       tipoDestino: destinoEfectivo,
       asunto: asuntoConTicket,
       cuerpo: cuerpoAvanzado,
