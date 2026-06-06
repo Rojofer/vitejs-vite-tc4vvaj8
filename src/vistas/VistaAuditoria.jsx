@@ -381,13 +381,44 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
       const lista20Dias = [];
       for (let i = 19; i >= 0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0,0,0,0);
-        const totalAlertasDia = interaccionesTiempoReal.filter(r => {
-          const fRec = r.fecha?.seconds ? new Date(r.fecha.seconds * 1000) : new Date(r.fecha);
-          return fRec && !isNaN(fRec.getTime()) && new Date(fRec).setHours(0,0,0,0) === d.getTime();
+        const dMs = d.getTime();
+        const aperturasDia = ticketsTiempoReal.filter(r => {
+          const f = r.fechaInicioReal?.seconds ? new Date(r.fechaInicioReal.seconds * 1000) : (r.fechaInicioReal ? new Date(r.fechaInicioReal) : null);
+          return f && !isNaN(f.getTime()) && new Date(f).setHours(0,0,0,0) === dMs;
         }).length;
-        lista20Dias.push({ label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, cantidad: totalAlertasDia });
+        const cierresDia = ticketsTiempoReal.filter(r => {
+          if (r.estado !== 'CERRADO') return false;
+          const f = r.fechaCierre?.seconds ? new Date(r.fechaCierre.seconds * 1000) : (r.fechaCierre ? new Date(r.fechaCierre) : null);
+          return f && !isNaN(f.getTime()) && new Date(f).setHours(0,0,0,0) === dMs;
+        }).length;
+        lista20Dias.push({ label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, cantidad: aperturasDia, cierres: cierresDia });
       }
-      const maxActividadPulso = Math.max(...lista20Dias.map(d => d.cantidad), 1);
+      const maxActividadPulso = Math.max(...lista20Dias.map(d => Math.max(d.cantidad, d.cierres)), 1);
+
+      // --- TIEMPO PROMEDIO POR COMPRADOR ---
+      const tiempoPorComprador = {};
+      ticketsTiempoReal.filter(r => r.estado === 'CERRADO' && r.fechaInicioReal && r.fechaCierre).forEach(r => {
+        const comp = extraerComprador(r.cuerpoOriginal);
+        const fInicio = r.fechaInicioReal?.seconds ? r.fechaInicioReal.seconds : new Date(r.fechaInicioReal).getTime() / 1000;
+        const fFin = r.fechaCierre?.seconds ? r.fechaCierre.seconds : new Date(r.fechaCierre).getTime() / 1000;
+        const dias = Math.max(0, (fFin - fInicio) / 86400);
+        if (!tiempoPorComprador[comp]) tiempoPorComprador[comp] = { total: 0, count: 0 };
+        tiempoPorComprador[comp].total += dias;
+        tiempoPorComprador[comp].count++;
+      });
+      const listaTiempoComprador = Object.entries(tiempoPorComprador).map(([nombre, d]) => ({
+        nombre, promedio: parseFloat((d.total / d.count).toFixed(1)), count: d.count
+      })).sort((a,b) => b.promedio - a.promedio);
+
+      // --- TICKETS VENCIDOS SIN RESPUESTA (abiertos hace >7 días sin nueva interacción en los últimos 3 días) ---
+      const ahora = Date.now() / 1000;
+      const vencidosSinRespuesta = activosBacklog.filter(r => {
+        const fInicio = r.fechaInicioReal?.seconds ? r.fechaInicioReal.seconds : (r.fechaInicioReal ? new Date(r.fechaInicioReal).getTime() / 1000 : 0);
+        const fUltima = r.fecha?.seconds ? r.fecha.seconds : (r.fecha ? new Date(r.fecha).getTime() / 1000 : 0);
+        const diasAbierto = (ahora - fInicio) / 86400;
+        const diasSinMovimiento = (ahora - fUltima) / 86400;
+        return diasAbierto > 7 && diasSinMovimiento > 3;
+      });
 
       const listaInsumos = ticketsDashboard.map(t => {
           const ins = insumos.find(i => i.id === t.insumoId) || {};
@@ -410,7 +441,9 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
         tasaResolucion, abiertosEsteMes: abiertosEnElPeriodo.length, cerradosEsteMes: cerradosEnElPeriodo.length,
         leadTime, activosBacklog: activosBacklog.length, activosCriticos: activosCriticos.length, pendientesGerencia,
         efectividadPrimerContacto, listaOperarios, listaGrupos, listaCompradores, listaInsumos,
-        pulsoSemanas: lista20Dias, maxActividadPulso
+        pulsoSemanas: lista20Dias, maxActividadPulso,
+        listaTiempoComprador, vencidosSinRespuesta: vencidosSinRespuesta.length,
+        vencidosDetalle: vencidosSinRespuesta
       };
     }, [reclamos, insumos, operarioEnfoque, grupoEnfoque, compradorEnfoque, diaEnfoque, filtroMes, busquedaKpi]);
 
@@ -874,121 +907,131 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Evacuación {filtroMes !== "TODOS" ? 'del Mes' : 'Actual'}</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Clearance Rate</p>
-                    </div>
-                    <div className="p-2 bg-emerald-50 rounded-xl"><Target size={16} className="text-emerald-500"/></div>
+              {/* FILA 1: 6 KPI cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {/* Evacuación */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-3">
+                    <div><h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Evacuación</h3><p className="text-[8px] font-bold text-slate-300 mt-0.5 uppercase">Clearance Rate</p></div>
+                    <div className="p-1.5 bg-emerald-50 rounded-lg"><Target size={14} className="text-emerald-500"/></div>
                   </div>
                   <div>
-                    <div className="flex items-end gap-2 mb-2"><span className="text-3xl font-black text-slate-800 leading-none">{kpiData.tasaResolucion}%</span></div>
-                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${kpiData.tasaResolucion >= 100 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{width: `${Math.min(kpiData.tasaResolucion, 100)}%`}}></div>
-                    </div>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{kpiData.cerradosEsteMes} CERRADOS VS {kpiData.abiertosEsteMes} NUEVOS</p>
+                    <span className="text-2xl font-black text-slate-800">{kpiData.tasaResolucion}%</span>
+                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-2"><div className={`h-full ${kpiData.tasaResolucion >= 100 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{width: `${Math.min(kpiData.tasaResolucion, 100)}%`}}></div></div>
+                    <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase">{kpiData.cerradosEsteMes}↓ vs {kpiData.abiertosEsteMes}↑</p>
                   </div>
                 </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lead Time Promedio</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Apertura a Cierre</p>
-                    </div>
-                    <div className="p-2 bg-blue-50 rounded-xl"><Timer size={16} className="text-blue-500"/></div>
+                {/* Lead Time */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-3">
+                    <div><h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Lead Time</h3><p className="text-[8px] font-bold text-slate-300 mt-0.5 uppercase">Apertura a Cierre</p></div>
+                    <div className="p-1.5 bg-blue-50 rounded-lg"><Timer size={14} className="text-blue-500"/></div>
                   </div>
                   <div>
-                    <div className="flex items-baseline gap-1 mb-2"><span className="text-3xl font-black text-slate-800 leading-none">{kpiData.leadTime}</span><span className="text-sm font-bold text-slate-400 uppercase">Días</span></div>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">TIEMPO HISTÓRICO DE RESPUESTA</p>
+                    <div className="flex items-baseline gap-1"><span className="text-2xl font-black text-slate-800">{kpiData.leadTime}</span><span className="text-xs font-bold text-slate-400">días</span></div>
+                    <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase">Tiempo promedio cierre</p>
                   </div>
                 </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Eficiencia de Contacto</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Sin Hilos de Insistencia</p>
-                    </div>
-                    <div className="p-2 bg-purple-50 rounded-xl"><Zap size={16} className="text-purple-500"/></div>
+                {/* Eficiencia */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-3">
+                    <div><h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">1er Contacto</h3><p className="text-[8px] font-bold text-slate-300 mt-0.5 uppercase">Sin reenvíos</p></div>
+                    <div className="p-1.5 bg-purple-50 rounded-lg"><Zap size={14} className="text-purple-500"/></div>
                   </div>
                   <div>
-                    <div className="flex items-end gap-2 mb-2"><span className="text-3xl font-black text-slate-800 leading-none">{kpiData.efectividadPrimerContacto}%</span></div>
-                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-purple-500" style={{width: `${kpiData.efectividadPrimerContacto}%`}}></div>
-                    </div>
-                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest">RESUELTOS CON 1 SOLO AVISO</p>
+                    <span className="text-2xl font-black text-slate-800">{kpiData.efectividadPrimerContacto}%</span>
+                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-2"><div className="h-full bg-purple-400" style={{width: `${kpiData.efectividadPrimerContacto}%`}}></div></div>
+                    <p className="text-[8px] font-bold text-slate-400 mt-1.5 uppercase">Resueltos con 1 aviso</p>
                   </div>
                 </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Backlog Activo</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Tickets en Planta Hoy</p>
-                    </div>
-                    <div className="p-2 bg-rose-50 rounded-xl"><AlertCircle size={16} className="text-rose-500"/></div>
+                {/* Backlog */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-3">
+                    <div><h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Backlog</h3><p className="text-[8px] font-bold text-slate-300 mt-0.5 uppercase">Tickets activos</p></div>
+                    <div className="p-1.5 bg-rose-50 rounded-lg"><AlertCircle size={14} className="text-rose-500"/></div>
                   </div>
                   <div>
-                    <div className="flex items-end gap-2 mb-2"><span className="text-3xl font-black text-slate-800 leading-none">{kpiData.activosBacklog}</span></div>
-                    <p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${kpiData.activosCriticos > 0 ? 'text-rose-500' : 'text-slate-400'}`}>{kpiData.activosCriticos > 0 ? `⚠️ ${kpiData.activosCriticos} CON DEMORA CRÍTICA (>7 DÍAS)` : '0 TICKETS VENCIDOS'}</p>
+                    <span className="text-2xl font-black text-slate-800">{kpiData.activosBacklog}</span>
+                    <p className={`text-[8px] font-black mt-1.5 uppercase ${kpiData.activosCriticos > 0 ? 'text-rose-500' : 'text-slate-400'}`}>{kpiData.activosCriticos > 0 ? `⚠️ ${kpiData.activosCriticos} críticos >7d` : 'Sin críticos'}</p>
                   </div>
                 </div>
-
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Firmas Gerencia</h3>
-                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">O/C por Autorizar</p>
-                    </div>
-                    <div className="p-2 bg-indigo-50 rounded-xl"><CheckSquare size={16} className="text-indigo-500"/></div>
+                {/* Vencidos sin respuesta — NUEVO */}
+                <div className={`p-4 rounded-2xl border shadow-sm flex flex-col justify-between ${kpiData.vencidosSinRespuesta > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
+                  <div className="flex justify-between items-start mb-3">
+                    <div><h3 className={`text-[9px] font-black uppercase tracking-widest ${kpiData.vencidosSinRespuesta > 0 ? 'text-amber-600' : 'text-slate-400'}`}>Vencidos</h3><p className={`text-[8px] font-bold mt-0.5 uppercase ${kpiData.vencidosSinRespuesta > 0 ? 'text-amber-500' : 'text-slate-300'}`}>Sin movimiento &gt;3d</p></div>
+                    <div className={`p-1.5 rounded-lg ${kpiData.vencidosSinRespuesta > 0 ? 'bg-amber-100' : 'bg-slate-50'}`}><AlertCircle size={14} className={kpiData.vencidosSinRespuesta > 0 ? 'text-amber-500' : 'text-slate-300'}/></div>
                   </div>
                   <div>
-                    <div className="flex items-end gap-2 mb-2"><span className="text-3xl font-black text-slate-800 leading-none">{kpiData.pendientesGerencia}</span></div>
-                    <p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${kpiData.pendientesGerencia > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
-                      {kpiData.pendientesGerencia > 0 ? 'TICKETS ESPERANDO FIRMA' : 'TODO AL DÍA'}
-                    </p>
+                    <span className={`text-2xl font-black ${kpiData.vencidosSinRespuesta > 0 ? 'text-amber-700' : 'text-slate-400'}`}>{kpiData.vencidosSinRespuesta}</span>
+                    <p className={`text-[8px] font-bold mt-1.5 uppercase ${kpiData.vencidosSinRespuesta > 0 ? 'text-amber-500' : 'text-slate-400'}`}>{kpiData.vencidosSinRespuesta > 0 ? 'Requieren seguimiento' : 'Todo al día'}</p>
+                  </div>
+                </div>
+                {/* Firmas Gerencia */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-3">
+                    <div><h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Gerencia</h3><p className="text-[8px] font-bold text-slate-300 mt-0.5 uppercase">Por autorizar</p></div>
+                    <div className="p-1.5 bg-indigo-50 rounded-lg"><CheckSquare size={14} className="text-indigo-500"/></div>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-black text-slate-800">{kpiData.pendientesGerencia}</span>
+                    <p className={`text-[8px] font-black mt-1.5 uppercase ${kpiData.pendientesGerencia > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>{kpiData.pendientesGerencia > 0 ? 'Esperando firma' : 'Todo al día'}</p>
                   </div>
                 </div>
               </div>
 
-              {/* GRILLAS Y TABLAS INFERIORES... */}
+              {/* PULSO DE ACTIVIDAD — 2 BARRAS: APERTURA vs CIERRE */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm w-full">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
                   <div className="flex items-center gap-2">
                     <History size={20} className="text-slate-800"/>
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Pulso de Actividad Reciente <span className="text-sky-600 font-bold ml-2 text-xs">{filtrosActivosText && `(Filtros: ${filtrosActivosText})`}</span></h3>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Volumen en los últimos 20 días (Clickeá una barra para aislar la actividad de ese día)</p>
+                      <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Pulso de Actividad — Últimos 20 días <span className="text-sky-600 font-bold ml-2 text-xs">{filtrosActivosText && `(${filtrosActivosText})`}</span></h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Clickeá una columna para filtrar ese día</p>
                     </div>
                   </div>
-                  {(operarioEnfoque || grupoEnfoque || compradorEnfoque || diaEnfoque) && (
-                    <button onClick={() => { setOperarioEnfoque(null); setGrupoEnfoque(null); setCompradorEnfoque(null); setDiaEnfoque(null); }} className="text-[9px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors">Limpiar Filtros</button>
-                  )}
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-indigo-400"></div><span className="text-[9px] font-black uppercase text-slate-400">Apertura</span></div>
+                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-400"></div><span className="text-[9px] font-black uppercase text-slate-400">Cierre</span></div>
+                    {(operarioEnfoque || grupoEnfoque || compradorEnfoque || diaEnfoque) && (
+                      <button onClick={() => { setOperarioEnfoque(null); setGrupoEnfoque(null); setCompradorEnfoque(null); setDiaEnfoque(null); }} className="text-[9px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors">Limpiar</button>
+                    )}
+                  </div>
                 </div>
                 
-                <div className="flex items-end gap-2 sm:gap-4 h-48 pt-6 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent w-full border-b border-slate-100 px-2 pb-2">
+                <div className="flex items-end gap-1 sm:gap-2 h-52 pt-6 overflow-x-auto w-full border-b border-slate-100 px-1 pb-2">
                   {kpiData.pulsoSemanas.map((dia, idx) => {
-                    const pctAltura = Math.max(8, Math.round((dia.cantidad / kpiData.maxActividadPulso) * 100));
+                    const pctApertura = Math.max(0, Math.round((dia.cantidad / kpiData.maxActividadPulso) * 100));
+                    const pctCierre   = Math.max(0, Math.round((dia.cierres   / kpiData.maxActividadPulso) * 100));
+                    const isSelected  = diaEnfoque === dia.label;
                     return (
-                      <div 
-                        key={idx} 
-                        onClick={() => setDiaEnfoque(diaEnfoque === dia.label ? null : dia.label)}
-                        className={`flex-1 min-w-[40px] max-w-[60px] flex flex-col items-center group relative h-full justify-end shrink-0 cursor-pointer transition-all ${diaEnfoque === dia.label ? 'bg-sky-50 ring-1 ring-sky-200 rounded-lg' : 'hover:bg-slate-50'}`}
+                      <div
+                        key={idx}
+                        onClick={() => setDiaEnfoque(isSelected ? null : dia.label)}
+                        className={`flex-1 min-w-[32px] max-w-[52px] flex flex-col items-center group relative h-full justify-end shrink-0 cursor-pointer transition-all rounded-lg pb-1 ${isSelected ? 'bg-sky-50 ring-1 ring-sky-200' : 'hover:bg-slate-50'}`}
                       >
-                        <div className="absolute -top-3 opacity-0 group-hover:opacity-100 bg-slate-900 text-white font-black text-[9px] px-1.5 py-0.5 rounded transition-all shadow-md z-30 pointer-events-none">{dia.cantidad}</div>
-                        <span className={`text-[10px] font-black mb-1 leading-none ${diaEnfoque === dia.label ? 'text-sky-700' : 'text-slate-700'}`}>{dia.cantidad}</span>
-                        <div style={{ height: `${pctAltura}%` }} className={`w-full rounded-t-lg transition-all duration-300 shadow-xs ${dia.cantidad > 0 ? (diaEnfoque === dia.label ? 'bg-sky-500' : 'bg-gradient-to-t from-indigo-500 to-indigo-400 group-hover:from-indigo-600') : 'bg-slate-100'}`}></div>
-                        <span className={`text-[8px] font-black uppercase mt-2 tracking-tighter whitespace-nowrap ${diaEnfoque === dia.label ? 'text-sky-600' : 'text-slate-400'}`}>{dia.label}</span>
+                        {/* Tooltip */}
+                        <div className="absolute top-0 opacity-0 group-hover:opacity-100 bg-slate-900 text-white font-black text-[8px] px-2 py-1 rounded-lg transition-all shadow-lg z-30 pointer-events-none whitespace-nowrap">
+                          ↑ {dia.cantidad} &nbsp; ↓ {dia.cierres}
+                        </div>
+                        {/* Barras lado a lado */}
+                        <div className="flex items-end gap-0.5 w-full px-0.5 h-[80%]">
+                          <div
+                            style={{ height: pctApertura > 0 ? `${pctApertura}%` : '4px' }}
+                            className={`flex-1 rounded-t transition-all duration-300 ${dia.cantidad > 0 ? (isSelected ? 'bg-sky-500' : 'bg-indigo-400 group-hover:bg-indigo-500') : 'bg-slate-100'}`}
+                          ></div>
+                          <div
+                            style={{ height: pctCierre > 0 ? `${pctCierre}%` : '4px' }}
+                            className={`flex-1 rounded-t transition-all duration-300 ${dia.cierres > 0 ? (isSelected ? 'bg-emerald-500' : 'bg-emerald-400 group-hover:bg-emerald-500') : 'bg-slate-100'}`}
+                          ></div>
+                        </div>
+                        <span className={`text-[7px] font-black uppercase mt-1 tracking-tighter whitespace-nowrap ${isSelected ? 'text-sky-600' : 'text-slate-400'}`}>{dia.label}</span>
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                   <div className="flex items-center gap-2 mb-6">
@@ -1093,6 +1136,39 @@ const VistaAuditoria = ({ insumos, reclamos, config, currentUser, formatearFecha
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+                </div>
+                {/* TIEMPO PROMEDIO POR COMPRADOR — NUEVO */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Timer size={20} className="text-slate-800"/>
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Tiempo por Comprador</h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Días promedio apertura → cierre</p>
+                    </div>
+                  </div>
+                  {kpiData.listaTiempoComprador.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 text-xs font-bold uppercase tracking-widest">Sin tickets cerrados</div>
+                  ) : (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 flex-1">
+                      {kpiData.listaTiempoComprador.map((comp, idx) => {
+                        const maxDias = kpiData.listaTiempoComprador[0].promedio;
+                        const pct = Math.round((comp.promedio / maxDias) * 100);
+                        const color = comp.promedio <= 3 ? 'bg-emerald-400' : comp.promedio <= 7 ? 'bg-amber-400' : 'bg-rose-400';
+                        const textColor = comp.promedio <= 3 ? 'text-emerald-700' : comp.promedio <= 7 ? 'text-amber-700' : 'text-rose-600';
+                        return (
+                          <div key={comp.nombre} className="flex items-center gap-3">
+                            <div className="w-[110px] shrink-0 text-[9px] font-black text-slate-600 uppercase truncate">{comp.nombre}</div>
+                            <div className="flex-1">
+                              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full transition-all ${color}`} style={{width: `${pct}%`}}></div>
+                              </div>
+                            </div>
+                            <span className={`text-[10px] font-black w-14 text-right shrink-0 ${textColor}`}>{comp.promedio}d <span className="text-slate-300 font-bold">({comp.count})</span></span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
